@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { KanbanBoard } from '@/features/kanban/components/KanbanBoard';
+import { IssueModal } from '@/features/kanban/components/IssueModal';
 import type { Issue } from '@/types';
 
 export function KanbanPage() {
@@ -32,22 +33,12 @@ export function KanbanPage() {
         onIssueClick={handleIssueClick}
         onAddClick={handleAddClick}
       />
-      {/* IssueModal will be added in prompt 10 */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="rounded-xl bg-white p-6 shadow-xl">
-            <p className="text-sm text-gray-600">
-              {selectedIssue ? `Editing: ${selectedIssue.title}` : 'Creating new issue'}
-            </p>
-            <button
-              onClick={handleModalClose}
-              className="mt-4 rounded-md bg-gray-100 px-4 py-2 text-sm text-gray-700 hover:bg-gray-200"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+      <IssueModal
+        issue={selectedIssue}
+        isOpen={isModalOpen}
+        projectId={projectId}
+        onClose={handleModalClose}
+      />
     </div>
   );
 }
