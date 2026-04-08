@@ -34,13 +34,18 @@ export function WikiEditor({ page, onSave, isSaving, canEdit }: Props) {
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Title bar */}
       <div className="flex items-center gap-3 border-b border-gray-200 px-6 py-3">
-        <input
-          disabled={!canEdit}
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Page title"
-          className="flex-1 text-xl font-bold text-gray-900 bg-transparent border-none outline-none placeholder:text-gray-300 disabled:text-gray-500"
-        />
+        <div className="flex flex-1 flex-col">
+          <input
+            disabled={!canEdit}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Page title"
+            className="text-xl font-bold text-gray-900 bg-transparent border-none outline-none placeholder:text-gray-300 disabled:text-gray-500"
+          />
+          <span className="text-xs text-gray-400 mt-0.5">
+            Last updated: {new Date(page.updatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </span>
+        </div>
         {canEdit && (
           <button
             onClick={handleSave}

@@ -37,18 +37,23 @@ export function KanbanBoard({ projectId, onIssueClick, onAddClick }: Props) {
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
       <div className="flex gap-4 overflow-x-auto pb-4">
-        {STATUSES.map((status) => (
-          <KanbanColumn
-            key={status}
-            status={status}
-            issues={groupByStatus(status)}
-            onIssueClick={onIssueClick}
-            onAddClick={onAddClick}
-            canAdd={canAdd}
-            canDrag={canDrag}
-            isLoading={isLoading}
-          />
-        ))}
+        {STATUSES.map((status) => {
+          const columnIssues = groupByStatus(status);
+          const totalPoints  = columnIssues.reduce((sum, i) => sum + i.storyPoints, 0);
+          return (
+            <KanbanColumn
+              key={status}
+              status={status}
+              issues={columnIssues}
+              totalPoints={totalPoints}
+              onIssueClick={onIssueClick}
+              onAddClick={onAddClick}
+              canAdd={canAdd}
+              canDrag={canDrag}
+              isLoading={isLoading}
+            />
+          );
+        })}
       </div>
     </DragDropContext>
   );

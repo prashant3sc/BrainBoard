@@ -16,7 +16,10 @@ export function useCreateWikiPage() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (dto: CreateWikiPageDto) => wikiApi.create(dto),
-    onSuccess: (_data, dto) => qc.invalidateQueries({ queryKey: ['wiki', dto.projectId] }),
+    onSuccess: (_data, dto) => {
+      qc.invalidateQueries({ queryKey: ['wiki', dto.projectId] });
+      // TODO: toast({ title: 'Page created' })
+    },
   });
 }
 

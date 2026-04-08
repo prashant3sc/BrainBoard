@@ -15,6 +15,10 @@ export function useCreateProject() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (dto: CreateProjectDto) => projectsApi.create(dto),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
+    onSuccess: (project) => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      // TODO: toast({ title: `Project "${project.name}" created` })
+      void project;
+    },
   });
 }

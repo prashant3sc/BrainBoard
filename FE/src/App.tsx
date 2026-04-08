@@ -1,6 +1,8 @@
 import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+// TODO: uncomment after `npx shadcn@latest add toast`
+// import { Toaster } from '@/components/ui/toaster';
 
 import ProtectedRoute from '@/components/layout/ProtectedRoute';
 import AppShell from '@/components/layout/AppShell';
@@ -16,6 +18,7 @@ const queryClient = new QueryClient();
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      {/* <Toaster /> */}
       <BrowserRouter>
         <Suspense fallback={<div className="flex h-screen items-center justify-center text-sm text-gray-400">Loading…</div>}>
           <Routes>
