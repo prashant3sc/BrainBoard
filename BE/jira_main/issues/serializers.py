@@ -39,8 +39,8 @@ class IssueSerializer(serializers.ModelSerializer):
 
 
 class IssueCreateSerializer(serializers.ModelSerializer):
-    assigneeId = serializers.IntegerField(required=False, allow_null=True, write_only=True)
-    projectId = serializers.IntegerField(write_only=True)
+    assigneeId = serializers.UUIDField(required=False, allow_null=True, write_only=True)
+    projectId = serializers.UUIDField(write_only=True)
     storyPoints = serializers.IntegerField(
         required=False, allow_null=True, write_only=True, source="story_points"
     )
@@ -86,7 +86,7 @@ class IssueCreateSerializer(serializers.ModelSerializer):
 
 
 class IssueUpdateSerializer(serializers.ModelSerializer):
-    assigneeId = serializers.IntegerField(required=False, allow_null=True, write_only=True)
+    assigneeId = serializers.UUIDField(required=False, allow_null=True, write_only=True)
     storyPoints = serializers.IntegerField(
         required=False, allow_null=True, write_only=True, source="story_points"
     )

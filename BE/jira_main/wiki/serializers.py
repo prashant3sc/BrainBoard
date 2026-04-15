@@ -24,8 +24,8 @@ class WikiPageSerializer(serializers.ModelSerializer):
 
 
 class WikiPageCreateSerializer(serializers.ModelSerializer):
-    parentId = serializers.IntegerField(required=False, allow_null=True, write_only=True)
-    projectId = serializers.IntegerField(write_only=True)
+    parentId = serializers.UUIDField(required=False, allow_null=True, write_only=True)
+    projectId = serializers.UUIDField(write_only=True)
 
     class Meta:
         model = WikiPage
@@ -69,7 +69,7 @@ class WikiPageCreateSerializer(serializers.ModelSerializer):
 
 
 class WikiPageUpdateSerializer(serializers.ModelSerializer):
-    parentId = serializers.IntegerField(required=False, allow_null=True, write_only=True)
+    parentId = serializers.UUIDField(required=False, allow_null=True, write_only=True)
 
     class Meta:
         model = WikiPage
