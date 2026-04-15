@@ -1,3 +1,5 @@
+import uuid
+
 from django.conf import settings
 from django.db import models
 
@@ -8,6 +10,7 @@ from projects.models import Project
 class WikiSpace(models.Model):
     """Top-level namespace within a project (Spaces → Pages → Sub-pages)."""
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, default="")
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="wiki_spaces")
@@ -29,6 +32,7 @@ class WikiSpace(models.Model):
 class WikiPage(models.Model):
     """A wiki page with optional parent for hierarchy."""
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=500)
     content = models.TextField(blank=True, default="")
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="wiki_pages")
@@ -72,6 +76,7 @@ class WikiPage(models.Model):
 class WikiPageVersion(models.Model):
     """Immutable snapshot of a wiki page at a point in time (version history)."""
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     page = models.ForeignKey(WikiPage, on_delete=models.CASCADE, related_name="versions")
     title = models.CharField(max_length=500)
     content = models.TextField()
@@ -96,6 +101,7 @@ class WikiPageVersion(models.Model):
 class TicketPageLink(models.Model):
     """Cross-link between an Issue (ticket) and a WikiPage."""
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     issue = models.ForeignKey(Issue, on_delete=models.CASCADE, related_name="wiki_links")
     wiki_page = models.ForeignKey(WikiPage, on_delete=models.CASCADE, related_name="issue_links")
     linked_by = models.ForeignKey(
