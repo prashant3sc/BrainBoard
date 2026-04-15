@@ -1,35 +1,47 @@
+from django.db.models import Q
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from projects.models import Project, Sprint
+from issues.models import Issue
+from issues.serializers import IssueSerializer
+from projects.models import Project, ProjectMember, Sprint
 from projects.serializers import (
     ProjectCreateSerializer,
+    ProjectMemberSerializer,
     ProjectSerializer,
     ProjectUpdateSerializer,
     SprintSerializer,
 )
+from users.permissions import IsAdminOrPM
 
 
 class ProjectListView(APIView):
-    """
-    GET  /projects — list all non-archived projects
-    POST /projects — create project (admin, pm only)
-    """
+    """GET /projects — list projects the requesting user is associated with (admin sees all)."""
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        projects = Project.objects.filter(is_archived=False)
+        if request.user.is_org_admin:
+            projects = Project.objects.filter(is_archived=False)
+        else:
+            member_project_ids = ProjectMember.objects.filter(
+                user=request.user
+            ).values_list("project_id", flat=True)
+            projects = Project.objects.filter(is_archived=False).filter(
+                Q(owner=request.user) | Q(id__in=member_project_ids)
+            )
         return Response(ProjectSerializer(projects, many=True).data)
 
+
+class ProjectCreateView(APIView):
+    """POST /projects/create — create a new project (admin, pm only)."""
+
+    permission_classes = [IsAdminOrPM]
+
     def post(self, request):
-        if not request.user.can_manage_projects:
-            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
-        serializer = ProjectCreateSerializer(
-            data=request.data, context={"request": request}
-        )
+        serializer = ProjectCreateSerializer(data=request.data, context={"request": request})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         project = serializer.save()
@@ -38,12 +50,12 @@ class ProjectListView(APIView):
 
 class ProjectDetailView(APIView):
     """
-    GET    /projects/:id — retrieve
-    PATCH  /projects/:id — update metadata (admin, pm)
-    DELETE /projects/:id — delete (admin, pm)
+    GET    /projects/:id — retrieve project details (admin, pm only)
+    PATCH  /projects/:id — update name/description (admin, pm only)
+    DELETE /projects/:id — delete project (admin, pm only)
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminOrPM]
 
     def _get_project(self, pk):
         try:
@@ -61,8 +73,6 @@ class ProjectDetailView(APIView):
         project = self._get_project(pk)
         if not project:
             return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
-        if not request.user.can_manage_projects:
-            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
         serializer = ProjectUpdateSerializer(project, data=request.data, partial=True)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -73,16 +83,85 @@ class ProjectDetailView(APIView):
         project = self._get_project(pk)
         if not project:
             return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
-        if not request.user.can_manage_projects:
-            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
         project.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class ProjectMemberListView(APIView):
+    """GET /projects/:id/members — list all members of a project."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, project_id):
+        try:
+            project = Project.objects.get(pk=project_id)
+        except Project.DoesNotExist:
+            return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        members = ProjectMember.objects.filter(project=project).select_related("user")
+        return Response(ProjectMemberSerializer(members, many=True).data)
+
+
+class ProjectMemberAddView(APIView):
+    """POST /projects/:id/members — add a user to a project (admin, pm only)."""
+
+    permission_classes = [IsAdminOrPM]
+
+    def post(self, request, project_id):
+        try:
+            project = Project.objects.get(pk=project_id)
+        except Project.DoesNotExist:
+            return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        serializer = ProjectMemberSerializer(data=request.data, context={"project": project})
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        member = serializer.save()
+        return Response(ProjectMemberSerializer(member).data, status=status.HTTP_201_CREATED)
+
+
+class ProjectMemberDeleteView(APIView):
+    """DELETE /projects/:id/members/:user_id — remove a user from a project (admin, pm only)."""
+
+    permission_classes = [IsAdminOrPM]
+
+    def delete(self, request, project_id, user_id):
+        try:
+            project = Project.objects.get(pk=project_id)
+        except Project.DoesNotExist:
+            return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            member = ProjectMember.objects.get(project=project, user_id=user_id)
+        except ProjectMember.DoesNotExist:
+            return Response({"detail": "Member not found"}, status=status.HTTP_404_NOT_FOUND)
+        member.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ActiveSprintView(APIView):
+    """GET /projects/:id/active-sprint — returns active sprint + its tickets, or 404 if none."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, project_id):
+        try:
+            project = Project.objects.get(pk=project_id)
+        except Project.DoesNotExist:
+            return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            sprint = Sprint.objects.get(project=project, status=Sprint.ACTIVE)
+        except Sprint.DoesNotExist:
+            return Response({"detail": "No active sprint"}, status=status.HTTP_404_NOT_FOUND)
+
+        issues = Issue.objects.filter(sprint=sprint).select_related("assignee", "reporter")
+        return Response({
+            "sprint": SprintSerializer(sprint).data,
+            "issues": IssueSerializer(issues, many=True).data,
+        })
+
+
 class SprintListView(APIView):
     """
-    GET  /projects/:projectId/sprints
-    POST /projects/:projectId/sprints (admin, pm)
+    GET  /projects/:id/sprints — list all sprints (planned, active, completed) for right panel
+    POST /projects/:id/sprints — create a sprint in planned state (admin, pm only)
     """
 
     permission_classes = [IsAuthenticated]
@@ -106,7 +185,7 @@ class SprintListView(APIView):
         project = self._get_project(project_id)
         if not project:
             return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
-        data = {**request.data, "project": project.pk}
+        data = {**request.data, "project": str(project.pk)}
         serializer = SprintSerializer(data=data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -115,11 +194,9 @@ class SprintListView(APIView):
 
 
 class SprintDetailView(APIView):
-    """
-    PATCH /sprints/:id — update sprint (status transitions, dates)
-    """
+    """PATCH /sprints/:id — start (planned→active) or end (active→completed) a sprint."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminOrPM]
 
     def _get_sprint(self, pk):
         try:
@@ -131,8 +208,21 @@ class SprintDetailView(APIView):
         sprint = self._get_sprint(pk)
         if not sprint:
             return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
-        if not request.user.can_plan_sprints:
-            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
+
+        new_status = request.data.get("status")
+
+        # Enforce: only one active sprint per project at a time
+        if new_status == Sprint.ACTIVE:
+            if Sprint.objects.filter(project=sprint.project, status=Sprint.ACTIVE).exists():
+                return Response(
+                    {"detail": "A sprint is already active for this project. End it before starting a new one."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # On sprint completion: move all unfinished tickets to backlog
+        if new_status == Sprint.COMPLETED and sprint.status == Sprint.ACTIVE:
+            Issue.objects.filter(sprint=sprint).exclude(status=Issue.DONE).update(sprint=None)
+
         serializer = SprintSerializer(sprint, data=request.data, partial=True)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

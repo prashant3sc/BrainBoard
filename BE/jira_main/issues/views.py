@@ -42,12 +42,6 @@ class IssueListView(APIView):
         serializer = IssueCreateSerializer(data=request.data, context={"request": request})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        # Validate the project exists
-        project_id = request.data.get("projectId")
-        if not Project.objects.filter(pk=project_id).exists():
-            return Response({"detail": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
-
         issue = serializer.save()
         return Response(IssueSerializer(issue).data, status=status.HTTP_201_CREATED)
 
