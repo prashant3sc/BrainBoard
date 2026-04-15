@@ -12,6 +12,7 @@ class LabelSerializer(serializers.ModelSerializer):
 class IssueSerializer(serializers.ModelSerializer):
     assigneeId = serializers.PrimaryKeyRelatedField(source="assignee", read_only=True)
     projectId = serializers.PrimaryKeyRelatedField(source="project", read_only=True)
+    sprintId = serializers.PrimaryKeyRelatedField(source="sprint", read_only=True)
     labelIds = serializers.PrimaryKeyRelatedField(source="labels", many=True, read_only=True)
 
     class Meta:
@@ -25,6 +26,7 @@ class IssueSerializer(serializers.ModelSerializer):
             "story_points",
             "assigneeId",
             "projectId",
+            "sprintId",
             "labelIds",
             "created_at",
             "updated_at",
@@ -50,7 +52,6 @@ class IssueCreateSerializer(serializers.ModelSerializer):
         fields = [
             "title",
             "description",
-            "status",
             "priority",
             "storyPoints",
             "assigneeId",
@@ -58,7 +59,7 @@ class IssueCreateSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
-        from projects.models import Project
+        from projects.models import Project, Sprint
         from users.models import User
 
         project_id = validated_data.pop("projectId", None)
@@ -70,6 +71,14 @@ class IssueCreateSerializer(serializers.ModelSerializer):
         except Project.DoesNotExist:
             raise serializers.ValidationError({"projectId": "Project not found"})
 
+        # Option A: block ticket creation if no active sprint exists
+        try:
+            active_sprint = Sprint.objects.get(project=project, status=Sprint.ACTIVE)
+        except Sprint.DoesNotExist:
+            raise serializers.ValidationError(
+                {"detail": "No active sprint. Start a sprint before creating tickets."}
+            )
+
         assignee = None
         if assignee_id:
             try:
@@ -79,6 +88,8 @@ class IssueCreateSerializer(serializers.ModelSerializer):
 
         return Issue.objects.create(
             project=project,
+            sprint=active_sprint,
+            status=Issue.TODO,
             assignee=assignee,
             reporter=request.user if request else None,
             **validated_data,
@@ -87,23 +98,41 @@ class IssueCreateSerializer(serializers.ModelSerializer):
 
 class IssueUpdateSerializer(serializers.ModelSerializer):
     assigneeId = serializers.UUIDField(required=False, allow_null=True, write_only=True)
+    sprintId = serializers.UUIDField(required=False, allow_null=True, write_only=True)
     storyPoints = serializers.IntegerField(
         required=False, allow_null=True, write_only=True, source="story_points"
     )
 
     class Meta:
         model = Issue
-        fields = ["title", "description", "status", "priority", "storyPoints", "assigneeId"]
+        fields = ["title", "description", "status", "priority", "storyPoints", "assigneeId", "sprintId"]
 
     def update(self, instance, validated_data):
+        from projects.models import Sprint
         from users.models import User
 
-        assignee_id = validated_data.pop("assigneeId", None)
-        if assignee_id is not None:
-            try:
-                instance.assignee = User.objects.get(pk=assignee_id)
-            except User.DoesNotExist:
+        # Handle assignee change — distinguish "not sent" from "sent as null"
+        if "assigneeId" in validated_data:
+            assignee_id = validated_data.pop("assigneeId")
+            if assignee_id is None:
                 instance.assignee = None
+            else:
+                try:
+                    instance.assignee = User.objects.get(pk=assignee_id)
+                except User.DoesNotExist:
+                    pass
+
+        # Handle sprint change — null means move to backlog
+        if "sprintId" in validated_data:
+            sprint_id = validated_data.pop("sprintId")
+            if sprint_id is None:
+                instance.sprint = None  # remove from sprint → backlog
+            else:
+                try:
+                    instance.sprint = Sprint.objects.get(pk=sprint_id)
+                except Sprint.DoesNotExist:
+                    pass
+
         for attr, val in validated_data.items():
             setattr(instance, attr, val)
         instance.save()

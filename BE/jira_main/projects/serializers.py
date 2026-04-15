@@ -41,25 +41,38 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
 
 
 class ProjectUpdateSerializer(serializers.ModelSerializer):
-    ownerId = serializers.UUIDField(write_only=True, required=False)
+    """Admin/PM: update project name and description only."""
 
     class Meta:
         model = Project
-        fields = ["name", "description", "ownerId"]
+        fields = ["name", "description"]
 
-    def update(self, instance, validated_data):
+
+class ProjectMemberSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    userId = serializers.UUIDField(write_only=True)
+
+    class Meta:
+        model = ProjectMember
+        fields = ["id", "user", "userId", "joined_at"]
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        rep["joinedAt"] = rep.pop("joined_at")
+        return rep
+
+    def create(self, validated_data):
         from users.models import User
 
-        owner_id = validated_data.pop("ownerId", None)
-        if owner_id is not None:
-            try:
-                instance.owner = User.objects.get(pk=owner_id)
-            except User.DoesNotExist:
-                pass
-        for attr, val in validated_data.items():
-            setattr(instance, attr, val)
-        instance.save()
-        return instance
+        user_id = validated_data.pop("userId")
+        project = self.context["project"]
+        try:
+            user = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            raise serializers.ValidationError({"userId": "User not found"})
+        if ProjectMember.objects.filter(project=project, user=user).exists():
+            raise serializers.ValidationError({"userId": "User is already a member of this project"})
+        return ProjectMember.objects.create(project=project, user=user)
 
 
 class SprintSerializer(serializers.ModelSerializer):
@@ -75,3 +88,10 @@ class SprintSerializer(serializers.ModelSerializer):
             "project",
             "created_at",
         ]
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        rep["startDate"] = rep.pop("start_date")
+        rep["endDate"] = rep.pop("end_date")
+        rep["createdAt"] = rep.pop("created_at")
+        return rep
