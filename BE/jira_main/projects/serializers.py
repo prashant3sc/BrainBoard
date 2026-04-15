@@ -18,7 +18,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 
 class ProjectCreateSerializer(serializers.ModelSerializer):
-    ownerId = serializers.IntegerField(write_only=True, required=False)
+    ownerId = serializers.UUIDField(write_only=True, required=False)
 
     class Meta:
         model = Project
@@ -41,7 +41,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
 
 
 class ProjectUpdateSerializer(serializers.ModelSerializer):
-    ownerId = serializers.IntegerField(write_only=True, required=False)
+    ownerId = serializers.UUIDField(write_only=True, required=False)
 
     class Meta:
         model = Project

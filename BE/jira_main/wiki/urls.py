@@ -9,9 +9,9 @@ from wiki.views import (
 )
 
 urlpatterns = [
-    path("projects/<int:project_id>/wiki", ProjectWikiListView.as_view(), name="project-wiki-list"),
+    path("projects/<uuid:project_id>/wiki", ProjectWikiListView.as_view(), name="project-wiki-list"),
     path("wiki", WikiPageListView.as_view(), name="wiki-list"),
-    path("wiki/<int:pk>", WikiPageDetailView.as_view(), name="wiki-detail"),
-    path("wiki/<int:pk>/history", WikiPageHistoryView.as_view(), name="wiki-history"),
-    path("wiki/<int:pk>/link-ticket", TicketPageLinkView.as_view(), name="wiki-link-ticket"),
+    path("wiki/<uuid:pk>", WikiPageDetailView.as_view(), name="wiki-detail"),
+    path("wiki/<uuid:pk>/history", WikiPageHistoryView.as_view(), name="wiki-history"),
+    path("wiki/<uuid:pk>/link-ticket", TicketPageLinkView.as_view(), name="wiki-link-ticket"),
 ]
