@@ -3,6 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from issues.filters import IssueFilter
 from issues.models import Issue, Label
 from issues.serializers import (
     IssueCreateSerializer,
@@ -15,7 +16,16 @@ from projects.models import Project
 
 class ProjectIssueListView(APIView):
     """
-    GET  /projects/:projectId/issues — list issues for a project
+    GET /projects/:projectId/issues — list issues for a project.
+
+    Filters:
+      ?status=todo|in_progress|review|done
+      ?priority=critical|high|medium|low
+      ?assignee_id=<uuid>
+      ?sprint_id=<uuid>
+      ?backlog=true             (sprint is null)
+      ?label_id=<uuid>
+      ?search=text
     """
 
     permission_classes = [IsAuthenticated]
@@ -25,8 +35,11 @@ class ProjectIssueListView(APIView):
             project = Project.objects.get(pk=project_id)
         except Project.DoesNotExist:
             return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
-        issues = Issue.objects.filter(project=project).select_related("assignee", "reporter")
-        return Response(IssueSerializer(issues, many=True).data)
+        queryset = Issue.objects.filter(project=project).select_related("assignee", "reporter")
+        filterset = IssueFilter(request.query_params, queryset=queryset)
+        if filterset.is_valid():
+            queryset = filterset.qs
+        return Response(IssueSerializer(queryset, many=True).data)
 
 
 class IssueListView(APIView):
