@@ -5,12 +5,13 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from users.models import User
+from users.permissions import IsOrgAdmin
 from users.serializers import (
     LoginSerializer,
+    PasswordChangeSerializer,
     UserCreateSerializer,
-    UserListSerializer,
+    UserRoleUpdateSerializer,
     UserSerializer,
-    UserUpdateSerializer,
 )
 
 
@@ -35,22 +36,52 @@ class LoginView(APIView):
         )
 
 
-class UserListView(APIView):
+class LogoutView(APIView):
+    """POST /auth/logout — client-side logout confirmation."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        # Token invalidation is handled client-side (delete the token).
+        # 8-hour expiry enforces hard session limit server-side.
+        return Response({"detail": "Logged out successfully"}, status=status.HTTP_200_OK)
+
+
+class UserProfileView(APIView):
     """
-    GET  /users — list all users
-    POST /users — create a user (admin only)
+    GET   /auth/me — view own profile
+    PATCH /auth/me — change own password only
     """
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        return Response(UserSerializer(request.user).data)
+
+    def patch(self, request):
+        serializer = PasswordChangeSerializer(data=request.data, context={"request": request})
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.save()
+        return Response({"detail": "Password updated successfully"}, status=status.HTTP_200_OK)
+
+
+class UserListView(APIView):
+    """GET /users — list all users (all authenticated roles)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
         users = User.objects.all().order_by("first_name", "last_name")
-        serializer = UserListSerializer(users, many=True)
-        return Response(serializer.data)
+        return Response(UserSerializer(users, many=True).data)
+
+
+class UserCreateView(APIView):
+    """POST /users/create — create a user (admin only)."""
+
+    permission_classes = [IsOrgAdmin]
 
     def post(self, request):
-        if not request.user.is_org_admin:
-            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
         serializer = UserCreateSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -60,11 +91,11 @@ class UserListView(APIView):
 
 class UserDetailView(APIView):
     """
-    GET   /users/:id — retrieve user
-    PATCH /users/:id — update (admin for role; self for profile)
+    GET   /users/:id — retrieve user (admin only)
+    PATCH /users/:id — update role (admin only)
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsOrgAdmin]
 
     def _get_user(self, pk):
         try:
@@ -82,17 +113,7 @@ class UserDetailView(APIView):
         user = self._get_user(pk)
         if not user:
             return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        if "role" in request.data and not request.user.is_org_admin:
-            return Response(
-                {"detail": "Only admins can change roles"},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        if not request.user.is_org_admin and request.user.pk != user.pk:
-            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
-
-        serializer = UserUpdateSerializer(user, data=request.data, partial=True)
+        serializer = UserRoleUpdateSerializer(user, data=request.data, partial=True)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         serializer.save()
