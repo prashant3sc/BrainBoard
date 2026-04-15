@@ -1,3 +1,5 @@
+import uuid
+
 from django.conf import settings
 from django.db import models
 
@@ -5,6 +7,7 @@ from projects.models import Project, Sprint
 
 
 class Label(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
     color = models.CharField(max_length=7, default="#2DD836DA")  # hex color
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="labels")
@@ -18,6 +21,8 @@ class Label(models.Model):
 
 
 class Issue(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
     # Status choices — maps to frontend IssueStatus type
     TODO = "todo"
     IN_PROGRESS = "in_progress"

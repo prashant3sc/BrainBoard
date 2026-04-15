@@ -1,8 +1,11 @@
+import uuid
+
 from django.conf import settings
 from django.db import models
 
 
 class Project(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, default="")
     owner = models.ForeignKey(
@@ -26,6 +29,7 @@ class Project(models.Model):
 class ProjectMember(models.Model):
     """Tracks which users are members of a project (beyond global role)."""
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="members")
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -43,6 +47,8 @@ class ProjectMember(models.Model):
 
 
 class Sprint(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
     PLANNED = "planned"
     ACTIVE = "active"
     COMPLETED = "completed"
