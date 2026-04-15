@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 
 from issues.models import Issue
 from issues.serializers import IssueSerializer
+from projects.filters import ProjectFilter, SprintFilter
 from projects.models import Project, ProjectMember, Sprint
 from projects.serializers import (
     ProjectCreateSerializer,
@@ -18,21 +19,30 @@ from users.permissions import IsAdminOrPM
 
 
 class ProjectListView(APIView):
-    """GET /projects — list projects the requesting user is associated with (admin sees all)."""
+    """
+    GET /projects — list projects the requesting user is associated with (admin sees all).
+
+    Filters:
+      ?is_archived=true|false
+      ?search=name_or_description
+    """
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         if request.user.is_org_admin:
-            projects = Project.objects.filter(is_archived=False)
+            queryset = Project.objects.filter(is_archived=False)
         else:
             member_project_ids = ProjectMember.objects.filter(
                 user=request.user
             ).values_list("project_id", flat=True)
-            projects = Project.objects.filter(is_archived=False).filter(
+            queryset = Project.objects.filter(is_archived=False).filter(
                 Q(owner=request.user) | Q(id__in=member_project_ids)
             )
-        return Response(ProjectSerializer(projects, many=True).data)
+        filterset = ProjectFilter(request.query_params, queryset=queryset)
+        if filterset.is_valid():
+            queryset = filterset.qs
+        return Response(ProjectSerializer(queryset, many=True).data)
 
 
 class ProjectCreateView(APIView):
@@ -176,8 +186,11 @@ class SprintListView(APIView):
         project = self._get_project(project_id)
         if not project:
             return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
-        sprints = Sprint.objects.filter(project=project)
-        return Response(SprintSerializer(sprints, many=True).data)
+        queryset = Sprint.objects.filter(project=project)
+        filterset = SprintFilter(request.query_params, queryset=queryset)
+        if filterset.is_valid():
+            queryset = filterset.qs
+        return Response(SprintSerializer(queryset, many=True).data)
 
     def post(self, request, project_id):
         if not request.user.can_plan_sprints:

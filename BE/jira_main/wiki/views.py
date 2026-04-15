@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from projects.models import Project
+from wiki.filters import WikiPageFilter
 from wiki.models import TicketPageLink, WikiPage, WikiPageVersion
 from wiki.serializers import (
     TicketPageLinkSerializer,
@@ -16,7 +17,13 @@ from wiki.serializers import (
 
 class ProjectWikiListView(APIView):
     """
-    GET /projects/:projectId/wiki — flat list of all wiki pages for a project
+    GET /projects/:projectId/wiki — list wiki pages for a project.
+
+    Filters:
+      ?space_id=<uuid>      filter by wiki space
+      ?parent_id=<uuid>     filter by parent page (direct children)
+      ?root_only=true       only top-level pages (parent=null)
+      ?search=text          title/content search
     """
 
     permission_classes = [IsAuthenticated]
@@ -26,8 +33,11 @@ class ProjectWikiListView(APIView):
             project = Project.objects.get(pk=project_id)
         except Project.DoesNotExist:
             return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
-        pages = WikiPage.objects.filter(project=project)
-        return Response(WikiPageSerializer(pages, many=True).data)
+        queryset = WikiPage.objects.filter(project=project)
+        filterset = WikiPageFilter(request.query_params, queryset=queryset)
+        if filterset.is_valid():
+            queryset = filterset.qs
+        return Response(WikiPageSerializer(queryset, many=True).data)
 
 
 class WikiPageListView(APIView):

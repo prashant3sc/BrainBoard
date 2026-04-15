@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from users.models import User
+from users.filters import UserFilter
 from users.permissions import IsOrgAdmin
 from users.serializers import (
     LoginSerializer,
@@ -67,13 +68,23 @@ class UserProfileView(APIView):
 
 
 class UserListView(APIView):
-    """GET /users — list all users (all authenticated roles)."""
+    """
+    GET /users — list all users (all authenticated roles).
+
+    Filters:
+      ?role=admin|pm|developer|viewer
+      ?email=partial
+      ?search=name_or_email
+    """
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        users = User.objects.all().order_by("first_name", "last_name")
-        return Response(UserSerializer(users, many=True).data)
+        queryset = User.objects.all().order_by("first_name", "last_name")
+        filterset = UserFilter(request.query_params, queryset=queryset)
+        if filterset.is_valid():
+            queryset = filterset.qs
+        return Response(UserSerializer(queryset, many=True).data)
 
 
 class UserCreateView(APIView):
