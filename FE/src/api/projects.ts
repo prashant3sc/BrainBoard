@@ -34,7 +34,7 @@ export const projectsApi = {
       };
       return Promise.resolve(data);
     }
-    return apiClient.post<Project>('/projects', dto).then((r) => r.data);
+    return apiClient.post<Project>('/projects/create', dto).then((r) => r.data);
   },
 
   // Apply a partial update to an existing project

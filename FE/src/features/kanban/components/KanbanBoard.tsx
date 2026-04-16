@@ -5,7 +5,7 @@ import { useIssues, useUpdateIssue } from '../useKanban';
 import { useRBAC } from '@/hooks/useRBAC';
 import { KanbanColumn } from './KanbanColumn';
 
-const STATUSES: IssueStatus[] = ['todo', 'in_progress', 'done'];
+const STATUSES: IssueStatus[] = ['todo', 'in_progress', 'review', 'done'];
 
 interface Props {
   projectId: string;

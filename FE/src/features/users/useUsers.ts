@@ -1,0 +1,40 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { usersApi } from '@/api/users';
+import type { User, Role } from '@/types';
+
+export function useUsers() {
+  return useQuery({
+    queryKey: ['users'],
+    queryFn: () => usersApi.getAll(),
+  });
+}
+
+interface UpdateRoleVars { id: string; role: Role }
+
+export function useUpdateUserRole() {
+  const queryClient = useQueryClient();
+
+  return useMutation<User, Error, UpdateRoleVars>({
+    mutationFn: ({ id, role }) => usersApi.updateRole(id, role),
+
+    onMutate: async ({ id, role }) => {
+      await queryClient.cancelQueries({ queryKey: ['users'] });
+      const previous = queryClient.getQueryData<User[]>(['users']);
+      queryClient.setQueryData<User[]>(['users'], (old = []) =>
+        old.map((u) => (u.id === id ? { ...u, role } : u)),
+      );
+      return { previous };
+    },
+
+    onError: (_err, _vars, context) => {
+      const ctx = context as { previous?: User[] } | undefined;
+      if (ctx?.previous) {
+        queryClient.setQueryData(['users'], ctx.previous);
+      }
+    },
+
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+}
