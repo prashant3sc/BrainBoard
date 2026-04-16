@@ -14,6 +14,10 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Zustand persists {user, token} to localStorage via the 'auth-store' key.
+    // After the 8-hour access-token expiry the user remains "logged in" locally
+    // until the next API call returns 401.  We rely on this interceptor to clear
+    // the stale token and redirect — no proactive /auth/me polling is needed.
     if (error.response?.status === 401) {
       localStorage.removeItem('auth_token');
       window.location.href = '/login';

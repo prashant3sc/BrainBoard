@@ -20,5 +20,6 @@ export const PRIORITY_COLORS: Record<Priority, string> = {
 export const STATUS_LABELS: Record<IssueStatus, string> = {
   todo:        'To Do',
   in_progress: 'In Progress',
+  review:      'Review',
   done:        'Done',
 };

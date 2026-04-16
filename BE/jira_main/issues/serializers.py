@@ -71,13 +71,11 @@ class IssueCreateSerializer(serializers.ModelSerializer):
         except Project.DoesNotExist:
             raise serializers.ValidationError({"projectId": "Project not found"})
 
-        # Option A: block ticket creation if no active sprint exists
+        # If an active sprint exists assign it; otherwise create the issue in the backlog
         try:
             active_sprint = Sprint.objects.get(project=project, status=Sprint.ACTIVE)
         except Sprint.DoesNotExist:
-            raise serializers.ValidationError(
-                {"detail": "No active sprint. Start a sprint before creating tickets."}
-            )
+            active_sprint = None
 
         assignee = None
         if assignee_id:
