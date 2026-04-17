@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Kanban tiles row 1 -->
+  <rect x="1"  y="7"  width="8" height="8" rx="2"   fill="#E75026"/>
+  <rect x="11" y="7"  width="8" height="8" rx="2"   fill="#E75026"/>
+  <rect x="21" y="7"  width="5" height="8" rx="1.5" fill="#E75026" opacity="0.35"/>
+  <!-- Kanban tiles row 2 -->
+  <rect x="1"  y="17" width="8" height="5" rx="1.5" fill="#E75026" opacity="0.5"/>
+  <rect x="11" y="17" width="8" height="5" rx="1.5" fill="#E75026" opacity="0.35"/>
+  <rect x="21" y="17" width="5" height="5" rx="1.5" fill="#E75026" opacity="0.6"/>
+  <!-- Connector line -->
+  <line x1="24" y1="7" x2="27" y2="4" stroke="#E75026" stroke-width="1.2" opacity="0.5"/>
+  <!-- Neural node — fully inside viewBox -->
+  <circle cx="28" cy="3.5" r="3.5" fill="#E75026"/>
+  <circle cx="28" cy="3.5" r="2"   fill="white"/>
+  <circle cx="28" cy="3.5" r="1"   fill="#E75026"/>
+</svg>

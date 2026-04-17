@@ -1,89 +1,290 @@
 import { NavLink, useParams } from 'react-router-dom';
 import useAuthStore from '@/store/useAuthStore';
+import useAppStore from '@/store/useAppStore';
 import { useRBAC } from '@/hooks/useRBAC';
 
-const ROLE_BADGE: Record<string, string> = {
-  admin:     'bg-red-100 text-red-700',
-  pm:        'bg-blue-100 text-blue-700',
-  developer: 'bg-green-100 text-green-700',
-  viewer:    'bg-gray-100 text-gray-600',
-};
+/* ── Logo (matches the browser tab favicon) ── */
+function BBLogo() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true">
+      {/* Kanban tiles row 1 */}
+      <rect x="1"  y="7"  width="8" height="8" rx="2"   fill="#E75026"/>
+      <rect x="11" y="7"  width="8" height="8" rx="2"   fill="#E75026"/>
+      <rect x="21" y="7"  width="5" height="8" rx="1.5" fill="#E75026" opacity="0.35"/>
+      {/* Kanban tiles row 2 */}
+      <rect x="1"  y="17" width="8" height="5" rx="1.5" fill="#E75026" opacity="0.5"/>
+      <rect x="11" y="17" width="8" height="5" rx="1.5" fill="#E75026" opacity="0.35"/>
+      <rect x="21" y="17" width="5" height="5" rx="1.5" fill="#E75026" opacity="0.6"/>
+      {/* Connector line */}
+      <line x1="24" y1="7" x2="27" y2="4" stroke="#E75026" strokeWidth="1.2" opacity="0.5"/>
+      {/* Neural node */}
+      <circle cx="28" cy="3.5" r="3.5" fill="#E75026"/>
+      <circle cx="28" cy="3.5" r="2"   fill="white"/>
+      <circle cx="28" cy="3.5" r="1"   fill="#E75026"/>
+    </svg>
+  );
+}
 
-const linkBase =
-  'block rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors';
-const linkActive =
-  'block rounded-md px-3 py-2 text-sm font-medium bg-indigo-50 text-indigo-700 font-semibold';
+/* ── Nav Icons ── */
+function DashboardIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" width="16" height="16" aria-hidden="true">
+      <rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor" />
+      <rect x="9" y="1" width="6" height="6" rx="1.5" fill="currentColor" />
+      <rect x="1" y="9" width="6" height="6" rx="1.5" fill="currentColor" />
+      <rect x="9" y="9" width="6" height="6" rx="1.5" fill="currentColor" />
+    </svg>
+  );
+}
+
+function KanbanIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" width="16" height="16" aria-hidden="true">
+      <rect x="1" y="1" width="4" height="14" rx="1" fill="currentColor" opacity="0.6" />
+      <rect x="7" y="4" width="4" height="11" rx="1" fill="currentColor" opacity="0.6" />
+      <rect x="13" y="7" width="2" height="8" rx="1" fill="currentColor" opacity="0.6" />
+    </svg>
+  );
+}
+
+function WikiIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" width="16" height="16" aria-hidden="true">
+      <path d="M2 3h12M2 7h8M2 11h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.6" />
+    </svg>
+  );
+}
+
+function BacklogIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" width="16" height="16" aria-hidden="true">
+      <rect x="1" y="2" width="14" height="2.5" rx="1" fill="currentColor" opacity="0.6" />
+      <rect x="1" y="6.75" width="14" height="2.5" rx="1" fill="currentColor" opacity="0.6" />
+      <rect x="1" y="11.5" width="10" height="2.5" rx="1" fill="currentColor" opacity="0.6" />
+    </svg>
+  );
+}
+
+function UsersIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" width="16" height="16" aria-hidden="true">
+      <circle cx="8" cy="5" r="3" fill="currentColor" />
+      <path d="M2 14c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function AnalyticsIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" width="16" height="16" aria-hidden="true">
+      <path d="M2 12L6 7l3 3 2.5-4L14 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  );
+}
+
+function getInitials(name: string) {
+  return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+}
 
 export default function Sidebar() {
   const user   = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const { can } = useRBAC();
   const { projectId } = useParams();
+  const { theme, toggleTheme } = useAppStore();
 
-  const kanbanHref = projectId
-    ? `/projects/${projectId}/kanban`
-    : '/dashboard';
-  const wikiHref = projectId
-    ? `/projects/${projectId}/wiki`
-    : '/dashboard';
+  const backlogHref = projectId ? `/projects/${projectId}/backlog` : null;
+  const kanbanHref  = projectId ? `/projects/${projectId}/kanban`  : null;
+  const wikiHref    = projectId ? `/projects/${projectId}/wiki`    : null;
 
   return (
-    <aside className="flex h-full w-60 flex-col border-r border-gray-200 bg-white">
-      {/* Logo */}
-      <div className="flex items-center gap-2 px-4 py-5 border-b border-gray-100">
-        <span className="text-lg font-bold text-indigo-600">Jira 2.0</span>
+    <aside
+      className="flex h-full flex-col"
+      style={{
+        width: 232,
+        minWidth: 232,
+        background: 'var(--bb-sidebar-bg)',
+        borderRight: '1px solid var(--bb-sidebar-border)',
+      }}
+    >
+      {/* ── Logo ── */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '20px 20px 16px',
+        borderBottom: '1px solid var(--bb-sidebar-border)',
+      }}>
+        <BBLogo />
+        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--bb-sidebar-logo-text)', letterSpacing: '-0.3px' }}>
+          BrainBoard
+        </span>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      {/* ── Navigation ── */}
+      <nav style={{ flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+
+        {/* Workspace section */}
+        <span style={{
+          fontSize: 10, fontWeight: 600, letterSpacing: '0.08em',
+          color: 'var(--bb-nav-label)', textTransform: 'uppercase', padding: '8px 10px 4px',
+        }}>
+          Workspace
+        </span>
+
         <NavLink
           to="/dashboard"
-          className={({ isActive }) => (isActive ? linkActive : linkBase)}
+          className={({ isActive }) => isActive ? 'bb-nav-item bb-nav-active' : 'bb-nav-item'}
         >
+          <span className="bb-nav-icon"><DashboardIcon /></span>
           Dashboard
         </NavLink>
 
-        <NavLink
-          to={kanbanHref}
-          className={({ isActive }) => (isActive ? linkActive : linkBase)}
-        >
-          Kanban
-        </NavLink>
+        {backlogHref ? (
+          <NavLink
+            to={backlogHref}
+            className={({ isActive }) => isActive ? 'bb-nav-item bb-nav-active' : 'bb-nav-item'}
+          >
+            <span className="bb-nav-icon"><BacklogIcon /></span>
+            Backlog
+          </NavLink>
+        ) : (
+          <div className="bb-nav-item bb-nav-disabled bb-tooltip-host">
+            <span className="bb-nav-icon"><BacklogIcon /></span>
+            Backlog
+            <span className="bb-tooltip">Open a project first</span>
+          </div>
+        )}
 
-        <NavLink
-          to={wikiHref}
-          className={({ isActive }) => (isActive ? linkActive : linkBase)}
-        >
-          Wiki
-        </NavLink>
+        {kanbanHref ? (
+          <NavLink
+            to={kanbanHref}
+            className={({ isActive }) => isActive ? 'bb-nav-item bb-nav-active' : 'bb-nav-item'}
+          >
+            <span className="bb-nav-icon"><KanbanIcon /></span>
+            Kanban
+          </NavLink>
+        ) : (
+          <div className="bb-nav-item bb-nav-disabled bb-tooltip-host">
+            <span className="bb-nav-icon"><KanbanIcon /></span>
+            Kanban
+            <span className="bb-tooltip">Open a project first</span>
+          </div>
+        )}
+
+        {wikiHref ? (
+          <NavLink
+            to={wikiHref}
+            className={({ isActive }) => isActive ? 'bb-nav-item bb-nav-active' : 'bb-nav-item'}
+          >
+            <span className="bb-nav-icon"><WikiIcon /></span>
+            Wiki
+          </NavLink>
+        ) : (
+          <div className="bb-nav-item bb-nav-disabled bb-tooltip-host">
+            <span className="bb-nav-icon"><WikiIcon /></span>
+            Wiki
+            <span className="bb-tooltip">Open a project first</span>
+          </div>
+        )}
 
         {can('manageUsers') && (
           <NavLink
             to="/users"
-            className={({ isActive }) => (isActive ? linkActive : linkBase)}
+            className={({ isActive }) => isActive ? 'bb-nav-item bb-nav-active' : 'bb-nav-item'}
           >
+            <span className="bb-nav-icon"><UsersIcon /></span>
             Users
           </NavLink>
         )}
+
+        {/* Reports section */}
+        <span style={{
+          fontSize: 10, fontWeight: 600, letterSpacing: '0.08em',
+          color: 'var(--bb-nav-label)', textTransform: 'uppercase', padding: '8px 10px 4px', marginTop: 8,
+        }}>
+          Reports
+        </span>
+
+        <div className="bb-nav-item">
+          <span className="bb-nav-icon"><AnalyticsIcon /></span>
+          Analytics
+          <span style={{
+            marginLeft: 'auto',
+            background: 'var(--bb-nav-badge-bg)',
+            color: 'var(--bb-nav-badge-color)',
+            fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 10,
+          }}>
+            New
+          </span>
+        </div>
       </nav>
 
-      {/* User info + logout */}
+      {/* ── Footer ── */}
       {user && (
-        <div className="border-t border-gray-100 px-4 py-4 space-y-3">
-          <div>
-            <p className="text-sm font-medium text-gray-800 truncate">{user.name}</p>
-            <span
-              className={`mt-1 inline-block rounded px-2 py-0.5 text-xs font-medium capitalize ${ROLE_BADGE[user.role] ?? ROLE_BADGE.viewer}`}
+        <div style={{ borderTop: '1px solid var(--bb-footer-border)', padding: '14px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+
+            {/* Avatar */}
+            <div style={{
+              width: 30, height: 30, borderRadius: '50%',
+              background: 'var(--bb-avatar-bg)',
+              border: '1.5px solid var(--bb-avatar-border)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 11, fontWeight: 600, color: 'var(--bb-avatar-color)', flexShrink: 0,
+            }}>
+              {getInitials(user.name)}
+            </div>
+
+            {/* User info */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                fontSize: 13, fontWeight: 500, color: 'var(--bb-user-name)',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {user.name}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--bb-user-role)', textTransform: 'capitalize' }}>
+                {user.role}
+              </div>
+            </div>
+
+            {/* Theme toggle */}
+            <button
+              onClick={toggleTheme}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="bb-sidebar-btn"
+              style={{ padding: '4px 6px' }}
             >
-              {user.role}
-            </span>
+              {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+            </button>
+
+            {/* Logout */}
+            <button
+              onClick={logout}
+              className="bb-sidebar-btn"
+              style={{ padding: '4px 8px', fontSize: 11 }}
+            >
+              Out
+            </button>
           </div>
-          <button
-            onClick={logout}
-            className="w-full rounded-md border border-gray-200 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-          >
-            Log out
-          </button>
         </div>
       )}
     </aside>

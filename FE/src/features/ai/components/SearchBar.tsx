@@ -42,20 +42,20 @@ export function SearchBar() {
       onClick={() => handleOpenChange(false)}
     >
       <div
-        className="w-full max-w-lg overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl"
+        className="w-full max-w-lg overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-[#30363D] dark:bg-[#161B22]"
         onClick={(e) => e.stopPropagation()}
       >
         <Command shouldFilter={false} className="flex flex-col">
-          <div className="flex items-center border-b border-gray-100 px-3">
-            <span className="mr-2 text-gray-400">⌕</span>
+          <div className="flex items-center border-b border-gray-100 px-3 dark:border-[#21262D]">
+            <span className="mr-2 text-gray-400 dark:text-[#6E7681]">⌕</span>
             <Command.Input
               value={query}
               onValueChange={setQuery}
               placeholder="Search issues and wiki pages…"
-              className="flex-1 bg-transparent py-3 text-sm text-gray-900 placeholder:text-gray-400 outline-none"
+              className="flex-1 bg-transparent py-3 text-sm text-gray-900 placeholder:text-gray-400 outline-none dark:text-[#E6EDF3] dark:placeholder:text-[#6E7681]"
               autoFocus
             />
-            <kbd className="hidden rounded border border-gray-200 px-1.5 py-0.5 text-xs text-gray-400 sm:block">
+            <kbd className="hidden rounded border border-gray-200 px-1.5 py-0.5 text-xs text-gray-400 sm:block dark:border-[#30363D] dark:text-[#6E7681]">
               esc
             </kbd>
           </div>
