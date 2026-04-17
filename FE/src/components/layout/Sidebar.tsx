@@ -74,6 +74,18 @@ function UsersIcon() {
   );
 }
 
+function SettingsIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" width="16" height="16" aria-hidden="true">
+      <circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.4" opacity="0.7" />
+      <path
+        d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M3.4 12.6l.7-.7M11.9 4.1l.7-.7"
+        stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" opacity="0.6"
+      />
+    </svg>
+  );
+}
+
 function AnalyticsIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" width="16" height="16" aria-hidden="true">
@@ -110,9 +122,10 @@ export default function Sidebar() {
   const { projectId } = useParams();
   const { theme, toggleTheme } = useAppStore();
 
-  const backlogHref = projectId ? `/projects/${projectId}/backlog` : null;
-  const kanbanHref  = projectId ? `/projects/${projectId}/kanban`  : null;
-  const wikiHref    = projectId ? `/projects/${projectId}/wiki`    : null;
+  const backlogHref   = projectId ? `/projects/${projectId}/backlog`   : null;
+  const kanbanHref    = projectId ? `/projects/${projectId}/kanban`    : null;
+  const wikiHref      = projectId ? `/projects/${projectId}/wiki`      : null;
+  const settingsHref  = projectId ? `/projects/${projectId}/settings`  : null;
 
   return (
     <aside
@@ -213,6 +226,24 @@ export default function Sidebar() {
             <span className="bb-nav-icon"><UsersIcon /></span>
             Users
           </NavLink>
+        )}
+
+        {can('manageProjectMembers') && (
+          settingsHref ? (
+            <NavLink
+              to={settingsHref}
+              className={({ isActive }) => isActive ? 'bb-nav-item bb-nav-active' : 'bb-nav-item'}
+            >
+              <span className="bb-nav-icon"><SettingsIcon /></span>
+              Settings
+            </NavLink>
+          ) : (
+            <div className="bb-nav-item bb-nav-disabled bb-tooltip-host">
+              <span className="bb-nav-icon"><SettingsIcon /></span>
+              Settings
+              <span className="bb-tooltip">Open a project first</span>
+            </div>
+          )
         )}
 
         {/* Reports section */}

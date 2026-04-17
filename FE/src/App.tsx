@@ -17,12 +17,13 @@ function ThemeSync() {
   return null;
 }
 
-const LoginPage          = React.lazy(() => import('@/pages/LoginPage'));
-const DashboardPage      = React.lazy(() => import('@/pages/DashboardPage'));
-const BacklogPage        = React.lazy(() => import('@/pages/BacklogPage'));
-const KanbanPage         = React.lazy(() => import('@/pages/KanbanPage'));
-const WikiPage           = React.lazy(() => import('@/pages/WikiPage'));
-const UserManagementPage = React.lazy(() => import('@/pages/UserManagementPage'));
+const LoginPage             = React.lazy(() => import('@/pages/LoginPage'));
+const DashboardPage         = React.lazy(() => import('@/pages/DashboardPage'));
+const BacklogPage           = React.lazy(() => import('@/pages/BacklogPage'));
+const KanbanPage            = React.lazy(() => import('@/pages/KanbanPage'));
+const WikiPage              = React.lazy(() => import('@/pages/WikiPage'));
+const UserManagementPage    = React.lazy(() => import('@/pages/UserManagementPage'));
+const ProjectSettingsPage   = React.lazy(() => import('@/pages/ProjectSettingsPage'));
 
 const queryClient = new QueryClient();
 
@@ -91,6 +92,17 @@ export default function App() {
                 <ProtectedRoute permission="manageUsers">
                   <AppShell>
                     <UserManagementPage />
+                  </AppShell>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/projects/:projectId/settings"
+              element={
+                <ProtectedRoute permission="manageProjectMembers">
+                  <AppShell>
+                    <ProjectSettingsPage />
                   </AppShell>
                 </ProtectedRoute>
               }

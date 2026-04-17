@@ -11,14 +11,44 @@ export function useProjects() {
   });
 }
 
+export function useProject(projectId: string) {
+  return useQuery({
+    queryKey: ['projects', projectId],
+    queryFn: () => projectsApi.getById(projectId),
+    enabled: !!projectId,
+  });
+}
+
 export function useCreateProject() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (dto: CreateProjectDto) => projectsApi.create(dto),
-    onSuccess: (project) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-      // TODO: toast({ title: `Project "${project.name}" created` })
-      void project;
+    },
+  });
+}
+
+export function useAddMember() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ projectId, userId }: { projectId: string; userId: string }) =>
+      projectsApi.addMember(projectId, userId),
+    onSuccess: (_data, { projectId }) => {
+      queryClient.invalidateQueries({ queryKey: ['projects', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+  });
+}
+
+export function useRemoveMember() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ projectId, userId }: { projectId: string; userId: string }) =>
+      projectsApi.removeMember(projectId, userId),
+    onSuccess: (_data, { projectId }) => {
+      queryClient.invalidateQueries({ queryKey: ['projects', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
     },
   });
 }

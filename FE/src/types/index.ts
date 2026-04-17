@@ -21,6 +21,7 @@ export interface Project {
   name: string;
   description: string;
   ownerId: string;
+  memberIds: string[];   // workspace user-ids assigned to this project
   createdAt: string;
 }
 

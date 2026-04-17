@@ -2,24 +2,32 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProjects } from '@/features/projects/useProjects';
 import { ProjectCard } from '@/features/projects/components/ProjectCard';
+import { AiPulse } from '@/features/projects/components/AiPulse';
 import { CreateProjectModal } from '@/features/projects/components/CreateProjectModal';
 import { useRBAC } from '@/hooks/useRBAC';
 import useAppStore from '@/store/useAppStore';
 import type { Project } from '@/types';
 
 type Filter = 'All' | 'Active' | 'In progress' | 'Archived';
-const FILTERS: Filter[] = ['All', 'Active', 'In progress', 'Archived'];
+const FILTERS: Filter[] = ['All', 'Active', 'Archived'];
 
 export function DashboardPage() {
   const { data: projects, isLoading, isError } = useProjects();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<Filter>('All');
+  const [pulseState, setPulseState] = useState<{ project: Project; index: number } | null>(null);
   const { can } = useRBAC();
   const { togglePalette } = useAppStore();
   const navigate = useNavigate();
 
   function handleProjectClick(project: Project) {
     navigate(`/projects/${project.id}/kanban`);
+  }
+
+  function handlePulse(project: Project, index: number) {
+    setPulseState((prev) =>
+      prev?.project.id === project.id ? null : { project, index }
+    );
   }
 
   /* All projects are considered Active — "In progress"/"Archived" show empty */
@@ -178,7 +186,14 @@ export function DashboardPage() {
         {!isLoading && !isError && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
             {displayed.map((project, i) => (
-              <ProjectCard key={project.id} project={project} onClick={handleProjectClick} index={i} />
+              <ProjectCard
+                key={project.id}
+                project={project}
+                onClick={handleProjectClick}
+                onPulse={handlePulse}
+                index={i}
+                isPulseActive={pulseState?.project.id === project.id}
+              />
             ))}
 
             {/* "Create new project" card */}
@@ -230,6 +245,15 @@ export function DashboardPage() {
               </div>
             )}
           </div>
+        )}
+
+        {/* ── AI Pulse panel ── */}
+        {pulseState && (
+          <AiPulse
+            project={pulseState.project}
+            projectIndex={pulseState.index}
+            onClose={() => setPulseState(null)}
+          />
         )}
       </div>
 
