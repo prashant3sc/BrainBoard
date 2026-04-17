@@ -3,12 +3,14 @@ import type { Project } from '@/types';
 interface Props {
   project: Project;
   onClick: (project: Project) => void;
+  onPulse: (project: Project, index: number) => void;
   index?: number;
+  isPulseActive?: boolean;
 }
 
 const ICONS = ['🖥️', '⚙️', '📦', '🚀', '🎯', '🔧', '📊', '🛠️'];
 
-export function ProjectCard({ project, onClick, index = 0 }: Props) {
+export function ProjectCard({ project, onClick, onPulse, index = 0, isPulseActive = false }: Props) {
   const date = new Date(project.createdAt).toLocaleDateString('en-IN', {
     day: 'numeric',
     month: 'short',
@@ -81,7 +83,7 @@ export function ProjectCard({ project, onClick, index = 0 }: Props) {
         {project.description || 'No description provided.'}
       </div>
 
-      {/* Meta: date + avatar */}
+      {/* Meta: date + pulse btn + avatar */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         paddingTop: 14,
@@ -90,7 +92,34 @@ export function ProjectCard({ project, onClick, index = 0 }: Props) {
         <span style={{ fontSize: 11, color: 'var(--bb-card-date)', fontFamily: 'monospace' }}>
           {date}
         </span>
-        <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* AI Pulse button */}
+          <button
+            className="bb-pulse-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPulse(project, index);
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '5px 10px', borderRadius: 6,
+              fontSize: 11, fontWeight: 600,
+              color: '#E75026',
+              background: isPulseActive ? '#FFD9CC' : '#FFF3F0',
+              border: '1px solid #FFD9CC',
+              cursor: 'pointer', fontFamily: 'inherit',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#FFD9CC')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = isPulseActive ? '#FFD9CC' : '#FFF3F0')}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <circle cx="6" cy="6" r="5" stroke="#E75026" strokeWidth="1.5" />
+              <path d="M2 6h1.5l1.5-3 2 6 1.5-3H10" stroke="#E75026" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            AI Pulse
+          </button>
+
           <div style={{
             width: 22, height: 22, borderRadius: '50%',
             border: '2px solid var(--bb-mini-avatar-border)',

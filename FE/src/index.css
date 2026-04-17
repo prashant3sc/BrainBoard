@@ -95,6 +95,19 @@
   --bb-skeleton-card-bg:      #FFFFFF;
   --bb-skeleton-stripe-bg:    #F4F5F7;
 
+  /* ── AI Pulse panel ── */
+  --bb-pulse-bg:              #FFFFFF;
+  --bb-pulse-border:          #DFE1E6;
+  --bb-pulse-inner-border:    #EBECF0;
+  --bb-pulse-tab-bg:          #FAFBFC;
+  --bb-pulse-metric-bg:       #FAFBFC;
+  --bb-pulse-title:           #172B4D;
+  --bb-pulse-text:            #42526E;
+  --bb-pulse-muted:           #6B778C;
+  --bb-pulse-health-green:    #006644;
+  --bb-pulse-health-amber:    #7A5800;
+  --bb-pulse-health-red:      #BF2600;
+
   /* ── Modal ── */
   --bb-modal-bg:              #FFFFFF;
   --bb-modal-border:          #E4E7EB;
@@ -198,6 +211,19 @@
   /* ── Skeleton ── */
   --bb-skeleton-card-bg:      #161B22;
   --bb-skeleton-stripe-bg:    #21262D;
+
+  /* ── AI Pulse panel ── */
+  --bb-pulse-bg:              #161B22;
+  --bb-pulse-border:          #21262D;
+  --bb-pulse-inner-border:    #30363D;
+  --bb-pulse-tab-bg:          #0D1117;
+  --bb-pulse-metric-bg:       #0D1117;
+  --bb-pulse-title:           #E6EDF3;
+  --bb-pulse-text:            #CDD9E5;
+  --bb-pulse-muted:           #8B949E;
+  --bb-pulse-health-green:    #2DC48D;
+  --bb-pulse-health-amber:    #E3AC39;
+  --bb-pulse-health-red:      #FF6B47;
 
   /* ── Modal ── */
   --bb-modal-bg:              #161B22;
@@ -414,6 +440,19 @@
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.4; }
+}
+
+/* AI Pulse loading dots */
+.bb-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #E75026;
+  animation: bb-pulse-bounce 0.8s ease-in-out infinite;
+}
+@keyframes bb-pulse-bounce {
+  0%, 80%, 100% { transform: scale(0.7); opacity: 0.5; }
+  40%           { transform: scale(1);   opacity: 1; }
 }
 
 /* ══════════════════════════════════════════════════
