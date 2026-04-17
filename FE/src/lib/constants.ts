@@ -1,13 +1,14 @@
 import type { Role, Priority, IssueStatus } from '@/types';
 
 export const PERMISSIONS: Record<string, Role[]> = {
-  createProject:  ['admin', 'pm'],
-  editIssue:      ['admin', 'pm', 'developer'],
-  deleteIssue:    ['admin', 'pm'],
-  moveIssue:      ['admin', 'pm', 'developer'],
-  manageUsers:    ['admin'],
-  createWikiPage: ['admin', 'pm', 'developer'],
-  editWikiPage:   ['admin', 'pm', 'developer'],
+  createProject:        ['admin', 'pm'],
+  editIssue:            ['admin', 'pm', 'developer'],
+  deleteIssue:          ['admin', 'pm'],
+  moveIssue:            ['admin', 'pm', 'developer'],
+  manageUsers:          ['admin'],
+  manageProjectMembers: ['admin', 'pm'],
+  createWikiPage:       ['admin', 'pm', 'developer'],
+  editWikiPage:         ['admin', 'pm', 'developer'],
 };
 
 export const PRIORITY_COLORS: Record<Priority, string> = {

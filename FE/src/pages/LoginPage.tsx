@@ -363,8 +363,8 @@ export function LoginPage() {
 
           {!USE_MOCK && (
             <>
-              <OrDivider />
-              <SSOButton />
+              {/* <OrDivider />
+              <SSOButton /> */}
             </>
           )}
         </form>

@@ -32,7 +32,8 @@ export const issuesApi = {
         id: `issue-${Date.now()}`,
         createdAt: new Date().toISOString(),
       };
-      return Promise.resolve(data);
+      mockIssues.push(data); // persist into the in-memory store
+      return Promise.resolve({ ...data });
     }
     return apiClient.post<Issue>('/issues', dto).then((r) => r.data);
   },
@@ -40,17 +41,21 @@ export const issuesApi = {
   // Apply a partial update to an existing issue
   update(id: string, dto: UpdateIssueDto): Promise<Issue> {
     if (USE_MOCK) {
-      const found = mockIssues.find((i) => i.id === id);
-      if (!found) return Promise.reject(new Error(`Issue ${id} not found`));
-      const data: Issue = { ...found, ...dto };
-      return Promise.resolve(data);
+      const index = mockIssues.findIndex((i) => i.id === id);
+      if (index === -1) return Promise.reject(new Error(`Issue ${id} not found`));
+      mockIssues[index] = { ...mockIssues[index], ...dto }; // mutate in place
+      return Promise.resolve({ ...mockIssues[index] });
     }
     return apiClient.patch<Issue>(`/issues/${id}`, dto).then((r) => r.data);
   },
 
   // Delete an issue by id
   remove(id: string): Promise<void> {
-    if (USE_MOCK) return Promise.resolve();
+    if (USE_MOCK) {
+      const index = mockIssues.findIndex((i) => i.id === id);
+      if (index !== -1) mockIssues.splice(index, 1); // remove from in-memory store
+      return Promise.resolve();
+    }
     return apiClient.delete(`/issues/${id}`).then(() => undefined);
   },
 };
