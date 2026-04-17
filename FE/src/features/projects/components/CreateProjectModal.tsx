@@ -31,45 +31,88 @@ export function CreateProjectModal({ isOpen, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-xl">
-        <h2 className="mb-4 text-base font-semibold text-gray-900">New Project</h2>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      style={{ background: 'rgba(0,0,0,0.5)' }}
+    >
+      <div
+        className="w-full max-w-md rounded-xl shadow-xl"
+        style={{
+          background: 'var(--bb-modal-bg)',
+          border: '1px solid var(--bb-modal-border)',
+          padding: 24,
+        }}
+      >
+        <h2 style={{ marginBottom: 16, fontSize: 15, fontWeight: 600, color: 'var(--bb-modal-title)' }}>
+          New Project
+        </h2>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-gray-700">Name *</label>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--bb-modal-label)' }}>
+              Name *
+            </label>
             <input
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Client Portal v3"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="bb-modal-input"
             />
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-gray-700">Description</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--bb-modal-label)' }}>
+              Description
+            </label>
             <textarea
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What is this project about?"
-              className="w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="bb-modal-input"
+              style={{ resize: 'none' }}
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-1">
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+              style={{
+                background: 'var(--bb-modal-cancel-bg)',
+                border: '1px solid var(--bb-modal-cancel-border)',
+                color: 'var(--bb-modal-cancel-color)',
+                borderRadius: 6,
+                padding: '7px 16px',
+                fontSize: 13,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                transition: 'background 0.12s',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bb-modal-cancel-hover-bg)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bb-modal-cancel-bg)')}
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isPending}
-              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              style={{
+                background: '#E75026',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: 6,
+                padding: '7px 16px',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: isPending ? 'not-allowed' : 'pointer',
+                fontFamily: 'inherit',
+                opacity: isPending ? 0.6 : 1,
+                transition: 'background 0.12s',
+              }}
+              onMouseEnter={(e) => { if (!isPending) e.currentTarget.style.background = '#C73D16'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = '#E75026'; }}
             >
               {isPending ? 'Creating…' : 'Create Project'}
             </button>

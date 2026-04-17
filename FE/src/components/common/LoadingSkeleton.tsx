@@ -9,7 +9,7 @@ export function LoadingSkeleton({ rows = 3, className = '' }: Props) {
       {Array.from({ length: rows }).map((_, i) => (
         <div
           key={i}
-          className="h-10 w-full animate-pulse rounded-md bg-gray-200"
+          className="h-10 w-full animate-pulse rounded-md bg-gray-200 dark:bg-[#21262D]"
         />
       ))}
     </div>

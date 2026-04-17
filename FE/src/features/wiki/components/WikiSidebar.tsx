@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { WikiPage } from '@/types';
 
-interface TreeNode {
-  page: WikiPage;
-  children: WikiPage[];
-}
+const SECTION_ICONS: Record<string, string> = {
+  Engineering: '🏢',
+  Design: '🎨',
+  Product: '📦',
+  Onboarding: '🤝',
+};
+
+const SECTION_ORDER = ['Engineering', 'Design', 'Product', 'Onboarding'];
 
 interface Props {
   pages: WikiPage[];
@@ -15,79 +19,134 @@ interface Props {
 }
 
 export function WikiSidebar({ pages, selectedPageId, onSelect, onCreatePage, canCreate }: Props) {
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
 
-  const topLevel = pages.filter((p) => p.parentId === null);
-  const tree: TreeNode[] = topLevel.map((page) => ({
-    page,
-    children: pages.filter((p) => p.parentId === page.id),
-  }));
+  const topLevelPages = useMemo(() => pages.filter((p) => p.parentId === null), [pages]);
 
-  function toggleExpand(id: string) {
-    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+  const sections = useMemo(() => {
+    const map: Record<string, WikiPage[]> = {};
+    for (const p of topLevelPages) {
+      const s = p.section ?? 'Other';
+      if (!map[s]) map[s] = [];
+      map[s].push(p);
+    }
+    return map;
+  }, [topLevelPages]);
+
+  const sectionKeys = useMemo(() => {
+    const ordered = SECTION_ORDER.filter((s) => sections[s]?.length > 0);
+    for (const s of Object.keys(sections)) {
+      if (!ordered.includes(s)) ordered.push(s);
+    }
+    return ordered;
+  }, [sections]);
+
+  const filteredPages = search.trim()
+    ? pages.filter((p) => p.title.toLowerCase().includes(search.toLowerCase()))
+    : null;
+
+  function toggleSection(section: string) {
+    setCollapsedSections((prev) => ({ ...prev, [section]: !prev[section] }));
   }
 
-  function handleCreateRoot() {
-    onCreatePage(null);
+  function getChildren(pageId: string) {
+    return pages.filter((p) => p.parentId === pageId);
   }
-
-  const activeCls = 'bg-indigo-50 text-indigo-700 font-medium';
-  const baseCls   = 'text-gray-700 hover:bg-gray-100';
 
   return (
-    <div className="flex h-full flex-col border-r border-gray-200 bg-white">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-        <span className="text-sm font-semibold text-gray-800">Pages</span>
+    <div className="wiki-tree">
+      <div className="wiki-tree-header">
+        <div className="wiki-tree-title">Pages</div>
+        <div className="wiki-search">
+          <span style={{ fontSize: 12, color: 'var(--bb-text-secondary)' }}>🔍</span>
+          <input
+            className="wiki-search-input"
+            placeholder="Find a page…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="wiki-tree-body">
+        {filteredPages ? (
+          /* Search results */
+          filteredPages.length > 0 ? (
+            filteredPages.map((page) => (
+              <div
+                key={page.id}
+                className={`tree-item ${selectedPageId === page.id ? 'active' : ''}`}
+                onClick={() => onSelect(page)}
+              >
+                <span className="tree-item-icon">{page.icon ?? '📄'}</span>
+                {page.title}
+              </div>
+            ))
+          ) : (
+            <p style={{ padding: '12px 8px', fontSize: 12, color: 'var(--bb-text-muted)' }}>
+              No pages found.
+            </p>
+          )
+        ) : (
+          /* Grouped by section */
+          sectionKeys.map((section) => {
+            const sectionPages = sections[section] ?? [];
+            const isOpen = !collapsedSections[section];
+            return (
+              <div className="tree-section" key={section}>
+                <div
+                  className="tree-section-header"
+                  onClick={() => toggleSection(section)}
+                >
+                  <span className={`tree-chevron ${isOpen ? 'open' : ''}`}>▶</span>
+                  {SECTION_ICONS[section] ?? '📁'} {section}
+                </div>
+                {isOpen && (
+                  <div className="tree-children">
+                    {sectionPages.map((page) => {
+                      const children = getChildren(page.id);
+                      return (
+                        <div key={page.id}>
+                          <div
+                            className={`tree-item ${selectedPageId === page.id ? 'active' : ''}`}
+                            onClick={() => onSelect(page)}
+                          >
+                            <span className="tree-item-icon">{page.icon ?? '📄'}</span>
+                            {page.title}
+                          </div>
+                          {children.length > 0 && (
+                            <div className="tree-sub">
+                              {children.map((child) => (
+                                <div
+                                  key={child.id}
+                                  className={`tree-item ${selectedPageId === child.id ? 'active' : ''}`}
+                                  onClick={() => onSelect(child)}
+                                >
+                                  {child.title}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+
         {canCreate && (
-          <button onClick={handleCreateRoot} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors">
-            + New Page
+          <button
+            className="tree-new-btn"
+            onClick={() => onCreatePage(null)}
+          >
+            <span>+</span> New page
           </button>
         )}
       </div>
-
-      <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
-        {tree.map(({ page, children }) => (
-          <div key={page.id}>
-            {/* Top-level page row */}
-            <div
-              className="group flex items-center justify-between rounded-md px-2 py-1.5 cursor-pointer"
-              onMouseEnter={() => setHoveredId(page.id)}
-              onMouseLeave={() => setHoveredId(null)}
-            >
-              <button
-                onClick={() => { onSelect(page); if (children.length) toggleExpand(page.id); }}
-                className={`flex-1 text-left text-sm truncate rounded ${selectedPageId === page.id ? activeCls : baseCls} px-1`}
-              >
-                {children.length > 0 && (
-                  <span className="mr-1 text-xs text-gray-400">{expanded[page.id] ? '▾' : '▸'}</span>
-                )}
-                {page.title}
-              </button>
-              {canCreate && hoveredId === page.id && (
-                <button
-                  onClick={() => onCreatePage(page.id)}
-                  className="ml-1 shrink-0 text-xs text-gray-400 hover:text-indigo-600 transition-colors"
-                  title="Add sub-page"
-                >
-                  + Sub
-                </button>
-              )}
-            </div>
-
-            {/* Sub-pages */}
-            {expanded[page.id] && children.map((child) => (
-              <button
-                key={child.id}
-                onClick={() => onSelect(child)}
-                className={`w-full text-left rounded-md px-2 py-1.5 pl-7 text-sm truncate ${selectedPageId === child.id ? activeCls : baseCls}`}
-              >
-                {child.title}
-              </button>
-            ))}
-          </div>
-        ))}
-      </nav>
     </div>
   );
 }

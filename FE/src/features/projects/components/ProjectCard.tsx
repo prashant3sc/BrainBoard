@@ -3,14 +3,26 @@ import type { Project } from '@/types';
 interface Props {
   project: Project;
   onClick: (project: Project) => void;
+  index?: number;
 }
 
-export function ProjectCard({ project, onClick }: Props) {
+const ICONS = ['🖥️', '⚙️', '📦', '🚀', '🎯', '🔧', '📊', '🛠️'];
+
+export function ProjectCard({ project, onClick, index = 0 }: Props) {
   const date = new Date(project.createdAt).toLocaleDateString('en-IN', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
   });
+
+  const isBlue   = index % 2 === 1;
+  const icon     = ICONS[index % ICONS.length];
+  const initials = project.name
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <div
@@ -18,11 +30,79 @@ export function ProjectCard({ project, onClick }: Props) {
       tabIndex={0}
       onClick={() => onClick(project)}
       onKeyDown={(e) => e.key === 'Enter' && onClick(project)}
-      className="cursor-pointer rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      className="bb-project-card"
+      style={{
+        background: 'var(--bb-card-bg)',
+        border: '1px solid var(--bb-card-border)',
+        borderRadius: 10,
+        padding: 20,
+        cursor: 'pointer',
+      }}
     >
-      <p className="truncate text-base font-semibold text-gray-900">{project.name}</p>
-      <p className="mt-1.5 line-clamp-2 text-sm text-gray-500">{project.description}</p>
-      <p className="mt-4 text-xs text-gray-400">Created {date}</p>
+      {/* Card header: icon + status badge */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 8,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 16,
+          background: isBlue ? 'var(--bb-card-icon-blue)' : 'var(--bb-card-icon-orange)',
+        }}>
+          {icon}
+        </div>
+        <span style={{
+          fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 4,
+          background: 'var(--bb-status-active-bg)',
+          color: 'var(--bb-status-active-color)',
+        }}>
+          Active
+        </span>
+      </div>
+
+      {/* Name */}
+      <div style={{
+        fontSize: 14.5, fontWeight: 600,
+        color: 'var(--bb-card-name)',
+        marginBottom: 6, letterSpacing: '-0.2px',
+      }}>
+        {project.name}
+      </div>
+
+      {/* Description */}
+      <div style={{
+        fontSize: 12.5,
+        color: 'var(--bb-card-desc)',
+        lineHeight: 1.55,
+        marginBottom: 16,
+        display: '-webkit-box',
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: 'vertical',
+        overflow: 'hidden',
+      }}>
+        {project.description || 'No description provided.'}
+      </div>
+
+      {/* Meta: date + avatar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        paddingTop: 14,
+        borderTop: '1px solid var(--bb-card-meta-border)',
+      }}>
+        <span style={{ fontSize: 11, color: 'var(--bb-card-date)', fontFamily: 'monospace' }}>
+          {date}
+        </span>
+        <div>
+          <div style={{
+            width: 22, height: 22, borderRadius: '50%',
+            border: '2px solid var(--bb-mini-avatar-border)',
+            fontSize: 9, fontWeight: 600,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: isBlue ? '#B3D4FF' : '#FFAB8F',
+            color: isBlue ? '#0747A6' : '#7A1F08',
+          }}>
+            {initials}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

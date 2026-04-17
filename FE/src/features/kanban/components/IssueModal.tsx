@@ -3,152 +3,308 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { issuesApi } from '@/api/issues';
 import { useRBAC } from '@/hooks/useRBAC';
 import { mockUsers } from '@/mocks/users';
-import type { Issue, IssueStatus, Priority } from '@/types';
+import type { Issue, IssueStatus, Priority, IssueType } from '@/types';
+import { KANBAN_COLUMNS } from './KanbanBoard';
 
 interface Props {
-  issue: Issue | null;
+  issue: Issue | null;          // null → create mode
   isOpen: boolean;
   projectId: string;
+  defaultStatus?: IssueStatus;  // pre-select column in create mode
   onClose: () => void;
 }
 
-const PRIORITIES: Priority[]    = ['critical', 'high', 'medium', 'low'];
-const STATUSES: IssueStatus[]   = ['todo', 'in_progress', 'done'];
-const STATUS_LABELS: Record<IssueStatus, string> = {
-  todo: 'To Do', in_progress: 'In Progress', done: 'Done',
+const PRIORITIES: Priority[]   = ['critical', 'high', 'medium', 'low'];
+const ISSUE_TYPES: IssueType[] = ['feat', 'bug', 'chore', 'design'];
+
+const TYPE_LABELS: Record<IssueType, string> = {
+  feat:   'Feature',
+  bug:    'Bug',
+  chore:  'Chore',
+  design: 'Design',
 };
 
-const inputCls = 'w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-400';
+const PRIORITY_LABELS: Record<Priority, string> = {
+  critical: 'Critical',
+  high:     'High',
+  medium:   'Medium',
+  low:      'Low',
+};
 
-export function IssueModal({ issue, isOpen, projectId, onClose }: Props) {
-  const isEditMode = issue !== null;
-  const { can }    = useRBAC();
-  const qc         = useQueryClient();
-  const canEdit    = can('editIssue');
-  const canDelete  = can('deleteIssue');
+export function IssueModal({ issue, isOpen, projectId, defaultStatus = 'todo', onClose }: Props) {
+  const isEdit  = issue !== null;
+  const { can } = useRBAC();
+  const qc      = useQueryClient();
+  const canEdit = can('editIssue');
+  const canDel  = can('deleteIssue');
 
-  const [title, setTitle]           = useState('');
-  const [description, setDesc]      = useState('');
-  const [priority, setPriority]     = useState<Priority>('medium');
-  const [status, setStatus]         = useState<IssueStatus>('todo');
-  const [storyPoints, setPoints]    = useState(3);
-  const [assigneeId, setAssigneeId] = useState<string>('');
-  const [titleError, setTitleError] = useState('');
+  const [title,      setTitle]      = useState('');
+  const [desc,       setDesc]       = useState('');
+  const [status,     setStatus]     = useState<IssueStatus>(defaultStatus);
+  const [priority,   setPriority]   = useState<Priority>('medium');
+  const [issueType,  setIssueType]  = useState<IssueType>('feat');
+  const [assigneeId, setAssigneeId] = useState('');
+  const [due,        setDue]        = useState('');
+  const [points,     setPoints]     = useState(3);
+  const [titleErr,   setTitleErr]   = useState(false);
 
+  /* Sync form when opening */
   useEffect(() => {
-    setTitle(issue?.title ?? '');
-    setDesc(issue?.description ?? '');
+    if (!isOpen) return;
+    setTitle(issue?.title       ?? '');
+    setDesc(issue?.description  ?? '');
+    setStatus(issue?.status     ?? defaultStatus);
     setPriority(issue?.priority ?? 'medium');
-    setStatus(issue?.status ?? 'todo');
-    setPoints(issue?.storyPoints ?? 3);
+    setIssueType(issue?.issueType ?? 'feat');
     setAssigneeId(issue?.assigneeId ?? '');
-    setTitleError('');
-  }, [issue]);
+    setDue(issue?.due ?? '');
+    setPoints(issue?.storyPoints ?? 3);
+    setTitleErr(false);
+  }, [issue, isOpen, defaultStatus]);
+
+  function close() { onClose(); }
 
   function invalidateAndClose() {
     qc.invalidateQueries({ queryKey: ['issues', projectId] });
-    onClose();
+    close();
   }
 
-  const createMutation = useMutation({
-    mutationFn: () => issuesApi.create({ title, description, priority, status, storyPoints, assigneeId: assigneeId || null, projectId }),
+  const createMut = useMutation({
+    mutationFn: () =>
+      issuesApi.create({
+        title,
+        description: desc,
+        priority,
+        status,
+        storyPoints: points,
+        assigneeId: assigneeId || null,
+        projectId,
+        issueType,
+        due: due || null,
+      }),
     onSuccess: invalidateAndClose,
   });
 
-  const updateMutation = useMutation({
-    mutationFn: () => issuesApi.update(issue!.id, { title, description, priority, status, storyPoints, assigneeId: assigneeId || null }),
+  const updateMut = useMutation({
+    mutationFn: () =>
+      issuesApi.update(issue!.id, {
+        title,
+        description: desc,
+        priority,
+        status,
+        storyPoints: points,
+        assigneeId: assigneeId || null,
+        issueType,
+        due: due || null,
+      }),
     onSuccess: invalidateAndClose,
   });
 
-  const deleteMutation = useMutation({
+  const deleteMut = useMutation({
     mutationFn: () => issuesApi.remove(issue!.id),
     onSuccess: invalidateAndClose,
   });
 
-  const isPending = createMutation.isPending || updateMutation.isPending;
+  const isPending = createMut.isPending || updateMut.isPending;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim()) { setTitleError('Title is required'); return; }
-    isEditMode ? updateMutation.mutate() : createMutation.mutate();
+    if (!title.trim()) { setTitleErr(true); return; }
+    isEdit ? updateMut.mutate() : createMut.mutate();
   }
 
-  function handleDelete() {
-    deleteMutation.mutate();
+  /* Overlay click → close */
+  function handleOverlay(e: React.MouseEvent<HTMLDivElement>) {
+    if (e.target === e.currentTarget) close();
   }
+
+  /* Escape key → close */
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-xl">
-        <h2 className="mb-4 text-base font-semibold text-gray-900">
-          {isEditMode ? 'Edit Issue' : 'New Issue'}
-        </h2>
+    <div className="kb-modal-overlay" onClick={handleOverlay}>
+      <div className="kb-modal bb-modal-animate">
 
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-700">Title *</label>
-            <input disabled={!canEdit} value={title} onChange={(e) => { setTitle(e.target.value); setTitleError(''); }} className={inputCls} placeholder="Issue title" />
-            {titleError && <p className="mt-1 text-xs text-red-500">{titleError}</p>}
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-700">Description</label>
-            <textarea disabled={!canEdit} rows={3} value={description} onChange={(e) => setDesc(e.target.value)} className={`${inputCls} resize-none`} placeholder="Optional details" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-700">Priority</label>
-              <select disabled={!canEdit} value={priority} onChange={(e) => setPriority(e.target.value as Priority)} className={inputCls}>
-                {PRIORITIES.map((p) => <option key={p} value={p} className="capitalize">{p}</option>)}
-              </select>
+        {/* Header */}
+        <div className="kb-modal-header">
+          <div className="kb-modal-header-left">
+            <div className="kb-modal-icon">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <rect x="1" y="1" width="4" height="14" rx="1" fill="#E75026"/>
+                <rect x="7" y="4" width="4" height="11" rx="1" fill="#E75026"/>
+                <rect x="13" y="7" width="2" height="8"  rx="1" fill="#E75026"/>
+              </svg>
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-700">Story Points</label>
-              <input disabled={!canEdit} type="number" min={1} max={13} value={storyPoints} onChange={(e) => setPoints(Number(e.target.value))} className={inputCls} />
-            </div>
+            <span className="kb-modal-title">
+              {isEdit ? 'Edit issue' : 'Add new card'}
+            </span>
           </div>
+          <button className="kb-modal-close" onClick={close}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+            </svg>
+          </button>
+        </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            {isEditMode && (
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">Status</label>
-                <select disabled={!canEdit} value={status} onChange={(e) => setStatus(e.target.value as IssueStatus)} className={inputCls}>
-                  {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+        {/* Body */}
+        <form onSubmit={handleSubmit}>
+          <div className="kb-modal-body">
+
+            {/* Title */}
+            <div className="kb-field">
+              <label className="kb-label">Title <span className="kb-required">*</span></label>
+              <input
+                className={`kb-input${titleErr ? ' kb-input-error' : ''}`}
+                placeholder="e.g. Fix login timeout on Safari"
+                value={title}
+                disabled={!canEdit}
+                onChange={(e) => { setTitle(e.target.value); setTitleErr(false); }}
+              />
+            </div>
+
+            {/* Description */}
+            <div className="kb-field">
+              <label className="kb-label">Description</label>
+              <textarea
+                className="kb-input kb-textarea"
+                placeholder="What needs to be done?"
+                value={desc}
+                disabled={!canEdit}
+                onChange={(e) => setDesc(e.target.value)}
+              />
+            </div>
+
+            {/* Column + Priority */}
+            <div className="kb-row2">
+              <div className="kb-field">
+                <label className="kb-label">Column <span className="kb-required">*</span></label>
+                <select
+                  className="kb-input kb-select"
+                  value={status}
+                  disabled={!canEdit}
+                  onChange={(e) => setStatus(e.target.value as IssueStatus)}
+                >
+                  {KANBAN_COLUMNS.map((c) => (
+                    <option key={c.id} value={c.id}>{c.label}</option>
+                  ))}
                 </select>
               </div>
-            )}
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-700">Assignee</label>
-              <select disabled={!canEdit} value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} className={inputCls}>
-                <option value="">Unassigned</option>
-                {mockUsers.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
+              <div className="kb-field">
+                <label className="kb-label">Priority</label>
+                <select
+                  className="kb-input kb-select"
+                  value={priority}
+                  disabled={!canEdit}
+                  onChange={(e) => setPriority(e.target.value as Priority)}
+                >
+                  {PRIORITIES.map((p) => (
+                    <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>
+                  ))}
+                </select>
+              </div>
             </div>
+
+            {/* Type + Assignee */}
+            <div className="kb-row2">
+              <div className="kb-field">
+                <label className="kb-label">Type</label>
+                <select
+                  className="kb-input kb-select"
+                  value={issueType}
+                  disabled={!canEdit}
+                  onChange={(e) => setIssueType(e.target.value as IssueType)}
+                >
+                  {ISSUE_TYPES.map((t) => (
+                    <option key={t} value={t}>{TYPE_LABELS[t]}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="kb-field">
+                <label className="kb-label">Assignee</label>
+                <select
+                  className="kb-input kb-select"
+                  value={assigneeId}
+                  disabled={!canEdit}
+                  onChange={(e) => setAssigneeId(e.target.value)}
+                >
+                  <option value="">Unassigned</option>
+                  {mockUsers.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Due date + Story points */}
+            <div className="kb-row2">
+              <div className="kb-field">
+                <label className="kb-label">Due date</label>
+                <input
+                  type="date"
+                  className="kb-input"
+                  value={due}
+                  disabled={!canEdit}
+                  onChange={(e) => setDue(e.target.value)}
+                />
+              </div>
+              <div className="kb-field">
+                <label className="kb-label">Story points</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={13}
+                  className="kb-input"
+                  value={points}
+                  disabled={!canEdit}
+                  onChange={(e) => setPoints(Number(e.target.value))}
+                />
+              </div>
+            </div>
+
           </div>
 
-          <div className="flex items-center justify-between pt-2">
+          {/* Footer */}
+          <div className="kb-modal-footer">
             <div>
-              {isEditMode && canDelete && (
-                <button type="button" onClick={handleDelete} disabled={deleteMutation.isPending} className="rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors">
-                  {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
+              {isEdit && canDel && (
+                <button
+                  type="button"
+                  className="kb-btn-danger"
+                  disabled={deleteMut.isPending}
+                  onClick={() => deleteMut.mutate()}
+                >
+                  {deleteMut.isPending ? 'Deleting…' : 'Delete'}
                 </button>
               )}
+              {!isEdit && (
+                <span className="kb-modal-hint">
+                  Fields marked <span style={{ color: '#DE350B' }}>*</span> are required
+                </span>
+              )}
             </div>
-            <div className="flex gap-2">
-              <button type="button" onClick={onClose} className="rounded-md border border-gray-200 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+            <div className="kb-modal-footer-right">
+              <button type="button" className="kb-btn-ghost" onClick={close}>
                 Cancel
               </button>
               {canEdit && (
-                <button type="submit" disabled={isPending} className="rounded-md bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-                  {isPending ? 'Saving…' : isEditMode ? 'Save' : 'Create'}
+                <button type="submit" className="kb-btn-create" disabled={isPending}>
+                  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                    <path d="M7 2v10M2 7h10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                  {isPending ? 'Saving…' : isEdit ? 'Save changes' : 'Create card'}
                 </button>
               )}
             </div>
           </div>
         </form>
+
       </div>
     </div>
   );

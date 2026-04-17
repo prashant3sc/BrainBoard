@@ -31,13 +31,13 @@ export function SearchResults({ results, isLoading, query, onSelect }: Props) {
         key={result.id}
         value={`${result.type}-${result.id}`}
         onSelect={() => onSelect(result)}
-        className="flex cursor-pointer flex-col gap-0.5 rounded-md px-3 py-2 text-sm aria-selected:bg-indigo-50"
+        className="flex cursor-pointer flex-col gap-0.5 rounded-md px-3 py-2 text-sm aria-selected:bg-[#FFF3F0] dark:aria-selected:bg-[#E75026]/10"
       >
         <div className="flex items-center gap-2">
           <span className={`rounded px-1.5 py-0.5 text-xs font-medium capitalize ${TYPE_BADGE[result.type]}`}>
             {result.type}
           </span>
-          <span className="font-medium text-gray-800 truncate">{result.title}</span>
+          <span className="font-medium text-gray-800 truncate dark:text-[#CDD9E5]">{result.title}</span>
         </div>
         {result.excerpt && (
           <span className="truncate text-xs text-gray-400 pl-10">{result.excerpt}</span>
