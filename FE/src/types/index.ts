@@ -93,6 +93,13 @@ export interface WikiPage {
   relatedPageIds?: string[];
 }
 
+/** A member entry returned by GET /projects/:id/members */
+export interface ProjectMember {
+  id: string;
+  user: User;
+  joinedAt: string;
+}
+
 /** A unified search result that can represent either an issue or a wiki page. */
 export interface SearchResult {
   id: string;
