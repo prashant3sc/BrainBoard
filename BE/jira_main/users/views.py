@@ -129,3 +129,12 @@ class UserDetailView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         serializer.save()
         return Response(UserSerializer(user).data)
+
+    def delete(self, request, pk):
+        user = self._get_user(pk)
+        if not user:
+            return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        if user.pk == request.user.pk:
+            return Response({"detail": "Cannot delete your own account"}, status=status.HTTP_400_BAD_REQUEST)
+        user.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
