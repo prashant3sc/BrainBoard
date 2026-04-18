@@ -10,6 +10,7 @@ interface AuthState {
 interface AuthActions {
   login(user: User, token: string): void;
   logout(): void;
+  setUser(user: User): void;
   isLoggedIn(): boolean;
 }
 
@@ -27,6 +28,10 @@ const useAuthStore = create<AuthState & AuthActions>()(
       logout() {
         localStorage.removeItem('auth_token');
         set({ user: null, token: null });
+      },
+
+      setUser(user) {
+        set({ user });
       },
 
       isLoggedIn() {

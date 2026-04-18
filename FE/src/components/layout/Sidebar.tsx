@@ -2,6 +2,7 @@ import { NavLink, useParams } from 'react-router-dom';
 import useAuthStore from '@/store/useAuthStore';
 import useAppStore from '@/store/useAppStore';
 import { useRBAC } from '@/hooks/useRBAC';
+import { authApi } from '@/api/auth';
 
 /* ── Logo (matches the browser tab favicon) ── */
 function BBLogo() {
@@ -116,8 +117,13 @@ function getInitials(name: string) {
 }
 
 export default function Sidebar() {
-  const user   = useAuthStore((s) => s.user);
-  const logout = useAuthStore((s) => s.logout);
+  const user        = useAuthStore((s) => s.user);
+  const logoutStore = useAuthStore((s) => s.logout);
+
+  async function logout() {
+    await authApi.logout().catch(() => {/* ignore – clear local state regardless */});
+    logoutStore();
+  }
   const { can } = useRBAC();
   const { projectId } = useParams();
   const { theme, toggleTheme } = useAppStore();

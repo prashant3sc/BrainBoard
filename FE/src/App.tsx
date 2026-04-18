@@ -7,6 +7,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import ProtectedRoute from '@/components/layout/ProtectedRoute';
 import AppShell from '@/components/layout/AppShell';
 import useAppStore from '@/store/useAppStore';
+import useAuthStore from '@/store/useAuthStore';
+import { authApi } from '@/api/auth';
 
 /* Syncs the Zustand theme state → <html class="dark"> */
 function ThemeSync() {
@@ -14,6 +16,21 @@ function ThemeSync() {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
+  return null;
+}
+
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
+
+/* Refreshes user data from /auth/me on app startup when a token exists */
+function AuthSync() {
+  const token   = useAuthStore((s) => s.token);
+  const setUser = useAuthStore((s) => s.setUser);
+
+  useEffect(() => {
+    if (USE_MOCK || !token) return;
+    authApi.me().then(setUser).catch(() => {/* 401 is handled by axios interceptor */});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return null;
 }
 
@@ -31,6 +48,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeSync />
+      <AuthSync />
       {/* <Toaster /> */}
       <BrowserRouter>
         <Suspense fallback={<div className="flex h-screen items-center justify-center text-sm text-gray-400">Loading…</div>}>
