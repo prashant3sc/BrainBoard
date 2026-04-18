@@ -23,7 +23,9 @@ class IssueSerializer(serializers.ModelSerializer):
             "description",
             "status",
             "priority",
+            "issue_type",
             "story_points",
+            "due_date",
             "assigneeId",
             "projectId",
             "sprintId",
@@ -35,6 +37,8 @@ class IssueSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         rep = super().to_representation(instance)
         rep["storyPoints"] = rep.pop("story_points")
+        rep["issueType"] = rep.pop("issue_type")
+        rep["dueDate"] = rep.pop("due_date")
         rep["createdAt"] = rep.pop("created_at")
         rep["updatedAt"] = rep.pop("updated_at")
         return rep
@@ -46,6 +50,10 @@ class IssueCreateSerializer(serializers.ModelSerializer):
     storyPoints = serializers.IntegerField(
         required=False, allow_null=True, write_only=True, source="story_points"
     )
+    issueType = serializers.ChoiceField(
+        choices=Issue.ISSUE_TYPE_CHOICES, required=False, write_only=True, source="issue_type"
+    )
+    dueDate = serializers.DateField(required=False, allow_null=True, write_only=True, source="due_date")
 
     class Meta:
         model = Issue
@@ -53,7 +61,9 @@ class IssueCreateSerializer(serializers.ModelSerializer):
             "title",
             "description",
             "priority",
+            "issueType",
             "storyPoints",
+            "dueDate",
             "assigneeId",
             "projectId",
         ]
@@ -100,10 +110,14 @@ class IssueUpdateSerializer(serializers.ModelSerializer):
     storyPoints = serializers.IntegerField(
         required=False, allow_null=True, write_only=True, source="story_points"
     )
+    issueType = serializers.ChoiceField(
+        choices=Issue.ISSUE_TYPE_CHOICES, required=False, write_only=True, source="issue_type"
+    )
+    dueDate = serializers.DateField(required=False, allow_null=True, write_only=True, source="due_date")
 
     class Meta:
         model = Issue
-        fields = ["title", "description", "status", "priority", "storyPoints", "assigneeId", "sprintId"]
+        fields = ["title", "description", "status", "priority", "issueType", "storyPoints", "dueDate", "assigneeId", "sprintId"]
 
     def update(self, instance, validated_data):
         from projects.models import Sprint
