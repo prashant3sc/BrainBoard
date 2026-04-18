@@ -12,11 +12,10 @@ interface Props {
   col:          ColConfig;
   issues:       Issue[];
   isLoading:    boolean;
-  onAddClick:   () => void;
   onIssueClick: (issue: Issue) => void;
 }
 
-export function KanbanColumn({ col, issues, isLoading, onAddClick, onIssueClick }: Props) {
+export function KanbanColumn({ col, issues, isLoading, onIssueClick }: Props) {
   return (
     <div className={`kb-col ${col.cls}`}>
       {/* Header */}
@@ -26,11 +25,6 @@ export function KanbanColumn({ col, issues, isLoading, onAddClick, onIssueClick 
           <span className="kb-col-name">{col.label}</span>
           <span className="kb-col-count">{isLoading ? '–' : issues.length}</span>
         </div>
-        <button className="kb-col-add-btn" onClick={onAddClick} title={`Add to ${col.label}`}>
-          <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-            <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-          </svg>
-        </button>
       </div>
 
       {/* Card list — Droppable target for @hello-pangea/dnd */}
@@ -77,13 +71,6 @@ export function KanbanColumn({ col, issues, isLoading, onAddClick, onIssueClick 
         )}
       </Droppable>
 
-      {/* Inline add button */}
-      <button className="kb-add-card-btn" onClick={onAddClick}>
-        <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-          <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-        </svg>
-        Add card
-      </button>
     </div>
   );
 }

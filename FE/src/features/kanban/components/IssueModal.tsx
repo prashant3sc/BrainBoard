@@ -6,11 +6,15 @@ import { mockUsers } from '@/mocks/users';
 import type { Issue, IssueStatus, Priority, IssueType } from '@/types';
 import { KANBAN_COLUMNS } from './KanbanBoard';
 
+type Destination = 'backlog' | 'sprint';
+
+/** The active sprint ID — tickets sent to "Current Sprint" get this sprintId. */
+const ACTIVE_SPRINT_ID = 'sprint-12';
+
 interface Props {
-  issue: Issue | null;          // null → create mode
+  issue: Issue | null;   // null → create mode
   isOpen: boolean;
   projectId: string;
-  defaultStatus?: IssueStatus;  // pre-select column in create mode
   onClose: () => void;
 }
 
@@ -31,36 +35,38 @@ const PRIORITY_LABELS: Record<Priority, string> = {
   low:      'Low',
 };
 
-export function IssueModal({ issue, isOpen, projectId, defaultStatus = 'todo', onClose }: Props) {
+export function IssueModal({ issue, isOpen, projectId, onClose }: Props) {
   const isEdit  = issue !== null;
   const { can } = useRBAC();
   const qc      = useQueryClient();
   const canEdit = can('editIssue');
   const canDel  = can('deleteIssue');
 
-  const [title,      setTitle]      = useState('');
-  const [desc,       setDesc]       = useState('');
-  const [status,     setStatus]     = useState<IssueStatus>(defaultStatus);
-  const [priority,   setPriority]   = useState<Priority>('medium');
-  const [issueType,  setIssueType]  = useState<IssueType>('feat');
-  const [assigneeId, setAssigneeId] = useState('');
-  const [due,        setDue]        = useState('');
-  const [points,     setPoints]     = useState(3);
-  const [titleErr,   setTitleErr]   = useState(false);
+  const [title,       setTitle]       = useState('');
+  const [desc,        setDesc]        = useState('');
+  const [status,      setStatus]      = useState<IssueStatus>('todo');
+  const [priority,    setPriority]    = useState<Priority>('medium');
+  const [issueType,   setIssueType]   = useState<IssueType>('feat');
+  const [assigneeId,  setAssigneeId]  = useState('');
+  const [due,         setDue]         = useState('');
+  const [points,      setPoints]      = useState(3);
+  const [titleErr,    setTitleErr]    = useState(false);
+  const [destination, setDestination] = useState<Destination>('backlog');
 
   /* Sync form when opening */
   useEffect(() => {
     if (!isOpen) return;
     setTitle(issue?.title       ?? '');
     setDesc(issue?.description  ?? '');
-    setStatus(issue?.status     ?? defaultStatus);
+    setStatus(issue?.status     ?? 'todo');
     setPriority(issue?.priority ?? 'medium');
     setIssueType(issue?.issueType ?? 'feat');
     setAssigneeId(issue?.assigneeId ?? '');
     setDue(issue?.due ?? '');
     setPoints(issue?.storyPoints ?? 3);
     setTitleErr(false);
-  }, [issue, isOpen, defaultStatus]);
+    setDestination('backlog');
+  }, [issue, isOpen]);
 
   function close() { onClose(); }
 
@@ -81,6 +87,7 @@ export function IssueModal({ issue, isOpen, projectId, defaultStatus = 'todo', o
         projectId,
         issueType,
         due: due || null,
+        sprintId: destination === 'sprint' ? ACTIVE_SPRINT_ID : null,
       }),
     onSuccess: invalidateAndClose,
   });
@@ -210,6 +217,45 @@ export function IssueModal({ issue, isOpen, projectId, defaultStatus = 'todo', o
                 </select>
               </div>
             </div>
+
+            {/* Destination — create mode only */}
+            {!isEdit && (
+              <div className="kb-field">
+                <label className="kb-label">Add to <span className="kb-required">*</span></label>
+                <div className="kb-destination-group">
+                  <label className={`kb-dest-option${destination === 'backlog' ? ' kb-dest-active' : ''}`}>
+                    <input
+                      type="radio"
+                      name="destination"
+                      value="backlog"
+                      checked={destination === 'backlog'}
+                      onChange={() => setDestination('backlog')}
+                    />
+                    <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                      <rect x="1" y="3" width="12" height="2" rx="1" fill="currentColor"/>
+                      <rect x="1" y="7" width="12" height="2" rx="1" fill="currentColor"/>
+                      <rect x="1" y="11" width="7" height="2" rx="1" fill="currentColor"/>
+                    </svg>
+                    Backlog
+                  </label>
+                  <label className={`kb-dest-option${destination === 'sprint' ? ' kb-dest-active' : ''}`}>
+                    <input
+                      type="radio"
+                      name="destination"
+                      value="sprint"
+                      checked={destination === 'sprint'}
+                      onChange={() => setDestination('sprint')}
+                    />
+                    <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                      <path d="M2 7a5 5 0 0 1 9.5-2.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                      <path d="M12 7a5 5 0 0 1-9.5 2.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                      <path d="M11.5 2.5l.5 2.3-2.3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Current Sprint
+                  </label>
+                </div>
+              </div>
+            )}
 
             {/* Type + Assignee */}
             <div className="kb-row2">
