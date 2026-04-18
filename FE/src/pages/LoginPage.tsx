@@ -3,8 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import useAuthStore from '@/store/useAuthStore';
 import useAppStore from '@/store/useAppStore';
 import { mockUsers } from '@/mocks/users';
-import { apiClient } from '@/api/client';
-import type { User } from '@/types';
+import { authApi } from '@/api/auth';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 
@@ -241,9 +240,7 @@ export function LoginPage() {
         const user = mockUsers.find((u) => u.id === selectedUserId)!;
         login(user, 'mock-token');
       } else {
-        const { data } = await apiClient.post<{ user: User; token: string }>(
-          '/auth/login', { email, password },
-        );
+        const data = await authApi.login(email, password);
         login(data.user, data.token);
       }
       navigate('/dashboard', { replace: true });
