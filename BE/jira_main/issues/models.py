@@ -49,11 +49,24 @@ class Issue(models.Model):
         (LOW, "Low"),
     ]
 
+    # Issue type choices
+    TASK = "task"
+    SUBTASK = "subtask"
+    BUG = "bug"
+
+    ISSUE_TYPE_CHOICES = [
+        (TASK, "Task"),
+        (SUBTASK, "Subtask"),
+        (BUG, "Bug"),
+    ]
+
     title = models.CharField(max_length=500)
     description = models.TextField(blank=True, default="")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=TODO)
     priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default=MEDIUM)
+    issue_type = models.CharField(max_length=20, choices=ISSUE_TYPE_CHOICES, default=TASK)
     story_points = models.PositiveIntegerField(null=True, blank=True)
+    due_date = models.DateField(null=True, blank=True)
 
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="project_issues")
     sprint = models.ForeignKey(
