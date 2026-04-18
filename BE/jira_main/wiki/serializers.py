@@ -15,7 +15,7 @@ class WikiPageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = WikiPage
-        fields = ["id", "title", "content", "parentId", "projectId", "updated_at"]
+        fields = ["id", "title", "content", "parentId", "projectId", "updated_at", "created_at"]
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
