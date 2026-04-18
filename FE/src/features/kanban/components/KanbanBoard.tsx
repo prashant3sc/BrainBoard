@@ -16,11 +16,10 @@ export const KANBAN_COLUMNS: { id: IssueStatus; label: string; cls: string }[] =
 interface Props {
   projectId:    string;
   searchQuery:  string;
-  onAddOpen:    (col: IssueStatus) => void;
   onIssueClick: (issue: Issue) => void;
 }
 
-export function KanbanBoard({ projectId, searchQuery, onAddOpen, onIssueClick }: Props) {
+export function KanbanBoard({ projectId, searchQuery, onIssueClick }: Props) {
   const { data: serverIssues = [], isLoading } = useIssues(projectId);
   const { mutate: updateIssue } = useUpdateIssue();
 
@@ -75,7 +74,6 @@ export function KanbanBoard({ projectId, searchQuery, onAddOpen, onIssueClick }:
             col={col}
             issues={visible.filter((i) => i.status === col.id)}
             isLoading={isLoading}
-            onAddClick={() => onAddOpen(col.id)}
             onIssueClick={onIssueClick}
           />
         ))}

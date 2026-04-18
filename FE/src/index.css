@@ -2181,6 +2181,31 @@
 .kb-modal-hint         { font-size: 11.5px; color: var(--kb-modal-hint); }
 .kb-modal-footer-right { display: flex; align-items: center; gap: 8px; }
 
+/* Destination radio group (create mode) */
+.kb-destination-group {
+  display: flex; gap: 8px;
+}
+.kb-dest-option {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 6px; cursor: pointer;
+  font-size: 13px; font-weight: 500;
+  border: 1.5px solid var(--kb-input-border);
+  color: var(--kb-field-label);
+  background: var(--kb-input-bg);
+  transition: border-color 150ms, background 150ms, color 150ms;
+  user-select: none;
+}
+.kb-dest-option input[type="radio"] { display: none; }
+.kb-dest-option:hover {
+  border-color: var(--bb-accent);
+  color: var(--bb-accent);
+}
+.kb-dest-option.kb-dest-active {
+  border-color: var(--bb-accent);
+  background: rgba(99,102,241,.08);
+  color: var(--bb-accent);
+}
+
 .kb-field    { display: flex; flex-direction: column; gap: 5px; }
 .kb-label    { font-size: 12px; font-weight: 500; color: var(--kb-field-label); }
 .kb-required { color: #DE350B; margin-left: 2px; }
