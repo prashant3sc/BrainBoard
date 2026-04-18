@@ -88,12 +88,12 @@ export function UserManagementPage() {
 
   /* add user modal */
   const [addOpen, setAddOpen] = useState(false);
-  const [fname, setFname]     = useState('');
-  const [lname, setLname]     = useState('');
-  const [email, setEmail]     = useState('');
-  const [role,  setRole]      = useState<Role | ''>('');
-  const [dept,  setDept]      = useState('');
-  const [errors, setErrors]   = useState<Record<string, boolean>>({});
+  const [fname,    setFname]    = useState('');
+  const [lname,    setLname]    = useState('');
+  const [email,    setEmail]    = useState('');
+  const [role,     setRole]     = useState<Role | ''>('');
+  const [password, setPassword] = useState('');
+  const [errors,   setErrors]   = useState<Record<string, boolean>>({});
   const fnameRef              = useRef<HTMLInputElement>(null);
 
   /* focus first field when modal opens */
@@ -104,7 +104,11 @@ export function UserManagementPage() {
   /* close modals on Escape */
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') { setAddOpen(false); setRemoveTarget(null); }
+      if (e.key === 'Escape') {
+        setAddOpen(false);
+        setFname(''); setLname(''); setEmail(''); setRole(''); setPassword(''); setErrors({});
+        setRemoveTarget(null);
+      }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -140,20 +144,21 @@ export function UserManagementPage() {
 
   function resetForm() {
     setFname(''); setLname(''); setEmail('');
-    setRole(''); setDept(''); setErrors({});
+    setRole(''); setPassword(''); setErrors({});
   }
 
   function handleAddSubmit(e: React.FormEvent) {
     e.preventDefault();
     const errs: Record<string, boolean> = {};
-    if (!fname.trim()) errs.fname = true;
-    if (!lname.trim()) errs.lname = true;
-    if (!email.trim()) errs.email = true;
-    if (!role)         errs.role  = true;
+    if (!fname.trim())    errs.fname    = true;
+    if (!lname.trim())    errs.lname    = true;
+    if (!email.trim())    errs.email    = true;
+    if (!role)            errs.role     = true;
+    if (!password.trim()) errs.password = true;
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
     createUser(
-      { name: `${fname.trim()} ${lname.trim()}`, email: email.trim(), role: role as Role },
+      { first_name: fname.trim(), last_name: lname.trim(), email: email.trim(), role: role as Role, password: password.trim() },
       {
         onSuccess: (u) => {
           setAddOpen(false);
@@ -212,7 +217,7 @@ export function UserManagementPage() {
           </div>
 
           <button
-            onClick={() => setAddOpen(true)}
+            onClick={() => { resetForm(); setAddOpen(true); }}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               background: '#E75026', color: '#FFFFFF', border: 'none',
@@ -465,6 +470,7 @@ export function UserManagementPage() {
                 <Field label="Work email" required error={errors.email} hint="An invite will be sent to this address">
                   <input
                     type="email"
+                    autoComplete="off"
                     className={`bb-modal-input${errors.email ? ' bb-modal-input-error' : ''}`}
                     placeholder="priya.sharma@company.com"
                     value={email}
@@ -472,29 +478,31 @@ export function UserManagementPage() {
                   />
                 </Field>
 
-                {/* Role + Department */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                  <Field label="Role" required error={errors.role}>
-                    <select
-                      className={`bb-modal-input bb-modal-select${errors.role ? ' bb-modal-input-error' : ''}`}
-                      value={role}
-                      onChange={(e) => { setRole(e.target.value as Role); setErrors((p) => ({ ...p, role: false })); }}
-                    >
-                      <option value="">Select role</option>
-                      {ROLES.map((r) => (
-                        <option key={r} value={r}>{roleLabel(r)}</option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Department">
-                    <input
-                      className="bb-modal-input"
-                      placeholder="Engineering"
-                      value={dept}
-                      onChange={(e) => setDept(e.target.value)}
-                    />
-                  </Field>
-                </div>
+                {/* Role */}
+                <Field label="Role" required error={errors.role}>
+                  <select
+                    className={`bb-modal-input bb-modal-select${errors.role ? ' bb-modal-input-error' : ''}`}
+                    value={role}
+                    onChange={(e) => { setRole(e.target.value as Role); setErrors((p) => ({ ...p, role: false })); }}
+                  >
+                    <option value="">Select role</option>
+                    {ROLES.map((r) => (
+                      <option key={r} value={r}>{roleLabel(r)}</option>
+                    ))}
+                  </select>
+                </Field>
+
+                {/* Password */}
+                <Field label="Password" required error={errors.password}>
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    className={`bb-modal-input${errors.password ? ' bb-modal-input-error' : ''}`}
+                    placeholder="Set a password"
+                    value={password}
+                    onChange={(e) => { setPassword(e.target.value); setErrors((p) => ({ ...p, password: false })); }}
+                  />
+                </Field>
               </div>
 
               {/* Modal footer */}
@@ -543,7 +551,7 @@ export function UserManagementPage() {
                     <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
                       <path d="M7 2v10M2 7h10" stroke="white" strokeWidth="2" strokeLinecap="round" />
                     </svg>
-                    {isCreating ? 'Sending…' : 'Send invite'}
+                    {isCreating ? 'Creating…' : 'Create user'}
                   </button>
                 </div>
               </div>

@@ -24,13 +24,13 @@ export const usersApi = {
     return apiClient.patch<User>(`/users/${id}`, { role }).then((r) => r.data);
   },
 
-  createUser(data: { name: string; email: string; role: Role }): Promise<User> {
+  createUser(data: { first_name: string; last_name: string; email: string; role: Role; password: string }): Promise<User> {
     if (USE_MOCK) {
-      const newUser: User = { id: `user-${_nextId++}`, ...data };
+      const newUser: User = { id: `user-${_nextId++}`, name: `${data.first_name} ${data.last_name}`, email: data.email, role: data.role };
       _mockUsers.push(newUser);
       return Promise.resolve({ ...newUser });
     }
-    return apiClient.post<User>('/users', data).then((r) => r.data);
+    return apiClient.post<User>('/users/create', data).then((r) => r.data);
   },
 
   deleteUser(id: string): Promise<void> {
