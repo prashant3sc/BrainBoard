@@ -80,7 +80,7 @@ class UserListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        queryset = User.objects.all().order_by("first_name", "last_name")
+        queryset = User.objects.filter(is_superuser=False).order_by("first_name", "last_name")
         filterset = UserFilter(request.query_params, queryset=queryset)
         if filterset.is_valid():
             queryset = filterset.qs
