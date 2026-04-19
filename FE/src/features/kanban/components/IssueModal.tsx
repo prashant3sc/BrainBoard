@@ -17,6 +17,7 @@ interface Props {
   isOpen: boolean;
   projectId: string;
   onClose: () => void;
+  onNavigate?: (issue: Issue) => void;
 }
 
 const PRIORITIES: Priority[]   = ['critical', 'high', 'medium', 'low'];
@@ -35,7 +36,7 @@ const PRIORITY_LABELS: Record<Priority, string> = {
   low:      'Low',
 };
 
-export function IssueModal({ issue, isOpen, projectId, onClose }: Props) {
+export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Props) {
   const isEdit  = issue !== null;
   const { can } = useRBAC();
   const qc      = useQueryClient();
@@ -343,6 +344,22 @@ export function IssueModal({ issue, isOpen, projectId, onClose }: Props) {
                     Parent issue is required for subtasks.
                   </span>
                 )}
+
+                {isEdit && parentId && onNavigate && (() => {
+                  const parent = allIssues.find((i) => i.id === parentId);
+                  return parent ? (
+                    <button
+                      type="button"
+                      className="kb-parent-link"
+                      onClick={() => { close(); onNavigate(parent); }}
+                    >
+                      <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                        <path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      Go to parent issue
+                    </button>
+                  ) : null;
+                })()}
               </div>
             )}
 
