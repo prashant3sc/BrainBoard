@@ -155,6 +155,13 @@ export function IssueCard({ issue, index, members, onClick }: Props) {
             </span>
 
             <div className="kb-card-footer-right">
+              {/* Story points */}
+              {issue.storyPoints > 0 && (
+                <span className="kb-story-points" title="Story points">
+                  {issue.storyPoints}
+                </span>
+              )}
+
               {/* Subtask count */}
               {(issue.subtaskCount ?? 0) > 0 && (
                 <span className="kb-subtask-count">

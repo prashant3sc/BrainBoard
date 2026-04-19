@@ -142,6 +142,7 @@ export function KanbanPage() {
         isOpen={modalOpen}
         projectId={projectId}
         onClose={closeModal}
+        onNavigate={openEdit}
       />
     </div>
   );
