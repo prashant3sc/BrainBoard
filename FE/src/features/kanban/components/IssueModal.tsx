@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { issuesApi } from '@/api/issues';
 import { useRBAC } from '@/hooks/useRBAC';
-import { mockUsers } from '@/mocks/users';
+import { useProjectMembers } from '@/features/projects/useProjects';
 import type { Issue, IssueStatus, Priority, IssueType } from '@/types';
 import { KANBAN_COLUMNS } from './KanbanBoard';
 
@@ -19,13 +19,12 @@ interface Props {
 }
 
 const PRIORITIES: Priority[]   = ['critical', 'high', 'medium', 'low'];
-const ISSUE_TYPES: IssueType[] = ['feat', 'bug', 'chore', 'design'];
+const ISSUE_TYPES: IssueType[] = ['task', 'subtask', 'bug'];
 
 const TYPE_LABELS: Record<IssueType, string> = {
-  feat:   'Feature',
-  bug:    'Bug',
-  chore:  'Chore',
-  design: 'Design',
+  task:    'Task',
+  subtask: 'Subtask',
+  bug:     'Bug',
 };
 
 const PRIORITY_LABELS: Record<Priority, string> = {
@@ -41,13 +40,15 @@ export function IssueModal({ issue, isOpen, projectId, onClose }: Props) {
   const qc      = useQueryClient();
   const canEdit = can('editIssue');
   const canDel  = can('deleteIssue');
+  const { data: members = [] } = useProjectMembers(projectId);
 
   const [title,       setTitle]       = useState('');
   const [desc,        setDesc]        = useState('');
   const [status,      setStatus]      = useState<IssueStatus>('todo');
   const [priority,    setPriority]    = useState<Priority>('medium');
-  const [issueType,   setIssueType]   = useState<IssueType>('feat');
+  const [issueType,   setIssueType]   = useState<IssueType>('task');
   const [assigneeId,  setAssigneeId]  = useState('');
+  const [reporterId,  setReporterId]  = useState('');
   const [due,         setDue]         = useState('');
   const [points,      setPoints]      = useState(3);
   const [titleErr,    setTitleErr]    = useState(false);
@@ -60,8 +61,9 @@ export function IssueModal({ issue, isOpen, projectId, onClose }: Props) {
     setDesc(issue?.description  ?? '');
     setStatus(issue?.status     ?? 'todo');
     setPriority(issue?.priority ?? 'medium');
-    setIssueType(issue?.issueType ?? 'feat');
+    setIssueType(issue?.issueType ?? 'task');
     setAssigneeId(issue?.assigneeId ?? '');
+    setReporterId(issue?.reporterId ?? '');
     setDue(issue?.due ?? '');
     setPoints(issue?.storyPoints ?? 3);
     setTitleErr(false);
@@ -81,9 +83,9 @@ export function IssueModal({ issue, isOpen, projectId, onClose }: Props) {
         title,
         description: desc,
         priority,
-        status,
         storyPoints: points,
-        assigneeId: assigneeId || null,
+        assigneeId:  assigneeId  || null,
+        reporterId:  reporterId  || null,
         projectId,
         issueType,
         due: due || null,
@@ -100,7 +102,8 @@ export function IssueModal({ issue, isOpen, projectId, onClose }: Props) {
         priority,
         status,
         storyPoints: points,
-        assigneeId: assigneeId || null,
+        assigneeId:  assigneeId  || null,
+        reporterId:  reporterId  || null,
         issueType,
         due: due || null,
       }),
@@ -188,21 +191,23 @@ export function IssueModal({ issue, isOpen, projectId, onClose }: Props) {
               />
             </div>
 
-            {/* Column + Priority */}
+            {/* Column (edit only) + Priority */}
             <div className="kb-row2">
-              <div className="kb-field">
-                <label className="kb-label">Column <span className="kb-required">*</span></label>
-                <select
-                  className="kb-input kb-select"
-                  value={status}
-                  disabled={!canEdit}
-                  onChange={(e) => setStatus(e.target.value as IssueStatus)}
-                >
-                  {KANBAN_COLUMNS.map((c) => (
-                    <option key={c.id} value={c.id}>{c.label}</option>
-                  ))}
-                </select>
-              </div>
+              {isEdit && (
+                <div className="kb-field">
+                  <label className="kb-label">Status</label>
+                  <select
+                    className="kb-input kb-select"
+                    value={status}
+                    disabled={!canEdit}
+                    onChange={(e) => setStatus(e.target.value as IssueStatus)}
+                  >
+                    {KANBAN_COLUMNS.map((c) => (
+                      <option key={c.id} value={c.id}>{c.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="kb-field">
                 <label className="kb-label">Priority</label>
                 <select
@@ -281,24 +286,28 @@ export function IssueModal({ issue, isOpen, projectId, onClose }: Props) {
                   onChange={(e) => setAssigneeId(e.target.value)}
                 >
                   <option value="">Unassigned</option>
-                  {mockUsers.map((u) => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
+                  {members.map((m) => (
+                    <option key={m.user.id} value={m.user.id}>{m.user.name}</option>
                   ))}
                 </select>
               </div>
             </div>
 
-            {/* Due date + Story points */}
+            {/* Reporter + Story points */}
             <div className="kb-row2">
               <div className="kb-field">
-                <label className="kb-label">Due date</label>
-                <input
-                  type="date"
-                  className="kb-input"
-                  value={due}
+                <label className="kb-label">Reporter</label>
+                <select
+                  className="kb-input kb-select"
+                  value={reporterId}
                   disabled={!canEdit}
-                  onChange={(e) => setDue(e.target.value)}
-                />
+                  onChange={(e) => setReporterId(e.target.value)}
+                >
+                  <option value="">None</option>
+                  {members.map((m) => (
+                    <option key={m.user.id} value={m.user.id}>{m.user.name}</option>
+                  ))}
+                </select>
               </div>
               <div className="kb-field">
                 <label className="kb-label">Story points</label>
@@ -314,40 +323,73 @@ export function IssueModal({ issue, isOpen, projectId, onClose }: Props) {
               </div>
             </div>
 
+            {/* Due date */}
+            <div className="kb-field">
+              <label className="kb-label">Due date</label>
+              <input
+                type="date"
+                className="kb-input"
+                value={due}
+                disabled={!canEdit}
+                onChange={(e) => setDue(e.target.value)}
+              />
+            </div>
+
           </div>
 
           {/* Footer */}
           <div className="kb-modal-footer">
-            <div>
-              {isEdit && canDel && (
-                <button
-                  type="button"
-                  className="kb-btn-danger"
-                  disabled={deleteMut.isPending}
-                  onClick={() => deleteMut.mutate()}
-                >
-                  {deleteMut.isPending ? 'Deleting…' : 'Delete'}
-                </button>
-              )}
-              {!isEdit && (
-                <span className="kb-modal-hint">
-                  Fields marked <span style={{ color: '#DE350B' }}>*</span> are required
-                </span>
-              )}
-            </div>
-            <div className="kb-modal-footer-right">
-              <button type="button" className="kb-btn-ghost" onClick={close}>
-                Cancel
-              </button>
-              {canEdit && (
-                <button type="submit" className="kb-btn-create" disabled={isPending}>
-                  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-                    <path d="M7 2v10M2 7h10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-                  </svg>
-                  {isPending ? 'Saving…' : isEdit ? 'Save changes' : 'Create card'}
-                </button>
-              )}
-            </div>
+            {isEdit ? (
+              /* ── Edit footer: Delete (left) | Cancel + Save (right) ── */
+              <>
+                <div>
+                  {canDel && (
+                    <button
+                      type="button"
+                      className="kb-btn-danger"
+                      disabled={deleteMut.isPending}
+                      onClick={() => deleteMut.mutate()}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                        <path d="M2 3.5h10M5.5 3.5V2.5h3v1M11 3.5l-.75 8.5H3.75L3 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      {deleteMut.isPending ? 'Deleting…' : 'Delete issue'}
+                    </button>
+                  )}
+                </div>
+                <div className="kb-modal-footer-right">
+                  <button type="button" className="kb-btn-ghost" onClick={close}>Cancel</button>
+                  {canEdit && (
+                    <button type="submit" className="kb-btn-create" disabled={isPending}>
+                      <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                        <path d="M2 7l3.5 3.5L12 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      {isPending ? 'Saving…' : 'Save changes'}
+                    </button>
+                  )}
+                </div>
+              </>
+            ) : (
+              /* ── Create footer: hint (left) | Cancel + Create (right) ── */
+              <>
+                <div>
+                  <span className="kb-modal-hint">
+                    Fields marked <span style={{ color: '#DE350B' }}>*</span> are required
+                  </span>
+                </div>
+                <div className="kb-modal-footer-right">
+                  <button type="button" className="kb-btn-ghost" onClick={close}>Cancel</button>
+                  {canEdit && (
+                    <button type="submit" className="kb-btn-create" disabled={isPending}>
+                      <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                        <path d="M7 2v10M2 7h10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                      </svg>
+                      {isPending ? 'Creating…' : 'Create card'}
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </form>
 

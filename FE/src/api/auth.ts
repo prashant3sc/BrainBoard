@@ -20,4 +20,10 @@ export const authApi = {
     if (USE_MOCK) return Promise.reject(new Error('Use mock data directly'));
     return apiClient.get<User>('/auth/me').then((r) => r.data);
   },
+
+  changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    return apiClient
+      .patch('/auth/me', { current_password: currentPassword, new_password: newPassword })
+      .then(() => undefined);
+  },
 };

@@ -22,6 +22,5 @@ export const STATUS_LABELS: Record<IssueStatus, string> = {
   todo:        'To Do',
   in_progress: 'In Progress',
   review:      'In Review',
-  blocked:     'Blocked',
   done:        'Done',
 };
