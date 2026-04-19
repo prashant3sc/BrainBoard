@@ -42,7 +42,15 @@ const WikiPage              = React.lazy(() => import('@/pages/WikiPage'));
 const UserManagementPage    = React.lazy(() => import('@/pages/UserManagementPage'));
 const ProjectSettingsPage   = React.lazy(() => import('@/pages/ProjectSettingsPage'));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 2,   // data stays fresh for 2 minutes
+      refetchOnWindowFocus: false, // don't refetch on tab switch
+      retry: 1,                    // only retry failed requests once
+    },
+  },
+});
 
 export default function App() {
   return (

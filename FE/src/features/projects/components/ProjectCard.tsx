@@ -7,6 +7,7 @@ interface Props {
   onPulse: (project: Project, index: number) => void;
   onEdit?: (project: Project) => void;
   onDelete?: (project: Project) => void;
+  onArchive?: (project: Project) => void;
   canManage?: boolean;
   index?: number;
   isPulseActive?: boolean;
@@ -15,7 +16,7 @@ interface Props {
 const ICONS = ['🖥️', '⚙️', '📦', '🚀', '🎯', '🔧', '📊', '🛠️'];
 
 export function ProjectCard({
-  project, onClick, onPulse, onEdit, onDelete,
+  project, onClick, onPulse, onEdit, onDelete, onArchive,
   canManage = false, index = 0, isPulseActive = false,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -29,7 +30,6 @@ export function ProjectCard({
   const icon     = ICONS[index % ICONS.length];
   const initials = project.name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 
-  /* close menu on outside click */
   useEffect(() => {
     if (!menuOpen) return;
     function onDown(e: MouseEvent) {
@@ -50,11 +50,12 @@ export function ProjectCard({
       className="bb-project-card"
       style={{
         background: 'var(--bb-card-bg)',
-        border: '1px solid var(--bb-card-border)',
+        border: `1px solid ${project.isArchived ? 'var(--bb-tbl-wrap-border)' : 'var(--bb-card-border)'}`,
         borderRadius: 10,
         padding: 20,
         cursor: 'pointer',
         position: 'relative',
+        opacity: project.isArchived ? 0.72 : 1,
       }}
     >
       {/* Card header: icon + status badge + three-dot menu */}
@@ -63,21 +64,26 @@ export function ProjectCard({
           width: 36, height: 36, borderRadius: 8,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 16,
-          background: isBlue ? 'var(--bb-card-icon-blue)' : 'var(--bb-card-icon-orange)',
+          background: project.isArchived
+            ? 'var(--bb-skeleton-stripe-bg)'
+            : isBlue ? 'var(--bb-card-icon-blue)' : 'var(--bb-card-icon-orange)',
         }}>
           {icon}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{
-            fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 4,
-            background: 'var(--bb-status-active-bg)',
-            color: 'var(--bb-status-active-color)',
-          }}>
-            Active
-          </span>
+          {/* Status badge — only shown when archived */}
+          {project.isArchived && (
+            <span style={{
+              fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 4,
+              background: 'var(--bb-skeleton-card-bg)',
+              color: 'var(--bb-text-muted)',
+              border: '1px solid var(--bb-tbl-wrap-border)',
+            }}>
+              Archived
+            </span>
+          )}
 
-          {/* Three-dot menu — only for admin/pm */}
           {canManage && (
             <div ref={menuRef} style={{ position: 'relative' }}>
               <button
@@ -93,10 +99,7 @@ export function ProjectCard({
               </button>
 
               {menuOpen && (
-                <div
-                  className="bb-card-dropdown"
-                  onClick={(e) => e.stopPropagation()}
-                >
+                <div className="bb-card-dropdown" onClick={(e) => e.stopPropagation()}>
                   <button
                     className="bb-card-dropdown-option"
                     onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onEdit?.(project); }}
@@ -106,6 +109,28 @@ export function ProjectCard({
                     </svg>
                     Edit project
                   </button>
+
+                  <button
+                    className="bb-card-dropdown-option"
+                    onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onArchive?.(project); }}
+                  >
+                    {project.isArchived ? (
+                      <>
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="1 4 1 14 15 14 15 4" /><polyline points="1 4 8 10 15 4" /><polyline points="5 4 11 4" />
+                        </svg>
+                        Unarchive
+                      </>
+                    ) : (
+                      <>
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="1 4 1 14 15 14 15 4" /><polyline points="1 4 8 10 15 4" /><line x1="8" y1="1" x2="8" y2="9" />
+                        </svg>
+                        Archive
+                      </>
+                    )}
+                  </button>
+
                   <button
                     className="bb-card-dropdown-option bb-card-dropdown-danger"
                     onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete?.(project); }}
