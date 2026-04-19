@@ -70,9 +70,27 @@ const focusErrorStyle: React.CSSProperties = {
   boxShadow: '0 0 0 3px rgba(222, 53, 11, 0.12)',
 };
 
+/* ── Eye icon for password toggle ── */
+function EyeIcon({ visible }: { visible: boolean }) {
+  return visible ? (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  ) : (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+  );
+}
+
 /* ── Controlled themed input field ── */
 function Field({
-  label, type, value, onChange, placeholder, autoComplete, error, rightSlot,
+  label, type, value, onChange, placeholder, autoComplete, error, rightSlot, showPasswordToggle,
 }: {
   label: string;
   type: string;
@@ -82,9 +100,12 @@ function Field({
   autoComplete?: string;
   error?: string;
   rightSlot?: React.ReactNode;
+  showPasswordToggle?: boolean;
 }) {
   const [focused, setFocused] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const hasError = Boolean(error);
+  const inputType = showPasswordToggle ? (showPassword ? 'text' : 'password') : type;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -97,22 +118,44 @@ function Field({
         </label>
         {rightSlot}
       </div>
-      <input
-        type={type}
-        value={value}
-        autoComplete={autoComplete}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        /* bb-input targets ::placeholder via index.css */
-        className="bb-input"
-        style={{
-          ...inputStyle(hasError),
-          ...(focused && !hasError ? focusStyle : {}),
-          ...(focused && hasError  ? focusErrorStyle : {}),
-        }}
-      />
+      <div style={{ position: 'relative' }}>
+        <input
+          type={inputType}
+          value={value}
+          autoComplete={autoComplete}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          /* bb-input targets ::placeholder via index.css */
+          className="bb-input"
+          style={{
+            ...inputStyle(hasError),
+            ...(focused && !hasError ? focusStyle : {}),
+            ...(focused && hasError  ? focusErrorStyle : {}),
+            ...(showPasswordToggle ? { paddingRight: 40 } : {}),
+          }}
+        />
+        {showPasswordToggle && (
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            title={showPassword ? 'Hide password' : 'Show password'}
+            style={{
+              position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+              background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+              color: 'var(--bb-text-muted)', display: 'flex', alignItems: 'center',
+              borderRadius: 4,
+              transition: 'color 0.15s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = '#E75026')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--bb-text-muted)')}
+            tabIndex={-1}
+          >
+            <EyeIcon visible={showPassword} />
+          </button>
+        )}
+      </div>
       {hasError && <FieldError message={error!} />}
     </div>
   );
@@ -331,6 +374,7 @@ export function LoginPage() {
                 onChange={(v) => { setPassword(v); if (passwordErr) setPasswordErr(''); }}
                 placeholder="••••••••" autoComplete="current-password"
                 error={passwordErr}
+                showPasswordToggle
                 rightSlot={
                   <button type="button"
                     style={{ fontSize: 12, color: '#E75026', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
