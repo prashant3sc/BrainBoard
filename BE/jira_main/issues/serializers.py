@@ -11,6 +11,7 @@ class LabelSerializer(serializers.ModelSerializer):
 
 class IssueSerializer(serializers.ModelSerializer):
     assigneeId = serializers.PrimaryKeyRelatedField(source="assignee", read_only=True)
+    reporterId  = serializers.PrimaryKeyRelatedField(source="reporter", read_only=True)
     projectId = serializers.PrimaryKeyRelatedField(source="project", read_only=True)
     sprintId = serializers.PrimaryKeyRelatedField(source="sprint", read_only=True)
     labelIds = serializers.PrimaryKeyRelatedField(source="labels", many=True, read_only=True)
@@ -27,6 +28,7 @@ class IssueSerializer(serializers.ModelSerializer):
             "story_points",
             "due_date",
             "assigneeId",
+            "reporterId",
             "projectId",
             "sprintId",
             "labelIds",

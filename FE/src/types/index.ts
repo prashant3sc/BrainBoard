@@ -2,9 +2,9 @@ export type Role = 'admin' | 'pm' | 'developer' | 'viewer';
 
 export type Priority = 'critical' | 'high' | 'medium' | 'low';
 
-export type IssueStatus = 'todo' | 'in_progress' | 'review' | 'blocked' | 'done';
+export type IssueStatus = 'todo' | 'in_progress' | 'review' | 'done';
 
-export type IssueType = 'feat' | 'bug' | 'chore' | 'design';
+export type IssueType = 'task' | 'subtask' | 'bug';
 
 /** A user account in the system. */
 export interface User {
@@ -34,7 +34,8 @@ export interface Issue {
   status: IssueStatus;
   priority: Priority;
   storyPoints: number;
-  assigneeId: string | null;
+  assigneeId:  string | null;
+  reporterId?: string | null;
   projectId: string;
   createdAt: string;
   sprintId?:  string | null;

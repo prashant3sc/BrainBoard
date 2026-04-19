@@ -3,14 +3,14 @@ import { DragDropContext } from '@hello-pangea/dnd';
 import type { DropResult } from '@hello-pangea/dnd';
 import { useIssues, useUpdateIssue } from '../useKanban';
 import { KanbanColumn } from './KanbanColumn';
-import type { Issue, IssueStatus } from '@/types';
+import { useProjectMembers } from '@/features/projects/useProjects';
+import type { Issue, IssueStatus, ProjectMember } from '@/types';
 
 export const KANBAN_COLUMNS: { id: IssueStatus; label: string; cls: string }[] = [
-  { id: 'todo',        label: 'To Do',       cls: 'kb-col-todo'    },
-  { id: 'in_progress', label: 'In Progress',  cls: 'kb-col-inprog'  },
-  { id: 'review',      label: 'In Review',    cls: 'kb-col-review'  },
-  { id: 'blocked',     label: 'Blocked',      cls: 'kb-col-blocked' },
-  { id: 'done',        label: 'Done',         cls: 'kb-col-done'    },
+  { id: 'todo',        label: 'To Do',       cls: 'kb-col-todo'   },
+  { id: 'in_progress', label: 'In Progress',  cls: 'kb-col-inprog' },
+  { id: 'review',      label: 'In Review',    cls: 'kb-col-review' },
+  { id: 'done',        label: 'Done',         cls: 'kb-col-done'   },
 ];
 
 interface Props {
@@ -22,6 +22,7 @@ interface Props {
 export function KanbanBoard({ projectId, searchQuery, onIssueClick }: Props) {
   const { data: serverIssues = [], isLoading } = useIssues(projectId);
   const { mutate: updateIssue } = useUpdateIssue();
+  const { data: members = [] } = useProjectMembers(projectId);
 
   /* Local state for optimistic drag updates */
   const [localIssues, setLocalIssues] = useState<Issue[]>([]);
@@ -74,6 +75,7 @@ export function KanbanBoard({ projectId, searchQuery, onIssueClick }: Props) {
             col={col}
             issues={visible.filter((i) => i.status === col.id)}
             isLoading={isLoading}
+            members={members}
             onIssueClick={onIssueClick}
           />
         ))}

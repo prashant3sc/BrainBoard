@@ -44,9 +44,11 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
 class ProjectUpdateSerializer(serializers.ModelSerializer):
     """Admin/PM: update project name, description, and archived state."""
 
+    isArchived = serializers.BooleanField(source="is_archived", required=False)
+
     class Meta:
         model = Project
-        fields = ["name", "description", "is_archived"]
+        fields = ["name", "description", "isArchived"]
 
 
 class ProjectMemberSerializer(serializers.ModelSerializer):
@@ -77,6 +79,9 @@ class ProjectMemberSerializer(serializers.ModelSerializer):
 
 
 class SprintSerializer(serializers.ModelSerializer):
+    startDate = serializers.DateField(source="start_date", required=False, allow_null=True)
+    endDate = serializers.DateField(source="end_date", required=False, allow_null=True)
+
     class Meta:
         model = Sprint
         fields = [
@@ -84,15 +89,13 @@ class SprintSerializer(serializers.ModelSerializer):
             "name",
             "goal",
             "status",
-            "start_date",
-            "end_date",
+            "startDate",
+            "endDate",
             "project",
             "created_at",
         ]
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
-        rep["startDate"] = rep.pop("start_date")
-        rep["endDate"] = rep.pop("end_date")
         rep["createdAt"] = rep.pop("created_at")
         return rep
