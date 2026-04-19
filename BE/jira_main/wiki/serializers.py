@@ -20,6 +20,7 @@ class WikiPageSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         rep = super().to_representation(instance)
         rep["updatedAt"] = rep.pop("updated_at")
+        rep["createdAt"] = rep.pop("created_at")
         return rep
 
 

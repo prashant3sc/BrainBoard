@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { useWikiPages, useCreateWikiPage, useUpdateWikiPage } from '@/features/wiki/useWiki';
+import { useWikiPages, useCreateWikiPage, useUpdateWikiPage, useDeleteWikiPage } from '@/features/wiki/useWiki';
 import { WikiSidebar } from '@/features/wiki/components/WikiSidebar';
 import { WikiEditor, type WikiEditorHandle } from '@/features/wiki/components/WikiEditor';
 import { WikiMetaSidebar } from '@/features/wiki/components/WikiMetaSidebar';
@@ -20,11 +20,26 @@ export function WikiPage() {
   const { data: pages = [], isLoading } = useWikiPages(projectId!);
   const { mutate: createPage } = useCreateWikiPage();
   const { mutate: updatePage, isPending: isSaving } = useUpdateWikiPage();
+  const { mutate: deletePage } = useDeleteWikiPage();
 
   const selectedPage = pages.find((p) => p.id === selectedPageId) ?? null;
   const parentPage = selectedPage?.parentId
     ? (pages.find((p) => p.id === selectedPage.parentId) ?? null)
     : null;
+
+  function handleDeletePage(id: string) {
+    deletePage(
+      { id, projectId: projectId! },
+      {
+        onSuccess: () => {
+          if (selectedPageId === id) {
+            setSelectedPageId(null);
+            setIsEditing(false);
+          }
+        },
+      },
+    );
+  }
 
   function handleCreatePage(parentId: string | null) {
     createPage(
@@ -83,7 +98,6 @@ export function WikiPage() {
 
         <div style={{ flex: 1 }} />
 
-        <button className="wiki-tb-btn">🕐 History</button>
         <button className="wiki-tb-btn">⭐ Star page</button>
         <button className="wiki-tb-btn">↗ Share</button>
 
@@ -129,7 +143,9 @@ export function WikiPage() {
             selectedPageId={selectedPageId}
             onSelect={handleSelectPage}
             onCreatePage={handleCreatePage}
+            onDeletePage={handleDeletePage}
             canCreate={can('createWikiPage')}
+            canDelete={can('manageProjectMembers')}
           />
         )}
 

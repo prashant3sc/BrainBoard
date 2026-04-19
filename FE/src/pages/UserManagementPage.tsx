@@ -88,12 +88,13 @@ export function UserManagementPage() {
 
   /* add user modal */
   const [addOpen, setAddOpen] = useState(false);
-  const [fname,    setFname]    = useState('');
-  const [lname,    setLname]    = useState('');
-  const [email,    setEmail]    = useState('');
-  const [role,     setRole]     = useState<Role | ''>('');
-  const [password, setPassword] = useState('');
-  const [errors,   setErrors]   = useState<Record<string, boolean>>({});
+  const [fname,      setFname]      = useState('');
+  const [lname,      setLname]      = useState('');
+  const [email,      setEmail]      = useState('');
+  const [role,       setRole]       = useState<Role | ''>('');
+  const [password,   setPassword]   = useState('');
+  const [showPass,   setShowPass]   = useState(false);
+  const [errors,     setErrors]     = useState<Record<string, boolean>>({});
   const fnameRef              = useRef<HTMLInputElement>(null);
 
   /* focus first field when modal opens */
@@ -144,7 +145,7 @@ export function UserManagementPage() {
 
   function resetForm() {
     setFname(''); setLname(''); setEmail('');
-    setRole(''); setPassword(''); setErrors({});
+    setRole(''); setPassword(''); setShowPass(false); setErrors({});
   }
 
   function handleAddSubmit(e: React.FormEvent) {
@@ -494,14 +495,40 @@ export function UserManagementPage() {
 
                 {/* Password */}
                 <Field label="Password" required error={errors.password}>
-                  <input
-                    type="password"
-                    autoComplete="new-password"
-                    className={`bb-modal-input${errors.password ? ' bb-modal-input-error' : ''}`}
-                    placeholder="Set a password"
-                    value={password}
-                    onChange={(e) => { setPassword(e.target.value); setErrors((p) => ({ ...p, password: false })); }}
-                  />
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showPass ? 'text' : 'password'}
+                      autoComplete="new-password"
+                      className={`bb-modal-input${errors.password ? ' bb-modal-input-error' : ''}`}
+                      placeholder="Set a password"
+                      value={password}
+                      onChange={(e) => { setPassword(e.target.value); setErrors((p) => ({ ...p, password: false })); }}
+                      style={{ paddingRight: 36 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPass((p) => !p)}
+                      tabIndex={-1}
+                      style={{
+                        position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                        background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                        color: 'var(--bb-text-muted)', display: 'flex', alignItems: 'center',
+                      }}
+                    >
+                      {showPass ? (
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                          <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                          <line x1="1" y1="1" x2="23" y2="23" />
+                        </svg>
+                      ) : (
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
                 </Field>
               </div>
 
