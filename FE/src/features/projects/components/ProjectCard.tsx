@@ -1,30 +1,45 @@
+import { useState, useEffect, useRef } from 'react';
 import type { Project } from '@/types';
 
 interface Props {
   project: Project;
   onClick: (project: Project) => void;
   onPulse: (project: Project, index: number) => void;
+  onEdit?: (project: Project) => void;
+  onDelete?: (project: Project) => void;
+  canManage?: boolean;
   index?: number;
   isPulseActive?: boolean;
 }
 
 const ICONS = ['🖥️', '⚙️', '📦', '🚀', '🎯', '🔧', '📊', '🛠️'];
 
-export function ProjectCard({ project, onClick, onPulse, index = 0, isPulseActive = false }: Props) {
+export function ProjectCard({
+  project, onClick, onPulse, onEdit, onDelete,
+  canManage = false, index = 0, isPulseActive = false,
+}: Props) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   const date = new Date(project.createdAt).toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
+    day: 'numeric', month: 'short', year: 'numeric',
   });
 
   const isBlue   = index % 2 === 1;
   const icon     = ICONS[index % ICONS.length];
-  const initials = project.name
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
+  const initials = project.name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+
+  /* close menu on outside click */
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onDown(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [menuOpen]);
 
   return (
     <div
@@ -39,9 +54,10 @@ export function ProjectCard({ project, onClick, onPulse, index = 0, isPulseActiv
         borderRadius: 10,
         padding: 20,
         cursor: 'pointer',
+        position: 'relative',
       }}
     >
-      {/* Card header: icon + status badge */}
+      {/* Card header: icon + status badge + three-dot menu */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
         <div style={{
           width: 36, height: 36, borderRadius: 8,
@@ -51,13 +67,61 @@ export function ProjectCard({ project, onClick, onPulse, index = 0, isPulseActiv
         }}>
           {icon}
         </div>
-        <span style={{
-          fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 4,
-          background: 'var(--bb-status-active-bg)',
-          color: 'var(--bb-status-active-color)',
-        }}>
-          Active
-        </span>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{
+            fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 4,
+            background: 'var(--bb-status-active-bg)',
+            color: 'var(--bb-status-active-color)',
+          }}>
+            Active
+          </span>
+
+          {/* Three-dot menu — only for admin/pm */}
+          {canManage && (
+            <div ref={menuRef} style={{ position: 'relative' }}>
+              <button
+                className="bb-card-menu-btn"
+                onClick={(e) => { e.stopPropagation(); setMenuOpen((o) => !o); }}
+                title="More options"
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                  <circle cx="8" cy="2.5" r="1.3" />
+                  <circle cx="8" cy="8"   r="1.3" />
+                  <circle cx="8" cy="13.5" r="1.3" />
+                </svg>
+              </button>
+
+              {menuOpen && (
+                <div
+                  className="bb-card-dropdown"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    className="bb-card-dropdown-option"
+                    onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onEdit?.(project); }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11.5 2.5a2.121 2.121 0 0 1 3 3L5 15H2v-3L11.5 2.5z" />
+                    </svg>
+                    Edit project
+                  </button>
+                  <button
+                    className="bb-card-dropdown-option bb-card-dropdown-danger"
+                    onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete?.(project); }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="2 4 4 4 14 4" />
+                      <path d="M5 4V2h6v2" />
+                      <path d="M13 4l-.867 9.747A1 1 0 0 1 11.138 15H4.862a1 1 0 0 1-.995-.93L3 4" />
+                    </svg>
+                    Delete project
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Name */}
@@ -93,13 +157,9 @@ export function ProjectCard({ project, onClick, onPulse, index = 0, isPulseActiv
           {date}
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* AI Pulse button */}
           <button
             className="bb-pulse-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onPulse(project, index);
-            }}
+            onClick={(e) => { e.stopPropagation(); onPulse(project, index); }}
             style={{
               display: 'flex', alignItems: 'center', gap: 5,
               padding: '5px 10px', borderRadius: 6,
