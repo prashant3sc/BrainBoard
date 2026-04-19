@@ -9,10 +9,11 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ["id", "name", "description", "ownerId", "created_at"]
+        fields = ["id", "name", "description", "ownerId", "is_archived", "created_at"]
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
+        rep["isArchived"] = rep.pop("is_archived")
         rep["createdAt"] = rep.pop("created_at")
         return rep
 
@@ -41,11 +42,11 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
 
 
 class ProjectUpdateSerializer(serializers.ModelSerializer):
-    """Admin/PM: update project name and description only."""
+    """Admin/PM: update project name, description, and archived state."""
 
     class Meta:
         model = Project
-        fields = ["name", "description"]
+        fields = ["name", "description", "is_archived"]
 
 
 class ProjectMemberSerializer(serializers.ModelSerializer):

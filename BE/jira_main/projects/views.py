@@ -30,13 +30,16 @@ class ProjectListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        # Default to active projects; FE passes ?is_archived=true for the archive screen
+        show_archived = request.query_params.get("is_archived", "false").lower() == "true"
+
         if request.user.is_org_admin:
-            queryset = Project.objects.filter(is_archived=False)
+            queryset = Project.objects.filter(is_archived=show_archived)
         else:
             member_project_ids = ProjectMember.objects.filter(
                 user=request.user
             ).values_list("project_id", flat=True)
-            queryset = Project.objects.filter(is_archived=False).filter(
+            queryset = Project.objects.filter(is_archived=show_archived).filter(
                 Q(owner=request.user) | Q(id__in=member_project_ids)
             )
         filterset = ProjectFilter(request.query_params, queryset=queryset)
@@ -83,6 +86,11 @@ class ProjectDetailView(APIView):
         project = self._get_project(pk)
         if not project:
             return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # PM can only archive/update projects they own; admin has no restriction
+        if not request.user.is_org_admin and project.owner != request.user:
+            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
+
         serializer = ProjectUpdateSerializer(project, data=request.data, partial=True)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
