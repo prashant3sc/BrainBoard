@@ -59,6 +59,16 @@ export interface WikiVersion {
   isLatest?: boolean;
 }
 
+/** Version history entry from GET /wiki/:id/history */
+export interface WikiPageVersion {
+  id: string;
+  version_number: number;
+  title: string;
+  content: string;
+  created_by: string;
+  created_at: string;
+}
+
 export interface WikiLinkedIssue {
   id: string;
   title: string;

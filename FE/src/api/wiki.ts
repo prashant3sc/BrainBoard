@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { WikiPage } from '../types';
+import type { WikiPage, WikiPageVersion } from '../types';
 import { mockWikiPages } from '../mocks/wiki';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
@@ -55,5 +55,23 @@ export const wikiApi = {
   remove(id: string): Promise<void> {
     if (USE_MOCK) return Promise.resolve();
     return apiClient.delete(`/wiki/${id}`).then(() => undefined);
+  },
+
+  // Fetch version history for a wiki page
+  getHistory(id: string): Promise<WikiPageVersion[]> {
+    if (USE_MOCK) return Promise.resolve([]);
+    return apiClient.get<WikiPageVersion[]>(`/wiki/${id}/history`).then((r) => r.data);
+  },
+
+  // Link an issue to a wiki page
+  linkTicket(id: string, issueId: string): Promise<void> {
+    if (USE_MOCK) return Promise.resolve();
+    return apiClient.post(`/wiki/${id}/link-ticket`, { issueId }).then(() => undefined);
+  },
+
+  // Unlink an issue from a wiki page
+  unlinkTicket(id: string, issueId: string): Promise<void> {
+    if (USE_MOCK) return Promise.resolve();
+    return apiClient.delete(`/wiki/${id}/link-ticket`, { data: { issueId } }).then(() => undefined);
   },
 };

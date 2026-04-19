@@ -84,7 +84,9 @@ function Field({
   rightSlot?: React.ReactNode;
 }) {
   const [focused, setFocused] = useState(false);
+  const [showPass, setShowPass] = useState(false);
   const hasError = Boolean(error);
+  const isPassword = type === 'password';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -97,22 +99,49 @@ function Field({
         </label>
         {rightSlot}
       </div>
-      <input
-        type={type}
-        value={value}
-        autoComplete={autoComplete}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        /* bb-input targets ::placeholder via index.css */
-        className="bb-input"
-        style={{
-          ...inputStyle(hasError),
-          ...(focused && !hasError ? focusStyle : {}),
-          ...(focused && hasError  ? focusErrorStyle : {}),
-        }}
-      />
+      <div style={{ position: 'relative' }}>
+        <input
+          type={isPassword && showPass ? 'text' : type}
+          value={value}
+          autoComplete={autoComplete}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          className="bb-input"
+          style={{
+            ...inputStyle(hasError),
+            ...(focused && !hasError ? focusStyle : {}),
+            ...(focused && hasError  ? focusErrorStyle : {}),
+            ...(isPassword ? { paddingRight: 36 } : {}),
+          }}
+        />
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setShowPass((p) => !p)}
+            style={{
+              position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+              background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+              color: 'var(--bb-text-muted)', display: 'flex', alignItems: 'center',
+            }}
+            tabIndex={-1}
+          >
+            {showPass ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                <line x1="1" y1="1" x2="23" y2="23" />
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            )}
+          </button>
+        )}
+      </div>
       {hasError && <FieldError message={error!} />}
     </div>
   );
