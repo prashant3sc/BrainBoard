@@ -2410,6 +2410,17 @@
 .kb-destination-group {
   display: flex; gap: 8px;
 }
+.kb-reporter-display {
+  padding: 7px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--kb-input-border);
+  background: var(--kb-input-bg);
+  color: var(--kb-modal-title);
+  font-size: 13px;
+  opacity: .75;
+  cursor: default;
+}
+
 .kb-dest-option {
   display: flex; align-items: center; gap: 6px;
   padding: 7px 14px; border-radius: 6px; cursor: pointer;
