@@ -2333,6 +2333,14 @@
 .dark .kb-card-progress-done { background: #2DC48D; }
 
 .kb-subtask-count { display: flex; align-items: center; gap: 3px; font-size: 10.5px; color: var(--kb-card-meta); }
+.kb-story-points {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 4px;
+  background: var(--bb-nav-badge-bg);
+  color: var(--bb-nav-badge-color);
+  font-size: 10px; font-weight: 700;
+}
 
 /* ── Add card inline button ── */
 .kb-add-card-btn {
@@ -2410,6 +2418,17 @@
 .kb-destination-group {
   display: flex; gap: 8px;
 }
+.kb-parent-link {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-top: 6px;
+  background: none; border: none; padding: 0;
+  font-size: 12px; font-weight: 500;
+  color: #E75026; cursor: pointer; font-family: inherit;
+  text-decoration: underline; text-underline-offset: 2px;
+  opacity: .85; transition: opacity .12s;
+}
+.kb-parent-link:hover { opacity: 1; }
+
 .kb-reporter-display {
   padding: 7px 12px;
   border-radius: 6px;

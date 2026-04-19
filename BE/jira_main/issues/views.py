@@ -1,3 +1,4 @@
+from django.db.models import Count, Q
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -12,6 +13,14 @@ from issues.serializers import (
     LabelSerializer,
 )
 from projects.models import Project
+
+
+def annotate_issues(queryset):
+    """Attach subtask_count and done_subtask_count to each issue in one DB pass."""
+    return queryset.annotate(
+        subtask_count=Count("subtasks"),
+        done_subtask_count=Count("subtasks", filter=Q(subtasks__status=Issue.DONE)),
+    )
 
 
 class ProjectIssueListView(APIView):
@@ -35,7 +44,9 @@ class ProjectIssueListView(APIView):
             project = Project.objects.get(pk=project_id)
         except Project.DoesNotExist:
             return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
-        queryset = Issue.objects.filter(project=project).select_related("assignee", "reporter")
+        queryset = annotate_issues(
+            Issue.objects.filter(project=project).select_related("assignee", "reporter")
+        )
         filterset = IssueFilter(request.query_params, queryset=queryset)
         if filterset.is_valid():
             queryset = filterset.qs
@@ -56,6 +67,7 @@ class IssueListView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         issue = serializer.save()
+        issue = annotate_issues(Issue.objects.filter(pk=issue.pk)).first()
         return Response(IssueSerializer(issue).data, status=status.HTTP_201_CREATED)
 
 
@@ -69,10 +81,7 @@ class IssueDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def _get_issue(self, pk):
-        try:
-            return Issue.objects.get(pk=pk)
-        except Issue.DoesNotExist:
-            return None
+        return annotate_issues(Issue.objects.filter(pk=pk)).first()
 
     def get(self, request, pk):
         issue = self._get_issue(pk)

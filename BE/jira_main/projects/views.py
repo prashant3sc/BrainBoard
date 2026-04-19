@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 
 from issues.models import Issue
 from issues.serializers import IssueSerializer
+from issues.views import annotate_issues
 from projects.filters import ProjectFilter, SprintFilter
 from projects.models import Project, ProjectMember, Sprint
 from projects.serializers import (
@@ -169,7 +170,7 @@ class ActiveSprintView(APIView):
         except Sprint.DoesNotExist:
             return Response({"detail": "No active sprint"}, status=status.HTTP_404_NOT_FOUND)
 
-        issues = Issue.objects.filter(sprint=sprint).select_related("assignee", "reporter")
+        issues = annotate_issues(Issue.objects.filter(sprint=sprint).select_related("assignee", "reporter"))
         return Response({
             "sprint": SprintSerializer(sprint).data,
             "issues": IssueSerializer(issues, many=True).data,

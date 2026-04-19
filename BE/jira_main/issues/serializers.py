@@ -10,11 +10,14 @@ class LabelSerializer(serializers.ModelSerializer):
 
 
 class IssueSerializer(serializers.ModelSerializer):
-    assigneeId = serializers.PrimaryKeyRelatedField(source="assignee", read_only=True)
-    reporterId  = serializers.PrimaryKeyRelatedField(source="reporter", read_only=True)
-    projectId = serializers.PrimaryKeyRelatedField(source="project", read_only=True)
-    sprintId = serializers.PrimaryKeyRelatedField(source="sprint", read_only=True)
-    labelIds = serializers.PrimaryKeyRelatedField(source="labels", many=True, read_only=True)
+    assigneeId   = serializers.PrimaryKeyRelatedField(source="assignee", read_only=True)
+    reporterId   = serializers.PrimaryKeyRelatedField(source="reporter", read_only=True)
+    projectId    = serializers.PrimaryKeyRelatedField(source="project", read_only=True)
+    sprintId     = serializers.PrimaryKeyRelatedField(source="sprint", read_only=True)
+    parentId     = serializers.PrimaryKeyRelatedField(source="parent", read_only=True)
+    labelIds     = serializers.PrimaryKeyRelatedField(source="labels", many=True, read_only=True)
+    subtaskCount = serializers.SerializerMethodField()
+    progress     = serializers.SerializerMethodField()
 
     class Meta:
         model = Issue
@@ -31,24 +34,48 @@ class IssueSerializer(serializers.ModelSerializer):
             "reporterId",
             "projectId",
             "sprintId",
+            "parentId",
             "labelIds",
+            "subtaskCount",
+            "progress",
             "created_at",
             "updated_at",
         ]
 
+    def get_subtaskCount(self, instance):
+        # Use pre-annotated value from queryset if available, else count on demand
+        if hasattr(instance, "subtask_count"):
+            return instance.subtask_count
+        return instance.subtasks.count()
+
+    def get_progress(self, instance):
+        if hasattr(instance, "subtask_count") and hasattr(instance, "done_subtask_count"):
+            total = instance.subtask_count
+        else:
+            total = instance.subtasks.count()
+            if total == 0:
+                return 0
+            done = instance.subtasks.filter(status=Issue.DONE).count()
+            return round((done / total) * 100)
+
+        if total == 0:
+            return 0
+        return round((instance.done_subtask_count / total) * 100)
+
     def to_representation(self, instance):
         rep = super().to_representation(instance)
         rep["storyPoints"] = rep.pop("story_points")
-        rep["issueType"] = rep.pop("issue_type")
-        rep["dueDate"] = rep.pop("due_date")
-        rep["createdAt"] = rep.pop("created_at")
-        rep["updatedAt"] = rep.pop("updated_at")
+        rep["issueType"]   = rep.pop("issue_type")
+        rep["dueDate"]     = rep.pop("due_date")
+        rep["createdAt"]   = rep.pop("created_at")
+        rep["updatedAt"]   = rep.pop("updated_at")
         return rep
 
 
 class IssueCreateSerializer(serializers.ModelSerializer):
     assigneeId = serializers.UUIDField(required=False, allow_null=True, write_only=True)
-    projectId = serializers.UUIDField(write_only=True)
+    projectId  = serializers.UUIDField(write_only=True)
+    parentId   = serializers.UUIDField(required=False, allow_null=True, write_only=True)
     storyPoints = serializers.IntegerField(
         required=False, allow_null=True, write_only=True, source="story_points"
     )
@@ -68,15 +95,24 @@ class IssueCreateSerializer(serializers.ModelSerializer):
             "dueDate",
             "assigneeId",
             "projectId",
+            "parentId",
         ]
+
+    def validate(self, attrs):
+        issue_type = attrs.get("issue_type", Issue.TASK)
+        parent_id = attrs.get("parentId")
+        if issue_type == Issue.SUBTASK and not parent_id:
+            raise serializers.ValidationError({"parentId": "parentId is required when issueType is subtask."})
+        return attrs
 
     def create(self, validated_data):
         from projects.models import Project, Sprint
         from users.models import User
 
-        project_id = validated_data.pop("projectId", None)
+        project_id  = validated_data.pop("projectId", None)
         assignee_id = validated_data.pop("assigneeId", None)
-        request = self.context.get("request")
+        parent_id   = validated_data.pop("parentId", None)
+        request     = self.context.get("request")
 
         try:
             project = Project.objects.get(pk=project_id)
@@ -96,19 +132,28 @@ class IssueCreateSerializer(serializers.ModelSerializer):
             except User.DoesNotExist:
                 pass
 
+        parent = None
+        if parent_id:
+            try:
+                parent = Issue.objects.get(pk=parent_id)
+            except Issue.DoesNotExist:
+                raise serializers.ValidationError({"parentId": "Parent issue not found"})
+
         return Issue.objects.create(
             project=project,
             sprint=active_sprint,
             status=Issue.TODO,
             assignee=assignee,
             reporter=request.user if request else None,
+            parent=parent,
             **validated_data,
         )
 
 
 class IssueUpdateSerializer(serializers.ModelSerializer):
     assigneeId = serializers.UUIDField(required=False, allow_null=True, write_only=True)
-    sprintId = serializers.UUIDField(required=False, allow_null=True, write_only=True)
+    sprintId   = serializers.UUIDField(required=False, allow_null=True, write_only=True)
+    parentId   = serializers.UUIDField(required=False, allow_null=True, write_only=True)
     storyPoints = serializers.IntegerField(
         required=False, allow_null=True, write_only=True, source="story_points"
     )
@@ -119,7 +164,7 @@ class IssueUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Issue
-        fields = ["title", "description", "status", "priority", "issueType", "storyPoints", "dueDate", "assigneeId", "sprintId"]
+        fields = ["title", "description", "status", "priority", "issueType", "storyPoints", "dueDate", "assigneeId", "sprintId", "parentId"]
 
     def update(self, instance, validated_data):
         from projects.models import Sprint
@@ -140,11 +185,22 @@ class IssueUpdateSerializer(serializers.ModelSerializer):
         if "sprintId" in validated_data:
             sprint_id = validated_data.pop("sprintId")
             if sprint_id is None:
-                instance.sprint = None  # remove from sprint → backlog
+                instance.sprint = None
             else:
                 try:
                     instance.sprint = Sprint.objects.get(pk=sprint_id)
                 except Sprint.DoesNotExist:
+                    pass
+
+        # Handle parent change — null means detach from parent
+        if "parentId" in validated_data:
+            parent_id = validated_data.pop("parentId")
+            if parent_id is None:
+                instance.parent = None
+            else:
+                try:
+                    instance.parent = Issue.objects.get(pk=parent_id)
+                except Issue.DoesNotExist:
                     pass
 
         for attr, val in validated_data.items():
