@@ -68,6 +68,14 @@ class Issue(models.Model):
     story_points = models.PositiveIntegerField(null=True, blank=True)
     due_date = models.DateField(null=True, blank=True)
 
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="subtasks",
+    )
+
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="project_issues")
     sprint = models.ForeignKey(
         Sprint,

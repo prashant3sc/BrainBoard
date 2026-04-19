@@ -44,11 +44,19 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
 class ProjectUpdateSerializer(serializers.ModelSerializer):
     """Admin/PM: update project name, description, and archived state."""
 
-    isArchived = serializers.BooleanField(source="is_archived", required=False)
+    is_archived = serializers.BooleanField(required=False)
 
     class Meta:
         model = Project
-        fields = ["name", "description", "isArchived"]
+        fields = ["name", "description", "is_archived"]
+
+    def update(self, instance, validated_data):
+        if "is_archived" in validated_data:
+            instance.is_archived = validated_data.pop("is_archived")
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
 
 
 class ProjectMemberSerializer(serializers.ModelSerializer):
