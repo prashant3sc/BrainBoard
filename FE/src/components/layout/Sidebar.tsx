@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { NavLink, useParams } from 'react-router-dom';
 import useAuthStore from '@/store/useAuthStore';
 import useAppStore from '@/store/useAppStore';
 import { useRBAC } from '@/hooks/useRBAC';
 import { authApi } from '@/api/auth';
+import { ProfileModal } from './ProfileModal';
 
 /* ── Logo (matches the browser tab favicon) ── */
 function BBLogo() {
@@ -119,6 +121,8 @@ function getInitials(name: string) {
 export default function Sidebar() {
   const user        = useAuthStore((s) => s.user);
   const logoutStore = useAuthStore((s) => s.logout);
+
+  const [profileOpen, setProfileOpen] = useState(false);
 
   async function logout() {
     await authApi.logout().catch(() => {/* ignore – clear local state regardless */});
@@ -276,32 +280,27 @@ export default function Sidebar() {
 
       {/* ── Footer ── */}
       {user && (
-        <div style={{ borderTop: '1px solid var(--bb-footer-border)', padding: '14px 16px' }}>
+        <div style={{ borderTop: '1px solid var(--bb-footer-border)', padding: '12px 14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
 
-            {/* Avatar */}
-            <div style={{
-              width: 30, height: 30, borderRadius: '50%',
-              background: 'var(--bb-avatar-bg)',
-              border: '1.5px solid var(--bb-avatar-border)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 11, fontWeight: 600, color: 'var(--bb-avatar-color)', flexShrink: 0,
-            }}>
+            {/* Avatar button → opens profile modal */}
+            <button
+              className="bb-avatar-btn"
+              onClick={() => setProfileOpen(true)}
+              title="View profile"
+            >
               {getInitials(user.name)}
-            </div>
+              <span className="bb-avatar-btn-ring" />
+            </button>
 
-            {/* User info */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{
-                fontSize: 13, fontWeight: 500, color: 'var(--bb-user-name)',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              }}>
-                {user.name}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--bb-user-role)', textTransform: 'capitalize' }}>
-                {user.role}
-              </div>
-            </div>
+            {/* User info (also clickable) */}
+            <button
+              className="bb-user-info-btn"
+              onClick={() => setProfileOpen(true)}
+            >
+              <span className="bb-user-info-name">{user.name}</span>
+              <span className="bb-user-info-role">{user.role}</span>
+            </button>
 
             {/* Theme toggle */}
             <button
@@ -318,12 +317,15 @@ export default function Sidebar() {
               onClick={logout}
               className="bb-sidebar-btn"
               style={{ padding: '4px 8px', fontSize: 11 }}
+              title="Log out"
             >
               Out
             </button>
           </div>
         </div>
       )}
+
+      <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
     </aside>
   );
 }

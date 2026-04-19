@@ -39,7 +39,7 @@ export function useUpdateUserRole() {
 }
 
 /* ── Create user ── */
-interface CreateUserVars { name: string; email: string; role: Role }
+interface CreateUserVars { first_name: string; last_name: string; email: string; role: Role; password: string }
 
 export function useCreateUser() {
   const queryClient = useQueryClient();

@@ -80,7 +80,7 @@ class UserListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        queryset = User.objects.all().order_by("first_name", "last_name")
+        queryset = User.objects.filter(is_superuser=False).order_by("first_name", "last_name")
         filterset = UserFilter(request.query_params, queryset=queryset)
         if filterset.is_valid():
             queryset = filterset.qs
@@ -129,3 +129,12 @@ class UserDetailView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         serializer.save()
         return Response(UserSerializer(user).data)
+
+    def delete(self, request, pk):
+        user = self._get_user(pk)
+        if not user:
+            return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        if user.pk == request.user.pk:
+            return Response({"detail": "Cannot delete your own account"}, status=status.HTTP_400_BAD_REQUEST)
+        user.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

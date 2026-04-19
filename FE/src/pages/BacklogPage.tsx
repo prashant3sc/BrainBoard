@@ -5,7 +5,7 @@ import { useState, useMemo } from 'react';
 ───────────────────────────────────────────── */
 type IssueType = 'bug' | 'story' | 'task' | 'epic' | 'improvement' | 'chore' | 'security' | 'design' | 'question';
 type BadgeKind  = 'critical' | 'high' | 'medium' | 'low' | 'story' | 'epic';
-type StatusKind = 'todo' | 'inprogress' | 'done' | 'blocked' | 'review';
+type StatusKind = 'todo' | 'inprogress' | 'done' | 'review';
 type AssigneeKey = 'pk' | 'lt' | 'sr' | 'am' | 'kw' | 'none';
 
 interface BacklogIssue {
@@ -19,7 +19,7 @@ interface BacklogIssue {
   storyPts: string;
 }
 
-interface SprintStats { done: number; inprogress: number; blocked: number; todo: number; }
+interface SprintStats { done: number; inprogress: number; review: number; todo: number; }
 
 interface SprintData {
   id: string;
@@ -46,17 +46,17 @@ const SPRINTS: SprintData[] = [
     issueCount: 14,
     storyPts: 55,
     action: 'Complete sprint',
-    stats: { done: 4, inprogress: 5, blocked: 2, todo: 3 },
+    stats: { done: 4, inprogress: 5, review: 2, todo: 3 },
     progress: 28,
     issues: [
       { id: 's12-1', type: 'bug',         key: 'BB-247', summary: 'Login fails on Safari when 2FA is enabled — affects ~12% of users',              badges: ['critical'],         status: 'inprogress', assignee: 'pk',   storyPts: '5'  },
       { id: 's12-2', type: 'story',       key: 'BB-243', summary: 'Allow users to bulk-archive completed issues from the board view',                badges: ['story', 'high'],    status: 'inprogress', assignee: 'lt',   storyPts: '8'  },
-      { id: 's12-3', type: 'task',        key: 'BB-251', summary: 'Upgrade react-dnd to v16 and resolve drag ghost offset regression',               badges: ['medium'],           status: 'blocked',    assignee: 'sr',   storyPts: '3'  },
+      { id: 's12-3', type: 'task',        key: 'BB-251', summary: 'Upgrade react-dnd to v16 and resolve drag ghost offset regression',               badges: ['medium'],           status: 'review',     assignee: 'sr',   storyPts: '3'  },
       { id: 's12-4', type: 'bug',         key: 'BB-248', summary: "Notification bell badge count doesn't reset after reading all notifications",     badges: ['high'],             status: 'todo',       assignee: 'none', storyPts: '2'  },
       { id: 's12-5', type: 'epic',        key: 'BB-230', summary: 'Q2 Performance Initiative — reduce dashboard load time to under 1.5 s',           badges: ['epic'],             status: 'inprogress', assignee: 'am',   storyPts: '21' },
       { id: 's12-6', type: 'improvement', key: 'BB-252', summary: 'Add keyboard shortcut (⌘K) to open global search from any view',                  badges: ['medium'],           status: 'done',       assignee: 'lt',   storyPts: '3'  },
       { id: 's12-7', type: 'chore',       key: 'BB-249', summary: 'Migrate legacy REST calls in settings module to new GraphQL schema',               badges: ['low'],              status: 'inprogress', assignee: 'kw',   storyPts: '5'  },
-      { id: 's12-8', type: 'security',    key: 'BB-254', summary: 'Rotate expired JWT secret and update token validation middleware',                 badges: ['critical'],         status: 'blocked',    assignee: 'pk',   storyPts: '3'  },
+      { id: 's12-8', type: 'security',    key: 'BB-254', summary: 'Rotate expired JWT secret and update token validation middleware',                 badges: ['critical'],         status: 'todo',       assignee: 'pk',   storyPts: '3'  },
       { id: 's12-9', type: 'design',      key: 'BB-241', summary: 'Redesign empty state illustrations across board, backlog, and reports',            badges: ['medium'],           status: 'review',     assignee: 'sr',   storyPts: '5'  },
     ],
   },
@@ -129,13 +129,11 @@ const STATUS_CLASS: Record<StatusKind, string> = {
   todo:       'bb-status-badge bb-st-todo',
   inprogress: 'bb-status-badge bb-st-prog',
   done:       'bb-status-badge bb-st-done',
-  blocked:    'bb-status-badge bb-st-blocked',
   review:     'bb-status-badge bb-st-review',
 };
 
 const STATUS_LABEL: Record<StatusKind, string> = {
-  todo: 'To do', inprogress: 'In progress', done: 'Done',
-  blocked: 'Blocked', review: 'In review',
+  todo: 'To do', inprogress: 'In progress', done: 'Done', review: 'In review',
 };
 
 const ASSIGNEE_DATA: Record<AssigneeKey, { label: string; cls: string }> = {
@@ -232,8 +230,8 @@ function SprintBlock({ sprint, collapsed, onToggle }: SprintBlockProps) {
                 {sprint.stats.inprogress} in progress
               </div>
               <div className="bb-stat-item">
-                <div className="bb-stat-dot bb-dot-blocked" />
-                {sprint.stats.blocked} blocked
+                <div className="bb-stat-dot bb-dot-review" />
+                {sprint.stats.review} in review
               </div>
               <div className="bb-stat-item">
                 <div className="bb-stat-dot bb-dot-todo" />

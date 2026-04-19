@@ -2,9 +2,9 @@ export type Role = 'admin' | 'pm' | 'developer' | 'viewer';
 
 export type Priority = 'critical' | 'high' | 'medium' | 'low';
 
-export type IssueStatus = 'todo' | 'in_progress' | 'review' | 'blocked' | 'done';
+export type IssueStatus = 'todo' | 'in_progress' | 'review' | 'done';
 
-export type IssueType = 'feat' | 'bug' | 'chore' | 'design';
+export type IssueType = 'task' | 'subtask' | 'bug';
 
 /** A user account in the system. */
 export interface User {
@@ -23,6 +23,7 @@ export interface Project {
   ownerId: string;
   memberIds: string[];   // workspace user-ids assigned to this project
   createdAt: string;
+  isArchived: boolean;
 }
 
 /** A single trackable unit of work within a project. */
@@ -33,10 +34,12 @@ export interface Issue {
   status: IssueStatus;
   priority: Priority;
   storyPoints: number;
-  assigneeId: string | null;
+  assigneeId:  string | null;
+  reporterId?: string | null;
   projectId: string;
   createdAt: string;
   sprintId?:  string | null;
+  parentId?:  string | null;
   labelIds?:  string[];
   updatedAt?: string;
   // Kanban display fields
@@ -57,6 +60,16 @@ export interface WikiVersion {
   label: string;
   ago: string;
   isLatest?: boolean;
+}
+
+/** Version history entry from GET /wiki/:id/history */
+export interface WikiPageVersion {
+  id: string;
+  version_number: number;
+  title: string;
+  content: string;
+  created_by: string;
+  created_at: string;
 }
 
 export interface WikiLinkedIssue {
@@ -91,6 +104,13 @@ export interface WikiPage {
   versions?: WikiVersion[];
   linkedIssues?: WikiLinkedIssue[];
   relatedPageIds?: string[];
+}
+
+/** A member entry returned by GET /projects/:id/members */
+export interface ProjectMember {
+  id: string;
+  user: User;
+  joinedAt: string;
 }
 
 /** A unified search result that can represent either an issue or a wiki page. */

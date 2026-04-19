@@ -1,5 +1,5 @@
 import { Droppable } from '@hello-pangea/dnd';
-import type { Issue, IssueStatus } from '@/types';
+import type { Issue, IssueStatus, ProjectMember } from '@/types';
 import { IssueCard } from './IssueCard';
 
 interface ColConfig {
@@ -12,10 +12,11 @@ interface Props {
   col:          ColConfig;
   issues:       Issue[];
   isLoading:    boolean;
+  members:      ProjectMember[];
   onIssueClick: (issue: Issue) => void;
 }
 
-export function KanbanColumn({ col, issues, isLoading, onIssueClick }: Props) {
+export function KanbanColumn({ col, issues, isLoading, members, onIssueClick }: Props) {
   return (
     <div className={`kb-col ${col.cls}`}>
       {/* Header */}
@@ -62,6 +63,7 @@ export function KanbanColumn({ col, issues, isLoading, onIssueClick }: Props) {
                     key={issue.id}
                     issue={issue}
                     index={index}
+                    members={members}
                     onClick={onIssueClick}
                   />
                 ))

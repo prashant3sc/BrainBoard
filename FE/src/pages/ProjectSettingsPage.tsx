@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, NavLink } from 'react-router-dom';
-import { useProject, useAddMember, useRemoveMember } from '@/features/projects/useProjects';
+import { useProject, useProjectMembers, useAddMember, useRemoveMember } from '@/features/projects/useProjects';
 import { useUsers } from '@/features/users/useUsers';
 import useAuthStore from '@/store/useAuthStore';
 import useAppStore from '@/store/useAppStore';
@@ -65,6 +65,7 @@ export default function ProjectSettingsPage() {
   const { toastMsg, toastVisible, showToast } = useToast();
 
   const { data: project, isLoading: projectLoading } = useProject(projectId);
+  const { data: projectMembers = [], isLoading: membersLoading } = useProjectMembers(projectId);
   const { data: allUsers = [], isLoading: usersLoading } = useUsers();
   const { mutate: addMember,    isPending: adding   } = useAddMember();
   const { mutate: removeMember, isPending: removing } = useRemoveMember();
@@ -89,12 +90,12 @@ export default function ProjectSettingsPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const isLoading = projectLoading || usersLoading;
+  const isLoading = projectLoading || membersLoading || usersLoading;
 
-  /* derive member list */
-  const memberIds   = project?.memberIds ?? [];
-  const members     = allUsers.filter((u) => memberIds.includes(u.id));
-  const nonMembers  = allUsers.filter((u) => !memberIds.includes(u.id));
+  /* derive member list from API */
+  const members    = projectMembers.map((pm) => pm.user);
+  const memberIds  = members.map((u) => u.id);
+  const nonMembers = allUsers.filter((u) => !memberIds.includes(u.id));
 
   /* filter existing members by search */
   const q = search.toLowerCase();

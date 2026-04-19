@@ -9,10 +9,11 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ["id", "name", "description", "ownerId", "created_at"]
+        fields = ["id", "name", "description", "ownerId", "is_archived", "created_at"]
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
+        rep["isArchived"] = rep.pop("is_archived")
         rep["createdAt"] = rep.pop("created_at")
         return rep
 
@@ -41,11 +42,21 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
 
 
 class ProjectUpdateSerializer(serializers.ModelSerializer):
-    """Admin/PM: update project name and description only."""
+    """Admin/PM: update project name, description, and archived state."""
+
+    is_archived = serializers.BooleanField(required=False)
 
     class Meta:
         model = Project
-        fields = ["name", "description"]
+        fields = ["name", "description", "is_archived"]
+
+    def update(self, instance, validated_data):
+        if "is_archived" in validated_data:
+            instance.is_archived = validated_data.pop("is_archived")
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
 
 
 class ProjectMemberSerializer(serializers.ModelSerializer):
@@ -76,6 +87,9 @@ class ProjectMemberSerializer(serializers.ModelSerializer):
 
 
 class SprintSerializer(serializers.ModelSerializer):
+    startDate = serializers.DateField(source="start_date", required=False, allow_null=True)
+    endDate = serializers.DateField(source="end_date", required=False, allow_null=True)
+
     class Meta:
         model = Sprint
         fields = [
@@ -83,15 +97,13 @@ class SprintSerializer(serializers.ModelSerializer):
             "name",
             "goal",
             "status",
-            "start_date",
-            "end_date",
+            "startDate",
+            "endDate",
             "project",
             "created_at",
         ]
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
-        rep["startDate"] = rep.pop("start_date")
-        rep["endDate"] = rep.pop("end_date")
         rep["createdAt"] = rep.pop("created_at")
         return rep

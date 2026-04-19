@@ -1,21 +1,30 @@
 import { Draggable } from '@hello-pangea/dnd';
-import type { Issue } from '@/types';
-import { mockUsers } from '@/mocks/users';
+import type { Issue, ProjectMember } from '@/types';
 
 interface Props {
   issue:   Issue;
   index:   number;
+  members: ProjectMember[];
   onClick: (issue: Issue) => void;
 }
 
-/* ── Assignee colour map (per user-id) ── */
-const ASSIGNEE_COLORS: Record<string, { bg: string; text: string }> = {
-  'user-1': { bg: '#E3FCEF', text: '#006644' },
-  'user-2': { bg: '#FFAB8F', text: '#7A1F08' },
-  'user-3': { bg: '#B3D4FF', text: '#0747A6' },
-  'user-4': { bg: '#ABF5D1', text: '#006644' },
-  'user-5': { bg: '#EAE6FF', text: '#403294' },
-};
+/* Deterministic color from any user id string */
+const PALETTE: { bg: string; text: string }[] = [
+  { bg: '#E3FCEF', text: '#006644' },
+  { bg: '#FFAB8F', text: '#7A1F08' },
+  { bg: '#B3D4FF', text: '#0747A6' },
+  { bg: '#ABF5D1', text: '#006644' },
+  { bg: '#EAE6FF', text: '#403294' },
+  { bg: '#FFF0B3', text: '#7A5200' },
+  { bg: '#FFE2E2', text: '#8B0000' },
+  { bg: '#D3F1FF', text: '#003566' },
+];
+
+function avatarColor(id: string) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return PALETTE[hash % PALETTE.length];
+}
 
 function getInitials(name: string) {
   return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
@@ -46,27 +55,30 @@ function priorityLabel(p: string) {
 
 function typeClass(t: string) {
   const map: Record<string, string> = {
-    feat:   'kb-badge-feat',
-    bug:    'kb-badge-bug',
-    chore:  'kb-badge-chore',
-    design: 'kb-badge-design',
+    task:    'kb-badge-feat',
+    subtask: 'kb-badge-chore',
+    bug:     'kb-badge-bug',
   };
   return map[t] ?? '';
 }
 
 function typeLabel(t: string) {
   const map: Record<string, string> = {
-    feat:   'Feature',
-    bug:    'Bug',
-    chore:  'Chore',
-    design: 'Design',
+    task:    'Task',
+    subtask: 'Subtask',
+    bug:     'Bug',
   };
   return map[t] ?? t;
 }
 
-export function IssueCard({ issue, index, onClick }: Props) {
-  const assignee = issue.assigneeId ? mockUsers.find((u) => u.id === issue.assigneeId) ?? null : null;
-  const ac = assignee ? (ASSIGNEE_COLORS[assignee.id] ?? { bg: '#F4F5F7', text: '#42526E' }) : null;
+export function IssueCard({ issue, index, members, onClick }: Props) {
+  const findUser = (id: string | null | undefined) =>
+    id ? (members.find((m) => m.user.id === id)?.user ?? null) : null;
+
+  const assignee = findUser(issue.assigneeId);
+  const reporter = findUser(issue.reporterId);
+  const ac = assignee ? avatarColor(assignee.id) : null;
+  const rc = reporter ? avatarColor(reporter.id) : null;
 
   const overdueDate = issue.due && issue.status !== 'done' && isOverdue(issue.due);
   const progress = issue.progress ?? 0;
@@ -137,10 +149,19 @@ export function IssueCard({ issue, index, onClick }: Props) {
           {/* Footer: id | subtasks + date + avatar */}
           <div className="kb-card-meta">
             <span className="kb-card-id">
-              {issue.id.startsWith('issue-') ? `BB-${issue.id.replace('issue-', '')}` : issue.id}
+              {issue.id.startsWith('issue-')
+                ? `BB-${issue.id.replace('issue-', '')}`
+                : issue.id.slice(0, 8).toUpperCase()}
             </span>
 
             <div className="kb-card-footer-right">
+              {/* Story points */}
+              {issue.storyPoints > 0 && (
+                <span className="kb-story-points" title="Story points">
+                  {issue.storyPoints}
+                </span>
+              )}
+
               {/* Subtask count */}
               {(issue.subtaskCount ?? 0) > 0 && (
                 <span className="kb-subtask-count">
@@ -162,12 +183,23 @@ export function IssueCard({ issue, index, onClick }: Props) {
                 </span>
               )}
 
+              {/* Reporter avatar */}
+              {rc && reporter && (
+                <div
+                  className="kb-card-avatar kb-card-avatar-reporter"
+                  style={{ background: rc.bg, color: rc.text }}
+                  title={`Reporter: ${reporter.name}`}
+                >
+                  {getInitials(reporter.name)}
+                </div>
+              )}
+
               {/* Assignee avatar */}
               {ac && assignee && (
                 <div
                   className="kb-card-avatar"
                   style={{ background: ac.bg, color: ac.text }}
-                  title={assignee.name}
+                  title={`Assignee: ${assignee.name}`}
                 >
                   {getInitials(assignee.name)}
                 </div>

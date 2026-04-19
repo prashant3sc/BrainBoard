@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import type { WikiPage, TocItem } from '@/types';
+import { useWikiHistory } from '@/features/wiki/useWiki';
 
 interface Props {
   page: WikiPage;
@@ -37,6 +38,8 @@ export function WikiMetaSidebar({ page, allPages }: Props) {
   const [activeToc, setActiveToc] = useState<string | null>(null);
 
   const toc = useMemo(() => extractToc(page.content), [page.content, page.id]);
+
+  const { data: history = [] } = useWikiHistory(page.id);
 
   const relatedPages = useMemo(
     () => (page.relatedPageIds ?? []).map((id) => allPages.find((p) => p.id === id)).filter(Boolean) as WikiPage[],
@@ -87,16 +90,19 @@ export function WikiMetaSidebar({ page, allPages }: Props) {
       )}
 
       {/* Version history */}
-      {page.versions && page.versions.length > 0 && (
+      {history.length > 0 && (
         <div className="ds-section">
           <span className="ds-label">Version history</span>
           <div className="version-list">
-            {page.versions.map((v, i) => (
-              <div className="version-item" key={i}>
-                <div className={`version-dot ${v.isLatest ? 'latest' : ''}`} />
+            {history.map((v, i) => (
+              <div className="version-item" key={v.id}>
+                <div className={`version-dot ${i === 0 ? 'latest' : ''}`} />
                 <div className="version-info">
-                  {v.label} — {v.ago}
-                  {v.isLatest && <span className="version-tag">Latest</span>}
+                  v{v.version_number} — {v.title}
+                  <div style={{ fontSize: 10, color: 'var(--bb-text-muted)', marginTop: 1 }}>
+                    {new Date(v.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </div>
+                  {i === 0 && <span className="version-tag">Latest</span>}
                 </div>
               </div>
             ))}

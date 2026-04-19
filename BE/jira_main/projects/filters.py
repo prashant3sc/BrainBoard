@@ -6,16 +6,14 @@ from projects.models import Project, Sprint
 class ProjectFilter(django_filters.FilterSet):
     """
     Supported query params:
-      ?is_archived=true|false   (default view already hides archived; use true to see them)
-      ?search=name              (case-insensitive name/description search)
+      ?search=name   case-insensitive name/description search
     """
 
-    is_archived = django_filters.BooleanFilter()
-    search      = django_filters.CharFilter(method="filter_search")
+    search = django_filters.CharFilter(method="filter_search")
 
     class Meta:
         model  = Project
-        fields = ["is_archived"]
+        fields = []
 
     def filter_search(self, queryset, name, value):
         from django.db.models import Q
