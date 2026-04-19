@@ -9,9 +9,15 @@ type UpdateProjectDto = Partial<CreateProjectDto>;
 
 export const projectsApi = {
   // Fetch all projects visible to the current user
-  getAll(): Promise<Project[]> {
-    if (USE_MOCK) return Promise.resolve([...mockProjects]);
-    return apiClient.get<Project[]>('/projects').then((r) => r.data);
+  getAll(isArchived?: boolean): Promise<Project[]> {
+    if (USE_MOCK) {
+      const list = isArchived === undefined
+        ? [...mockProjects]
+        : mockProjects.filter((p) => !!p.isArchived === isArchived);
+      return Promise.resolve(list);
+    }
+    const params = isArchived !== undefined ? { is_archived: String(isArchived) } : {};
+    return apiClient.get<Project[]>('/projects', { params }).then((r) => r.data);
   },
 
   // Fetch a single project by its id
@@ -93,6 +99,17 @@ export const projectsApi = {
       return Promise.resolve({ ...mockProjects[index] });
     }
     return apiClient.delete<Project>(`/projects/${projectId}/members/${userId}`).then((r) => r.data);
+  },
+
+  // Archive or unarchive a project
+  archive(id: string, isArchived: boolean): Promise<Project> {
+    if (USE_MOCK) {
+      const index = mockProjects.findIndex((p) => p.id === id);
+      if (index === -1) return Promise.reject(new Error(`Project ${id} not found`));
+      mockProjects[index] = { ...mockProjects[index], isArchived };
+      return Promise.resolve({ ...mockProjects[index] });
+    }
+    return apiClient.patch<Project>(`/projects/${id}`, { is_archived: isArchived }).then((r) => r.data);
   },
 
   // Delete a project by id

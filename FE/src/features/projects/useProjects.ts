@@ -4,10 +4,10 @@ import type { Project, ProjectMember } from '@/types';
 
 type CreateProjectDto = Omit<Project, 'id' | 'createdAt'>;
 
-export function useProjects() {
+export function useProjects(isArchived?: boolean) {
   return useQuery({
-    queryKey: ['projects'],
-    queryFn: () => projectsApi.getAll(),
+    queryKey: ['projects', { isArchived }],
+    queryFn: () => projectsApi.getAll(isArchived),
   });
 }
 
@@ -54,6 +54,17 @@ export function useUpdateProject() {
   return useMutation({
     mutationFn: ({ id, name, description }: { id: string; name: string; description: string }) =>
       projectsApi.update(id, { name, description }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+  });
+}
+
+export function useArchiveProject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, isArchived }: { id: string; isArchived: boolean }) =>
+      projectsApi.archive(id, isArchived),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
     },

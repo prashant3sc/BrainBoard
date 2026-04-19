@@ -23,6 +23,7 @@ export interface Project {
   ownerId: string;
   memberIds: string[];   // workspace user-ids assigned to this project
   createdAt: string;
+  isArchived: boolean;
 }
 
 /** A single trackable unit of work within a project. */

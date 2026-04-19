@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useProjects, useDeleteProject, useUpdateProject } from '@/features/projects/useProjects';
+import { useProjects, useDeleteProject, useUpdateProject, useArchiveProject } from '@/features/projects/useProjects';
 import { ProjectCard } from '@/features/projects/components/ProjectCard';
 import { AiPulse } from '@/features/projects/components/AiPulse';
 import { CreateProjectModal } from '@/features/projects/components/CreateProjectModal';
@@ -8,33 +8,45 @@ import { useRBAC } from '@/hooks/useRBAC';
 import useAppStore from '@/store/useAppStore';
 import type { Project } from '@/types';
 
-type Filter = 'All' | 'Active' | 'In progress' | 'Archived';
-const FILTERS: Filter[] = ['All', 'Active', 'Archived'];
+type Tab = 'active' | 'archived';
+
+/* ── inline toast ── */
+function useToast() {
+  const [state, setState] = useState({ msg: '', visible: false, isError: false });
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function show(msg: string, isError = false) {
+    if (timer.current) clearTimeout(timer.current);
+    setState({ msg, visible: true, isError });
+    timer.current = setTimeout(() => setState((s) => ({ ...s, visible: false })), 3500);
+  }
+  return { toastMsg: state.msg, toastVisible: state.visible, toastIsError: state.isError, showToast: show };
+}
 
 export function DashboardPage() {
-  const { data: projects, isLoading, isError } = useProjects();
-  const { mutate: deleteProject } = useDeleteProject();
+  const { data: activeProjects = [], isLoading: loadingActive, isError: errorActive } = useProjects(false);
+  const { data: archivedProjects = [], isLoading: loadingArchived, isError: errorArchived } = useProjects(true);
+  const isLoading = loadingActive || loadingArchived;
+  const isError   = errorActive || errorArchived;
+  const { mutate: deleteProject }                     = useDeleteProject();
   const { mutate: updateProject, isPending: isUpdating } = useUpdateProject();
+  const { mutate: archiveProject }                    = useArchiveProject();
 
+  const [tab, setTab]                             = useState<Tab>('active');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [activeFilter, setActiveFilter]           = useState<Filter>('All');
   const [pulseState, setPulseState]               = useState<{ project: Project; index: number } | null>(null);
-
-  /* delete confirm */
-  const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
-
-  /* edit modal */
-  const [editTarget, setEditTarget]   = useState<Project | null>(null);
-  const [editName, setEditName]       = useState('');
-  const [editDesc, setEditDesc]       = useState('');
+  const [deleteTarget, setDeleteTarget]           = useState<Project | null>(null);
+  const [editTarget, setEditTarget]               = useState<Project | null>(null);
+  const [editName, setEditName]                   = useState('');
+  const [editDesc, setEditDesc]                   = useState('');
 
   const { can } = useRBAC();
   const { togglePalette } = useAppStore();
-  const navigate = useNavigate();
-  const canManage = can('manageProjectMembers'); // admin + pm
+  const navigate    = useNavigate();
+  const canManage   = can('manageProjectMembers'); // admin + pm
+  const { toastMsg, toastVisible, toastIsError, showToast } = useToast();
 
   function handleProjectClick(project: Project) {
-    navigate(`/projects/${project.id}/kanban`);
+    if (!project.isArchived) navigate(`/projects/${project.id}/kanban`);
   }
 
   function handlePulse(project: Project, index: number) {
@@ -52,25 +64,32 @@ export function DashboardPage() {
     if (!editTarget || !editName.trim()) return;
     updateProject(
       { id: editTarget.id, name: editName.trim(), description: editDesc.trim() },
-      { onSuccess: () => setEditTarget(null) },
+      {
+        onSuccess: () => { setEditTarget(null); showToast('Project updated'); },
+        onError: (err: Error) => showToast(err.message || 'Failed to update project', true),
+      },
     );
   }
 
   function handleDeleteConfirm() {
     if (!deleteTarget) return;
-    deleteProject(deleteTarget.id, { onSuccess: () => setDeleteTarget(null) });
+    deleteProject(deleteTarget.id, {
+      onSuccess: () => { setDeleteTarget(null); showToast('Project deleted'); },
+      onError: (err: Error) => { setDeleteTarget(null); showToast(err.message || 'Failed to delete project', true); },
+    });
   }
 
-  const displayed = (() => {
-    if (!projects) return [];
-    if (activeFilter === 'All' || activeFilter === 'Active') return projects;
-    return [];
-  })();
+  function handleArchive(project: Project) {
+    const next = !project.isArchived;
+    archiveProject({ id: project.id, isArchived: next }, {
+      onSuccess: () => showToast(next ? 'Project archived' : 'Project restored'),
+      onError: (err: Error) => showToast(err.message || 'Permission denied', true),
+    });
+  }
 
-  const subtitle =
-    projects && projects.length > 0
-      ? `${projects.length} active project${projects.length !== 1 ? 's' : ''} across your workspace`
-      : 'No projects yet';
+  const displayed     = tab === 'active' ? activeProjects : archivedProjects;
+  const activeCount   = activeProjects.length;
+  const archivedCount = archivedProjects.length;
 
   return (
     <>
@@ -130,23 +149,36 @@ export function DashboardPage() {
 
       {/* ── Content ── */}
       <div style={{ padding: '28px 32px', flex: 1, background: 'var(--bb-content-bg)', minHeight: 'calc(100vh - 57px)' }}>
+
+        {/* Page header */}
         <div style={{ marginBottom: 20 }}>
           <div style={{ fontSize: 22, fontWeight: 600, color: 'var(--bb-page-title)', letterSpacing: '-0.4px' }}>Projects</div>
-          <div style={{ fontSize: 13, color: 'var(--bb-page-subtitle)', marginTop: 3 }}>{subtitle}</div>
+          <div style={{ fontSize: 13, color: 'var(--bb-page-subtitle)', marginTop: 3 }}>
+            {activeCount} active · {archivedCount} archived
+          </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 22 }}>
-          {FILTERS.map((f) => (
-            <button key={f} onClick={() => setActiveFilter(f)} className={`bb-filter-btn${activeFilter === f ? ' bb-filter-active' : ''}`}>
-              {f}
+        {/* ── Tabs ── */}
+        <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid var(--bb-tbl-wrap-border)', marginBottom: 22 }}>
+          {(['active', 'archived'] as Tab[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              style={{
+                padding: '8px 16px', border: 'none', background: 'none', cursor: 'pointer',
+                fontSize: 13, fontWeight: tab === t ? 600 : 400,
+                color: tab === t ? '#E75026' : 'var(--bb-page-subtitle)',
+                borderBottom: tab === t ? '2px solid #E75026' : '2px solid transparent',
+                marginBottom: -1, fontFamily: 'inherit', textTransform: 'capitalize',
+                transition: 'color 0.1s',
+              }}
+            >
+              {t === 'active' ? `Active (${activeCount})` : `Archived (${archivedCount})`}
             </button>
           ))}
         </div>
 
-        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', color: 'var(--bb-section-label)', textTransform: 'uppercase', marginBottom: 12 }}>
-          Your projects
-        </div>
-
+        {/* Loading */}
         {isLoading && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
             {[0, 1, 2].map((i) => (
@@ -172,13 +204,15 @@ export function DashboardPage() {
                 onPulse={handlePulse}
                 onEdit={openEdit}
                 onDelete={setDeleteTarget}
+                onArchive={handleArchive}
                 canManage={canManage}
                 index={i}
                 isPulseActive={pulseState?.project.id === project.id}
               />
             ))}
 
-            {can('createProject') && (
+            {/* Create card — only on active tab */}
+            {tab === 'active' && can('createProject') && (
               <div
                 role="button" tabIndex={0}
                 onClick={() => setIsCreateModalOpen(true)}
@@ -194,7 +228,7 @@ export function DashboardPage() {
                 <div className="bb-new-icon" style={{
                   width: 36, height: 36, borderRadius: '50%', background: 'var(--bb-new-icon-bg)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 20, color: 'var(--bb-new-icon-color)', transition: 'background 0.15s, color 0.15s', lineHeight: 1,
+                  fontSize: 20, color: 'var(--bb-new-icon-color)', lineHeight: 1,
                 }}>+</div>
                 <span className="bb-new-label" style={{ fontSize: 12.5, color: 'var(--bb-new-label-color)', fontWeight: 500 }}>
                   Create new project
@@ -202,9 +236,9 @@ export function DashboardPage() {
               </div>
             )}
 
-            {displayed.length === 0 && !can('createProject') && (
+            {displayed.length === 0 && (
               <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '48px 0', color: 'var(--bb-page-subtitle)', fontSize: 13 }}>
-                No projects found.
+                {tab === 'active' ? 'No active projects.' : 'No archived projects.'}
               </div>
             )}
           </div>
@@ -217,7 +251,7 @@ export function DashboardPage() {
 
       <CreateProjectModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} />
 
-      {/* ── Edit Project Modal ── */}
+      {/* ── Edit Modal ── */}
       {editTarget && (
         <ModalOverlay onClose={() => setEditTarget(null)}>
           <div
@@ -231,47 +265,20 @@ export function DashboardPage() {
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
               </button>
             </div>
-
             <form onSubmit={handleEditSubmit}>
               <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--bb-field-label)' }}>
-                    Project name <span style={{ color: '#DE350B' }}>*</span>
-                  </label>
-                  <input
-                    className="bb-modal-input"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    placeholder="Project name"
-                    required
-                  />
+                  <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--bb-field-label)' }}>Project name <span style={{ color: '#DE350B' }}>*</span></label>
+                  <input className="bb-modal-input" value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Project name" required />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                   <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--bb-field-label)' }}>Description</label>
-                  <textarea
-                    className="bb-modal-input"
-                    value={editDesc}
-                    onChange={(e) => setEditDesc(e.target.value)}
-                    placeholder="Short description…"
-                    rows={3}
-                    style={{ resize: 'vertical' }}
-                  />
+                  <textarea className="bb-modal-input" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} placeholder="Short description…" rows={3} style={{ resize: 'vertical' }} />
                 </div>
               </div>
-
               <div style={{ padding: '14px 24px', borderTop: '1px solid var(--bb-modal-border)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                <button
-                  type="button"
-                  onClick={() => setEditTarget(null)}
-                  style={{ padding: '7px 16px', borderRadius: 6, border: '1px solid var(--bb-modal-cancel-border)', background: 'var(--bb-modal-cancel-bg)', color: 'var(--bb-modal-cancel-color)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isUpdating || !editName.trim()}
-                  style={{ padding: '7px 18px', borderRadius: 6, border: 'none', background: '#E75026', color: '#FFFFFF', fontSize: 13, fontWeight: 500, cursor: isUpdating ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: isUpdating ? 0.6 : 1 }}
-                >
+                <button type="button" onClick={() => setEditTarget(null)} style={{ padding: '7px 16px', borderRadius: 6, border: '1px solid var(--bb-modal-cancel-border)', background: 'var(--bb-modal-cancel-bg)', color: 'var(--bb-modal-cancel-color)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+                <button type="submit" disabled={isUpdating || !editName.trim()} style={{ padding: '7px 18px', borderRadius: 6, border: 'none', background: '#E75026', color: '#FFFFFF', fontSize: 13, fontWeight: 500, cursor: isUpdating ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: isUpdating ? 0.6 : 1 }}>
                   {isUpdating ? 'Saving…' : 'Save changes'}
                 </button>
               </div>
@@ -293,29 +300,33 @@ export function DashboardPage() {
                 <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="var(--bb-remove-icon-color)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--bb-remove-title)', marginBottom: 6 }}>
-              Delete "{deleteTarget.name}"?
-            </div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--bb-remove-title)', marginBottom: 6 }}>Delete "{deleteTarget.name}"?</div>
             <div style={{ fontSize: 13, color: 'var(--bb-remove-desc)', lineHeight: 1.55, marginBottom: 20 }}>
               This will permanently delete the project and all its issues, wiki pages, and members. This action cannot be undone.
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-              <button
-                onClick={() => setDeleteTarget(null)}
-                style={{ padding: '8px 20px', borderRadius: 6, border: '1px solid var(--bb-modal-cancel-border)', background: 'var(--bb-modal-cancel-bg)', color: 'var(--bb-modal-cancel-color)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteConfirm}
-                style={{ padding: '8px 20px', borderRadius: 6, border: 'none', background: '#DE350B', color: '#FFFFFF', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
-              >
-                Yes, delete
-              </button>
+              <button onClick={() => setDeleteTarget(null)} style={{ padding: '8px 20px', borderRadius: 6, border: '1px solid var(--bb-modal-cancel-border)', background: 'var(--bb-modal-cancel-bg)', color: 'var(--bb-modal-cancel-color)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+              <button onClick={handleDeleteConfirm} style={{ padding: '8px 20px', borderRadius: 6, border: 'none', background: '#DE350B', color: '#FFFFFF', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Yes, delete</button>
             </div>
           </div>
         </ModalOverlay>
       )}
+
+      {/* ── Toast ── */}
+      <div className={`bb-toast${toastVisible ? ' bb-toast-show' : ''}`} style={toastIsError ? { background: '#FFF0EE', borderColor: '#FFBDAD' } : {}}>
+        {toastIsError ? (
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <circle cx="7" cy="7" r="6" fill="#DE350B" />
+            <path d="M4.5 4.5l5 5M9.5 4.5l-5 5" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        ) : (
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <circle cx="7" cy="7" r="6" fill="#006644" />
+            <path d="M4 7l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+        <span style={toastIsError ? { color: '#DE350B' } : {}}>{toastMsg}</span>
+      </div>
     </>
   );
 }
