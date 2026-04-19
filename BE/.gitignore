@@ -1,6 +1,9 @@
 # Claude Code
 .claude/
 
+# laucnh json for debug
+.vscode/
+
 # Architecture / internal docs
 BACKEND_ARCHITECTURE.md
 BACKEND_ARCHITECTURE_PLAN.md
