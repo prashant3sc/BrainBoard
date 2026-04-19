@@ -95,13 +95,8 @@ class IssueDetailView(APIView):
             return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
 
         user = request.user
-        # Viewers cannot edit anything
         if user.role == "viewer":
             return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
-        # Developers can only edit issues they own or are assigned to
-        if user.role == "developer":
-            if issue.reporter_id != user.pk and issue.assignee_id != user.pk:
-                return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
 
         serializer = IssueUpdateSerializer(issue, data=request.data, partial=True)
         if not serializer.is_valid():

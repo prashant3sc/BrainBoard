@@ -39,9 +39,14 @@ export function KanbanColumn({ col, issues, isLoading, members, onIssueClick }: 
             {...provided.droppableProps}
             style={{
               background: snapshot.isDraggingOver
-                ? 'var(--kb-col-hover, rgba(99,102,241,0.06))'
+                ? 'var(--kb-drop-active, rgba(231,80,38,0.07))'
                 : undefined,
-              transition: 'background 150ms ease',
+              outline: snapshot.isDraggingOver
+                ? '2px dashed rgba(231,80,38,0.35)'
+                : '2px solid transparent',
+              outlineOffset: '-4px',
+              borderRadius: '0 0 8px 8px',
+              transition: 'background 120ms ease, outline 120ms ease',
             }}
           >
             {isLoading

@@ -64,12 +64,12 @@ class ProjectCreateView(APIView):
 
 class ProjectDetailView(APIView):
     """
-    GET    /projects/:id — retrieve project details (admin, pm only)
-    PATCH  /projects/:id — update name/description (admin, pm only)
+    GET    /projects/:id — retrieve project details (any authenticated user)
+    PATCH  /projects/:id — update name/description/archive (admin, pm only)
     DELETE /projects/:id — delete project (admin, pm only)
     """
 
-    permission_classes = [IsAdminOrPM]
+    permission_classes = [IsAuthenticated]
 
     def _get_project(self, pk):
         try:
@@ -84,6 +84,8 @@ class ProjectDetailView(APIView):
         return Response(ProjectSerializer(project).data)
 
     def patch(self, request, pk):
+        if not request.user.can_manage_projects:
+            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
         project = self._get_project(pk)
         if not project:
             return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -99,6 +101,8 @@ class ProjectDetailView(APIView):
         return Response(ProjectSerializer(project).data)
 
     def delete(self, request, pk):
+        if not request.user.can_manage_projects:
+            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
         project = self._get_project(pk)
         if not project:
             return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)

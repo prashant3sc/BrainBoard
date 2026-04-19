@@ -130,8 +130,8 @@ export function IssueCard({ issue, index, members, onClick }: Props) {
           {/* Title */}
           <div className="kb-card-title">{issue.title}</div>
 
-          {/* Progress bar (only when > 0) */}
-          {progress > 0 && (
+          {/* Progress bar — shown for tasks with subtasks (even at 0%) */}
+          {(issue.subtaskCount ?? 0) > 0 && (
             <div className="kb-card-progress">
               <div className="kb-card-progress-label">
                 <span>Progress</span>
