@@ -39,6 +39,7 @@ export interface Issue {
   projectId: string;
   createdAt: string;
   sprintId?:  string | null;
+  parentId?:  string | null;
   labelIds?:  string[];
   updatedAt?: string;
   // Kanban display fields

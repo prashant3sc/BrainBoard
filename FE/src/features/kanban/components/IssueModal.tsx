@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { issuesApi } from '@/api/issues';
 import { useRBAC } from '@/hooks/useRBAC';
 import { useProjectMembers } from '@/features/projects/useProjects';
+import useAuthStore from '@/store/useAuthStore';
 import type { Issue, IssueStatus, Priority, IssueType } from '@/types';
 import { KANBAN_COLUMNS } from './KanbanBoard';
 
@@ -41,6 +42,17 @@ export function IssueModal({ issue, isOpen, projectId, onClose }: Props) {
   const canEdit = can('editIssue');
   const canDel  = can('deleteIssue');
   const { data: members = [] } = useProjectMembers(projectId);
+  const currentUser = useAuthStore((s) => s.user);
+
+  /* All non-subtask issues in this project — used as parent candidates */
+  const { data: allIssues = [] } = useQuery({
+    queryKey: ['issues', projectId],
+    queryFn:  () => issuesApi.getAll(projectId),
+    enabled:  !!projectId,
+  });
+  const parentCandidates = allIssues.filter(
+    (i) => i.issueType !== 'subtask' && (!isEdit || i.id !== issue?.id),
+  );
 
   const [title,       setTitle]       = useState('');
   const [desc,        setDesc]        = useState('');
@@ -49,9 +61,11 @@ export function IssueModal({ issue, isOpen, projectId, onClose }: Props) {
   const [issueType,   setIssueType]   = useState<IssueType>('task');
   const [assigneeId,  setAssigneeId]  = useState('');
   const [reporterId,  setReporterId]  = useState('');
+  const [parentId,    setParentId]    = useState('');
   const [due,         setDue]         = useState('');
   const [points,      setPoints]      = useState(3);
   const [titleErr,    setTitleErr]    = useState(false);
+  const [parentErr,   setParentErr]   = useState(false);
   const [destination, setDestination] = useState<Destination>('backlog');
 
   /* Sync form when opening */
@@ -63,10 +77,12 @@ export function IssueModal({ issue, isOpen, projectId, onClose }: Props) {
     setPriority(issue?.priority ?? 'medium');
     setIssueType(issue?.issueType ?? 'task');
     setAssigneeId(issue?.assigneeId ?? '');
-    setReporterId(issue?.reporterId ?? '');
+    setReporterId(issue?.reporterId ?? currentUser?.id ?? '');
+    setParentId(issue?.parentId ?? '');
     setDue(issue?.due ?? '');
     setPoints(issue?.storyPoints ?? 3);
     setTitleErr(false);
+    setParentErr(false);
     setDestination('backlog');
   }, [issue, isOpen]);
 
@@ -84,8 +100,9 @@ export function IssueModal({ issue, isOpen, projectId, onClose }: Props) {
         description: desc,
         priority,
         storyPoints: points,
-        assigneeId:  assigneeId  || null,
-        reporterId:  reporterId  || null,
+        assigneeId:  assigneeId || null,
+        reporterId:  reporterId || null,
+        parentId:    issueType === 'subtask' ? (parentId || null) : null,
         projectId,
         issueType,
         due: due || null,
@@ -102,8 +119,9 @@ export function IssueModal({ issue, isOpen, projectId, onClose }: Props) {
         priority,
         status,
         storyPoints: points,
-        assigneeId:  assigneeId  || null,
-        reporterId:  reporterId  || null,
+        assigneeId:  assigneeId || null,
+        reporterId:  reporterId || null,
+        parentId:    issueType === 'subtask' ? (parentId || null) : null,
         issueType,
         due: due || null,
       }),
@@ -120,6 +138,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose }: Props) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) { setTitleErr(true); return; }
+    if (issueType === 'subtask' && !parentId) { setParentErr(true); return; }
     isEdit ? updateMut.mutate() : createMut.mutate();
   }
 
@@ -270,7 +289,11 @@ export function IssueModal({ issue, isOpen, projectId, onClose }: Props) {
                   className="kb-input kb-select"
                   value={issueType}
                   disabled={!canEdit}
-                  onChange={(e) => setIssueType(e.target.value as IssueType)}
+                  onChange={(e) => {
+                    setIssueType(e.target.value as IssueType);
+                    setParentErr(false);
+                    if (e.target.value !== 'subtask') setParentId('');
+                  }}
                 >
                   {ISSUE_TYPES.map((t) => (
                     <option key={t} value={t}>{TYPE_LABELS[t]}</option>
@@ -293,21 +316,46 @@ export function IssueModal({ issue, isOpen, projectId, onClose }: Props) {
               </div>
             </div>
 
+            {/* Parent issue — required when type is subtask */}
+            {issueType === 'subtask' && (
+              <div className="kb-field">
+                <label className="kb-label">
+                  Parent issue <span className="kb-required">*</span>
+                </label>
+                <select
+                  className={`kb-input kb-select${parentErr ? ' kb-input-error' : ''}`}
+                  value={parentId}
+                  disabled={!canEdit}
+                  onChange={(e) => { setParentId(e.target.value); setParentErr(false); }}
+                >
+                  <option value="">— Select parent issue —</option>
+                  {parentCandidates.map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.id.startsWith('issue-')
+                        ? `BB-${i.id.replace('issue-', '')}`
+                        : i.id.slice(0, 8).toUpperCase()}{' '}
+                      — {i.title}
+                    </option>
+                  ))}
+                </select>
+                {parentErr && (
+                  <span style={{ fontSize: 12, color: '#DE350B', marginTop: 2 }}>
+                    Parent issue is required for subtasks.
+                  </span>
+                )}
+              </div>
+            )}
+
             {/* Reporter + Story points */}
             <div className="kb-row2">
               <div className="kb-field">
                 <label className="kb-label">Reporter</label>
-                <select
-                  className="kb-input kb-select"
-                  value={reporterId}
-                  disabled={!canEdit}
-                  onChange={(e) => setReporterId(e.target.value)}
-                >
-                  <option value="">None</option>
-                  {members.map((m) => (
-                    <option key={m.user.id} value={m.user.id}>{m.user.name}</option>
-                  ))}
-                </select>
+                <div className="kb-reporter-display">
+                  {/* Always the logged-in user on create; stored value on edit */}
+                  {isEdit
+                    ? (members.find((m) => m.user.id === reporterId)?.user.name ?? currentUser?.name ?? '—')
+                    : (currentUser?.name ?? '—')}
+                </div>
               </div>
               <div className="kb-field">
                 <label className="kb-label">Story points</label>
