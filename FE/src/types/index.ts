@@ -106,6 +106,20 @@ export interface WikiPage {
   relatedPageIds?: string[];
 }
 
+/** A sprint within a project. */
+export type SprintStatus = 'planned' | 'active' | 'completed';
+
+export interface Sprint {
+  id: string;
+  name: string;
+  goal: string;
+  status: SprintStatus;
+  startDate: string | null;
+  endDate: string | null;
+  project: string;
+  createdAt: string;
+}
+
 /** A member entry returned by GET /projects/:id/members */
 export interface ProjectMember {
   id: string;

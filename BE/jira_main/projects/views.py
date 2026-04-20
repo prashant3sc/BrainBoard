@@ -64,12 +64,12 @@ class ProjectCreateView(APIView):
 
 class ProjectDetailView(APIView):
     """
-    GET    /projects/:id — retrieve project details (admin, pm only)
-    PATCH  /projects/:id — update name/description (admin, pm only)
+    GET    /projects/:id — retrieve project details (any authenticated user)
+    PATCH  /projects/:id — update name/description/archive (admin, pm only)
     DELETE /projects/:id — delete project (admin, pm only)
     """
 
-    permission_classes = [IsAdminOrPM]
+    permission_classes = [IsAuthenticated]
 
     def _get_project(self, pk):
         try:
@@ -84,6 +84,8 @@ class ProjectDetailView(APIView):
         return Response(ProjectSerializer(project).data)
 
     def patch(self, request, pk):
+        if not request.user.can_manage_projects:
+            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
         project = self._get_project(pk)
         if not project:
             return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -99,6 +101,8 @@ class ProjectDetailView(APIView):
         return Response(ProjectSerializer(project).data)
 
     def delete(self, request, pk):
+        if not request.user.can_manage_projects:
+            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
         project = self._get_project(pk)
         if not project:
             return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -241,9 +245,37 @@ class SprintDetailView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        # On sprint completion: move all unfinished tickets to backlog
+        # On sprint completion: move unfinished tickets to backlog or a chosen planned sprint
         if new_status == Sprint.COMPLETED and sprint.status == Sprint.ACTIVE:
-            Issue.objects.filter(sprint=sprint).exclude(status=Issue.DONE).update(sprint=None)
+            unfinished_qs = Issue.objects.filter(sprint=sprint).exclude(status=Issue.DONE)
+            action = request.data.get("unfinishedAction", "backlog")
+
+            if action == "next_sprint":
+                next_sprint_id = request.data.get("nextSprintId")
+
+                if not next_sprint_id:
+                    return Response(
+                        {"detail": "nextSprintId is required when unfinishedAction is next_sprint"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                try:
+                    next_sprint = Sprint.objects.get(
+                        pk=next_sprint_id,
+                        project=sprint.project,
+                        status=Sprint.PLANNED,
+                    )
+                except Sprint.DoesNotExist:
+                    return Response(
+                        {"detail": "Target sprint not found, does not belong to this project, or is not in planned status"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                unfinished_qs.update(sprint=next_sprint)
+                next_sprint.status = Sprint.ACTIVE
+                next_sprint.save()
+            else:
+                unfinished_qs.update(sprint=None)
 
         serializer = SprintSerializer(sprint, data=request.data, partial=True)
         if not serializer.is_valid():

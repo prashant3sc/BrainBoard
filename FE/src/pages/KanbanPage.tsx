@@ -2,22 +2,41 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { projectsApi } from '@/api/projects';
+import { useProjectMembers } from '@/features/projects/useProjects';
+import { useActiveSprint } from '@/features/projects/useSprints';
 import { KanbanBoard } from '@/features/kanban/components/KanbanBoard';
+import { IssueListView } from '@/features/kanban/components/IssueListView';
 import { IssueModal } from '@/features/kanban/components/IssueModal';
 import type { Issue } from '@/types';
 
-/* Avatar colours for the topbar stack (static display) */
-const TOP_AVATARS = [
-  { initials: 'RV', bg: '#B3D4FF', color: '#0747A6' },
-  { initials: 'SI', bg: '#ABF5D1', color: '#006644' },
-  { initials: 'PS', bg: '#FFAB8F', color: '#7A1F08' },
+const PALETTE: { bg: string; text: string }[] = [
+  { bg: '#B3D4FF', text: '#0747A6' },
+  { bg: '#ABF5D1', text: '#006644' },
+  { bg: '#FFAB8F', text: '#7A1F08' },
+  { bg: '#EAE6FF', text: '#403294' },
+  { bg: '#FFF0B3', text: '#7A5200' },
+  { bg: '#FFE2E2', text: '#8B0000' },
 ];
+
+function memberColor(id: string) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return PALETTE[hash % PALETTE.length];
+}
+
+function getInitials(name: string) {
+  return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+}
 
 export function KanbanPage() {
   const { projectId } = useParams<{ projectId: string }>();
 
   const [searchQuery,   setSearchQuery]   = useState('');
   const [modalOpen,     setModalOpen]     = useState(false);
+  const [viewMode,      setViewMode]      = useState<'board' | 'list'>('board');
+  const { data: members  = [] } = useProjectMembers(projectId ?? '');
+  const { data: activeSprintData, isLoading: issuesLoading } = useActiveSprint(projectId ?? '');
+  const allIssues = activeSprintData?.issues ?? [];
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
 
   const { data: project } = useQuery({
@@ -60,33 +79,47 @@ export function KanbanPage() {
           <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--bb-bc-current)' }}>
             {project?.name ?? '…'}
           </span>
-          <span className="kb-project-tag">
-            <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
-              <circle cx="5" cy="5" r="3.5" fill="#E75026"/>
-            </svg>
-            Active
-          </span>
+          {activeSprintData?.sprint && (
+            <span className="kb-project-tag">
+              <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+                <circle cx="5" cy="5" r="3.5" fill="#E75026"/>
+              </svg>
+              {activeSprintData.sprint.name}
+            </span>
+          )}
         </div>
 
         {/* Right controls */}
         <div className="kb-topbar-right">
-          {/* Avatar stack */}
-          <div style={{ display: 'flex' }}>
-            {TOP_AVATARS.map((av, i) => (
+          {/* Member avatar stack — real project members */}
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            {members.slice(0, 5).map((m, i) => {
+              const { bg, text } = memberColor(m.user.id);
+              return (
+                <div
+                  key={m.user.id}
+                  className="kb-t-avatar"
+                  style={{
+                    background: bg,
+                    color:      text,
+                    marginLeft: i === 0 ? 0 : -6,
+                    zIndex:     members.length - i,
+                  }}
+                  title={m.user.name}
+                >
+                  {getInitials(m.user.name)}
+                </div>
+              );
+            })}
+            {members.length > 5 && (
               <div
-                key={av.initials}
                 className="kb-t-avatar"
-                style={{
-                  background:  av.bg,
-                  color:       av.color,
-                  marginLeft:  i === 0 ? 0 : -6,
-                  zIndex:      TOP_AVATARS.length - i,
-                }}
-                title={av.initials}
+                style={{ background: '#F4F5F7', color: '#42526E', marginLeft: -6, zIndex: 0 }}
+                title={`+${members.length - 5} more`}
               >
-                {av.initials}
+                +{members.length - 5}
               </div>
-            ))}
+            )}
           </div>
 
           {/* Search box */}
@@ -105,14 +138,22 @@ export function KanbanPage() {
 
           {/* View toggle */}
           <div className="kb-view-toggle">
-            <button className="kb-view-btn kb-view-active" title="Board view">
+            <button
+              className={`kb-view-btn${viewMode === 'board' ? ' kb-view-active' : ''}`}
+              title="Board view"
+              onClick={() => setViewMode('board')}
+            >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                 <rect x="1" y="1" width="4" height="14" rx="1" fill="currentColor"/>
                 <rect x="7" y="4" width="4" height="11" rx="1" fill="currentColor"/>
                 <rect x="13" y="7" width="2" height="8"  rx="1" fill="currentColor"/>
               </svg>
             </button>
-            <button className="kb-view-btn" title="List view">
+            <button
+              className={`kb-view-btn${viewMode === 'list' ? ' kb-view-active' : ''}`}
+              title="List view"
+              onClick={() => setViewMode('list')}
+            >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                 <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
@@ -129,12 +170,23 @@ export function KanbanPage() {
         </div>
       </div>
 
-      {/* ── Board ── */}
-      <KanbanBoard
-        projectId={projectId}
-        searchQuery={searchQuery}
-        onIssueClick={openEdit}
-      />
+      {/* ── Board / List ── */}
+      {viewMode === 'board' ? (
+        <KanbanBoard
+          projectId={projectId}
+          searchQuery={searchQuery}
+          onIssueClick={openEdit}
+        />
+      ) : (
+        <IssueListView
+          issues={allIssues}
+          members={members}
+          isLoading={issuesLoading}
+          searchQuery={searchQuery}
+          projectId={projectId}
+          onIssueClick={openEdit}
+        />
+      )}
 
       {/* ── Modal (create + edit) ── */}
       <IssueModal
