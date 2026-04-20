@@ -74,6 +74,7 @@ class IssueCreateSerializer(serializers.ModelSerializer):
     assigneeId = serializers.UUIDField(required=False, allow_null=True, write_only=True)
     projectId  = serializers.UUIDField(write_only=True)
     parentId   = serializers.UUIDField(required=False, allow_null=True, write_only=True)
+    sprintId   = serializers.UUIDField(required=False, allow_null=True, write_only=True)
     storyPoints = serializers.IntegerField(
         required=False, allow_null=True, write_only=True, source="story_points"
     )
@@ -94,6 +95,7 @@ class IssueCreateSerializer(serializers.ModelSerializer):
             "assigneeId",
             "projectId",
             "parentId",
+            "sprintId",
         ]
 
     def validate(self, attrs):
@@ -109,6 +111,7 @@ class IssueCreateSerializer(serializers.ModelSerializer):
         project_id  = validated_data.pop("projectId", None)
         assignee_id = validated_data.pop("assigneeId", None)
         parent_id   = validated_data.pop("parentId", None)
+        sprint_id   = validated_data.pop("sprintId", None)
         request     = self.context.get("request")
 
         try:
@@ -116,10 +119,13 @@ class IssueCreateSerializer(serializers.ModelSerializer):
         except Project.DoesNotExist:
             raise serializers.ValidationError({"projectId": "Project not found"})
 
-        try:
-            active_sprint = Sprint.objects.get(project=project, status=Sprint.ACTIVE)
-        except Sprint.DoesNotExist:
-            active_sprint = None
+        # Resolve sprint: use explicit sprintId if provided, otherwise no sprint (backlog)
+        sprint = None
+        if sprint_id is not None:
+            try:
+                sprint = Sprint.objects.get(pk=sprint_id, project=project)
+            except Sprint.DoesNotExist:
+                raise serializers.ValidationError({"sprintId": "Sprint not found or does not belong to this project"})
 
         assignee = None
         if assignee_id:
@@ -137,7 +143,7 @@ class IssueCreateSerializer(serializers.ModelSerializer):
 
         return Issue.objects.create(
             project=project,
-            sprint=active_sprint,
+            sprint=sprint,
             status=Issue.TODO,
             assignee=assignee,
             reporter=request.user if request else None,

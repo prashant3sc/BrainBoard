@@ -245,9 +245,37 @@ class SprintDetailView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        # On sprint completion: move all unfinished tickets to backlog
+        # On sprint completion: move unfinished tickets to backlog or a chosen planned sprint
         if new_status == Sprint.COMPLETED and sprint.status == Sprint.ACTIVE:
-            Issue.objects.filter(sprint=sprint).exclude(status=Issue.DONE).update(sprint=None)
+            unfinished_qs = Issue.objects.filter(sprint=sprint).exclude(status=Issue.DONE)
+            action = request.data.get("unfinishedAction", "backlog")
+
+            if action == "next_sprint":
+                next_sprint_id = request.data.get("nextSprintId")
+
+                if not next_sprint_id:
+                    return Response(
+                        {"detail": "nextSprintId is required when unfinishedAction is next_sprint"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                try:
+                    next_sprint = Sprint.objects.get(
+                        pk=next_sprint_id,
+                        project=sprint.project,
+                        status=Sprint.PLANNED,
+                    )
+                except Sprint.DoesNotExist:
+                    return Response(
+                        {"detail": "Target sprint not found, does not belong to this project, or is not in planned status"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                unfinished_qs.update(sprint=next_sprint)
+                next_sprint.status = Sprint.ACTIVE
+                next_sprint.save()
+            else:
+                unfinished_qs.update(sprint=None)
 
         serializer = SprintSerializer(sprint, data=request.data, partial=True)
         if not serializer.is_valid():

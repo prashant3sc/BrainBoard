@@ -3,14 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { issuesApi } from '@/api/issues';
 import { useRBAC } from '@/hooks/useRBAC';
 import { useProjectMembers } from '@/features/projects/useProjects';
+import { useActiveSprint, useSprints } from '@/features/projects/useSprints';
 import useAuthStore from '@/store/useAuthStore';
 import type { Issue, IssueStatus, Priority, IssueType } from '@/types';
 import { KANBAN_COLUMNS } from './KanbanBoard';
 
 type Destination = 'backlog' | 'sprint';
-
-/** The active sprint ID — tickets sent to "Current Sprint" get this sprintId. */
-const ACTIVE_SPRINT_ID = 'sprint-12';
 
 interface Props {
   issue: Issue | null;   // null → create mode
@@ -43,6 +41,14 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
   const canEdit = can('editIssue');
   const canDel  = can('deleteIssue');
   const { data: members = [] } = useProjectMembers(projectId);
+  const { data: activeSprintData } = useActiveSprint(projectId);
+  const activeSprintId = activeSprintData?.sprint?.id ?? null;
+  const { data: sprints = [] } = useSprints(projectId);
+  const isInPlannedSprint = isEdit && !!issue?.sprintId &&
+    sprints.some((s) => s.id === issue.sprintId && s.status === 'planned');
+  const isInCompletedSprint = isEdit && !!issue?.sprintId &&
+    sprints.some((s) => s.id === issue.sprintId && s.status === 'completed');
+  const isReadOnly = isInPlannedSprint || isInCompletedSprint;
   const currentUser = useAuthStore((s) => s.user);
 
   /* All non-subtask issues in this project — used as parent candidates */
@@ -54,6 +60,9 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
   const parentCandidates = allIssues.filter(
     (i) => i.issueType !== 'subtask' && (!isEdit || i.id !== issue?.id),
   );
+  const subtasks = isEdit && issue?.issueType !== 'subtask'
+    ? allIssues.filter((i) => i.parentId === issue?.id)
+    : [];
 
   const [title,       setTitle]       = useState('');
   const [desc,        setDesc]        = useState('');
@@ -84,7 +93,12 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
     setPoints(issue?.storyPoints ?? 3);
     setTitleErr(false);
     setParentErr(false);
-    setDestination('backlog');
+    // In edit mode, pre-select based on issue's current sprint
+    if (issue?.sprintId) {
+      setDestination('sprint');
+    } else {
+      setDestination('backlog');
+    }
   }, [issue, isOpen]);
 
   function close() { onClose(); }
@@ -107,7 +121,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
         projectId,
         issueType,
         due: due || null,
-        sprintId: destination === 'sprint' ? ACTIVE_SPRINT_ID : null,
+        sprintId: destination === 'sprint' ? activeSprintId : null,
       }),
     onSuccess: invalidateAndClose,
   });
@@ -125,6 +139,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
         parentId:    issueType === 'subtask' ? (parentId || null) : null,
         issueType,
         due: due || null,
+        sprintId: destination === 'sprint' ? activeSprintId : null,
       }),
     onSuccess: invalidateAndClose,
   });
@@ -187,6 +202,26 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
           </button>
         </div>
 
+        {/* Read-only banners */}
+        {isInPlannedSprint && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 20px', background: '#FFF9E6', borderBottom: '1px solid #FFE58F', fontSize: 12, color: '#7A5200' }}>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="6.5" stroke="#F5A623" strokeWidth="1.4"/>
+              <path d="M8 5v4M8 11v.5" stroke="#F5A623" strokeWidth="1.4" strokeLinecap="round"/>
+            </svg>
+            This issue is in a planned sprint that hasn't started yet. Editing is disabled.
+          </div>
+        )}
+        {isInCompletedSprint && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 20px', background: '#F4F5F7', borderBottom: '1px solid #DFE1E6', fontSize: 12, color: '#6B778C' }}>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="6.5" stroke="#6B778C" strokeWidth="1.4"/>
+              <path d="M5 8l2 2 4-4" stroke="#6B778C" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            This issue belongs to a completed sprint and is read-only.
+          </div>
+        )}
+
         {/* Two-column body */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
           <div className="kb-modal-cols">
@@ -199,7 +234,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                   className={`kb-input${titleErr ? ' kb-input-error' : ''}`}
                   placeholder="e.g. Fix login timeout on Safari"
                   value={title}
-                  disabled={!canEdit}
+                  disabled={!canEdit || isReadOnly}
                   onChange={(e) => { setTitle(e.target.value); setTitleErr(false); }}
                 />
               </div>
@@ -210,18 +245,18 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                   className="kb-input kb-textarea-tall"
                   placeholder="What needs to be done? Add context, steps to reproduce, acceptance criteria…"
                   value={desc}
-                  disabled={!canEdit}
+                  disabled={!canEdit || isReadOnly}
                   onChange={(e) => setDesc(e.target.value)}
                 />
               </div>
 
-              {/* Destination — create mode only */}
-              {!isEdit && (
+              {/* Destination — create mode; Location — edit mode */}
+              {(!isEdit || (isEdit && !isReadOnly)) && (
                 <div className="kb-field">
-                  <label className="kb-label">Add to <span className="kb-required">*</span></label>
+                  <label className="kb-label">{isEdit ? 'Location' : 'Add to'} {!isEdit && <span className="kb-required">*</span>}</label>
                   <div className="kb-destination-group">
-                    <label className={`kb-dest-option${destination === 'backlog' ? ' kb-dest-active' : ''}`}>
-                      <input type="radio" name="destination" value="backlog" checked={destination === 'backlog'} onChange={() => setDestination('backlog')} />
+                    <label className={`kb-dest-option${destination === 'backlog' ? ' kb-dest-active' : ''}${isReadOnly ? ' kb-dest-disabled' : ''}`}>
+                      <input type="radio" name="destination" value="backlog" checked={destination === 'backlog'} disabled={isReadOnly} onChange={() => setDestination('backlog')} />
                       <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
                         <rect x="1" y="3" width="12" height="2" rx="1" fill="currentColor"/>
                         <rect x="1" y="7" width="12" height="2" rx="1" fill="currentColor"/>
@@ -229,14 +264,14 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                       </svg>
                       Backlog
                     </label>
-                    <label className={`kb-dest-option${destination === 'sprint' ? ' kb-dest-active' : ''}`}>
-                      <input type="radio" name="destination" value="sprint" checked={destination === 'sprint'} onChange={() => setDestination('sprint')} />
+                    <label className={`kb-dest-option${destination === 'sprint' ? ' kb-dest-active' : ''}${(!activeSprintId || isReadOnly) ? ' kb-dest-disabled' : ''}`}>
+                      <input type="radio" name="destination" value="sprint" checked={destination === 'sprint'} disabled={!activeSprintId || isReadOnly} onChange={() => setDestination('sprint')} />
                       <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
                         <path d="M2 7a5 5 0 0 1 9.5-2.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
                         <path d="M12 7a5 5 0 0 1-9.5 2.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
                         <path d="M11.5 2.5l.5 2.3-2.3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
-                      Current Sprint
+                      Current Sprint{!activeSprintId && <span style={{ fontSize: 10, opacity: 0.5, marginLeft: 4 }}>(none active)</span>}
                     </label>
                   </div>
                 </div>
@@ -252,7 +287,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
               {isEdit && (
                 <div className="kb-field">
                   <label className="kb-label">Status</label>
-                  <select className="kb-input kb-select" value={status} disabled={!canEdit} onChange={(e) => setStatus(e.target.value as IssueStatus)}>
+                  <select className="kb-input kb-select" value={status} disabled={!canEdit || isReadOnly} onChange={(e) => setStatus(e.target.value as IssueStatus)}>
                     {KANBAN_COLUMNS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
                   </select>
                 </div>
@@ -263,7 +298,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                 <select
                   className="kb-input kb-select"
                   value={issueType}
-                  disabled={!canEdit}
+                  disabled={!canEdit || isReadOnly}
                   onChange={(e) => {
                     setIssueType(e.target.value as IssueType);
                     setParentErr(false);
@@ -276,14 +311,14 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
 
               <div className="kb-field">
                 <label className="kb-label">Priority</label>
-                <select className="kb-input kb-select" value={priority} disabled={!canEdit} onChange={(e) => setPriority(e.target.value as Priority)}>
+                <select className="kb-input kb-select" value={priority} disabled={!canEdit || isReadOnly} onChange={(e) => setPriority(e.target.value as Priority)}>
                   {PRIORITIES.map((p) => <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>)}
                 </select>
               </div>
 
               <div className="kb-field">
                 <label className="kb-label">Assignee</label>
-                <select className="kb-input kb-select" value={assigneeId} disabled={!canEdit} onChange={(e) => setAssigneeId(e.target.value)}>
+                <select className="kb-input kb-select" value={assigneeId} disabled={!canEdit || isReadOnly} onChange={(e) => setAssigneeId(e.target.value)}>
                   <option value="">Unassigned</option>
                   {members.map((m) => <option key={m.user.id} value={m.user.id}>{m.user.name}</option>)}
                 </select>
@@ -297,11 +332,11 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
               <div className="kb-row2">
                 <div className="kb-field">
                   <label className="kb-label">Story points</label>
-                  <input type="number" min={1} max={13} className="kb-input" value={points} disabled={!canEdit} onChange={(e) => setPoints(Number(e.target.value))} />
+                  <input type="number" min={1} max={13} className="kb-input" value={points} disabled={!canEdit || isReadOnly} onChange={(e) => setPoints(Number(e.target.value))} />
                 </div>
                 <div className="kb-field">
                   <label className="kb-label">Due date</label>
-                  <input type="date" className="kb-input" value={due} disabled={!canEdit} onChange={(e) => setDue(e.target.value)} />
+                  <input type="date" className="kb-input" value={due} disabled={!canEdit || isReadOnly} onChange={(e) => setDue(e.target.value)} />
                 </div>
               </div>
 
@@ -312,7 +347,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                   <select
                     className={`kb-input kb-select${parentErr ? ' kb-input-error' : ''}`}
                     value={parentId}
-                    disabled={!canEdit}
+                    disabled={!canEdit || isReadOnly}
                     onChange={(e) => { setParentId(e.target.value); setParentErr(false); }}
                   >
                     <option value="">— Select parent issue —</option>
@@ -337,6 +372,35 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                 </div>
               )}
 
+              {/* Subtasks — shown on parent issues in edit mode */}
+              {subtasks.length > 0 && (
+                <div className="kb-field">
+                  <label className="kb-label">
+                    Subtasks
+                    <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 400, color: 'var(--bb-bl-count)' }}>
+                      {subtasks.filter((s) => s.status === 'done').length}/{subtasks.length} done
+                    </span>
+                  </label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 2 }}>
+                    {subtasks.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        className="kb-subtask-row"
+                        onClick={() => onNavigate && (close(), onNavigate(s))}
+                      >
+                        <span className={`kb-subtask-dot kb-subtask-dot-${s.status}`} />
+                        <span className="kb-subtask-key">{s.id.slice(0, 8).toUpperCase()}</span>
+                        <span className="kb-subtask-title">{s.title}</span>
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" style={{ marginLeft: 'auto', flexShrink: 0, opacity: 0.4 }}>
+                          <path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
             </div>
           </div>
 
@@ -356,7 +420,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                 </div>
                 <div className="kb-modal-footer-right">
                   <button type="button" className="kb-btn-ghost" onClick={close}>Cancel</button>
-                  {canEdit && (
+                  {canEdit && !isReadOnly && (
                     <button type="submit" className="kb-btn-create" disabled={isPending}>
                       <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
                         <path d="M2 7l3.5 3.5L12 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>

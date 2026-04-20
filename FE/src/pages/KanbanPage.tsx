@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { projectsApi } from '@/api/projects';
 import { useProjectMembers } from '@/features/projects/useProjects';
-import { useIssues } from '@/features/kanban/useKanban';
+import { useActiveSprint } from '@/features/projects/useSprints';
 import { KanbanBoard } from '@/features/kanban/components/KanbanBoard';
 import { IssueListView } from '@/features/kanban/components/IssueListView';
 import { IssueModal } from '@/features/kanban/components/IssueModal';
@@ -35,7 +35,8 @@ export function KanbanPage() {
   const [modalOpen,     setModalOpen]     = useState(false);
   const [viewMode,      setViewMode]      = useState<'board' | 'list'>('board');
   const { data: members  = [] } = useProjectMembers(projectId ?? '');
-  const { data: allIssues = [], isLoading: issuesLoading } = useIssues(projectId ?? '');
+  const { data: activeSprintData, isLoading: issuesLoading } = useActiveSprint(projectId ?? '');
+  const allIssues = activeSprintData?.issues ?? [];
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
 
   const { data: project } = useQuery({
@@ -78,12 +79,14 @@ export function KanbanPage() {
           <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--bb-bc-current)' }}>
             {project?.name ?? '…'}
           </span>
-          <span className="kb-project-tag">
-            <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
-              <circle cx="5" cy="5" r="3.5" fill="#E75026"/>
-            </svg>
-            Active
-          </span>
+          {activeSprintData?.sprint && (
+            <span className="kb-project-tag">
+              <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+                <circle cx="5" cy="5" r="3.5" fill="#E75026"/>
+              </svg>
+              {activeSprintData.sprint.name}
+            </span>
+          )}
         </div>
 
         {/* Right controls */}

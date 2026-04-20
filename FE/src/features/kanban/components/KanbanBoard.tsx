@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { DragDropContext } from '@hello-pangea/dnd';
 import type { DropResult } from '@hello-pangea/dnd';
-import { useIssues, useUpdateIssue } from '../useKanban';
+import { useUpdateIssue } from '../useKanban';
+import { useActiveSprint } from '@/features/projects/useSprints';
 import { KanbanColumn } from './KanbanColumn';
 import { useProjectMembers } from '@/features/projects/useProjects';
 import type { Issue, IssueStatus, ProjectMember } from '@/types';
@@ -20,9 +21,11 @@ interface Props {
 }
 
 export function KanbanBoard({ projectId, searchQuery, onIssueClick }: Props) {
-  const { data: serverIssues = [], isLoading } = useIssues(projectId);
+  const { data: activeSprintData, isLoading, isError } = useActiveSprint(projectId);
   const { mutate: updateIssue } = useUpdateIssue();
   const { data: members = [] } = useProjectMembers(projectId);
+
+  const serverIssues = activeSprintData?.issues ?? [];
 
   /* Local state for optimistic drag updates */
   const [localIssues, setLocalIssues] = useState<Issue[]>([]);
@@ -65,6 +68,20 @@ export function KanbanBoard({ projectId, searchQuery, onIssueClick }: Props) {
           i.id.toLowerCase().includes(q),
       )
     : localIssues;
+
+  /* No active sprint — show empty state */
+  if (!isLoading && (isError || !activeSprintData)) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 12, color: 'var(--bb-bl-count)' }}>
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" opacity={0.35}>
+          <rect x="4" y="4" width="16" height="40" rx="3" fill="currentColor"/>
+          <rect x="24" y="12" width="16" height="32" rx="3" fill="currentColor"/>
+        </svg>
+        <p style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>No active sprint</p>
+        <p style={{ fontSize: 12, margin: 0, opacity: 0.7 }}>Go to Backlog to start a sprint.</p>
+      </div>
+    );
+  }
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
