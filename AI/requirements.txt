@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic
+pydantic-settings
+langchain
+langchain-openai
+langchain-groq
+langchain-community
+chromadb
+tiktoken
+langchain-core
+slowapi

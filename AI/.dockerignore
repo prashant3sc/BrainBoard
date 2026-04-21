@@ -1,0 +1,27 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Logs — should never go into the Docker image
+logs.txt
+
+# Environment secrets — NEVER include in Docker image
+.env
+
+# Local database — should be volume-mounted, not baked into the image
+chroma_db/
+
+# Dev/test scripts
+seed_db.py
+test_api.py
+
+# IDE and OS files
+.vscode/
+.idea/
+*.DS_Store
+
+# Git
+.git/
+.gitignore

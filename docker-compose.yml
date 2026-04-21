@@ -1,0 +1,74 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  BrainBoard – DB HOST (Prashant's machine)
+#
+#  Runs: PostgreSQL + Django BE + React/Vite FE
+#  Your PostgreSQL is shared with the team over the network.
+#
+#  First time:     docker-compose up --build
+#  After that:     docker-compose up
+#  Stop:           docker-compose down
+#  Wipe DB data:   docker-compose down -v
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── PostgreSQL Database ─────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: brainboard_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432"     # exposed to your local network so teammates can connect
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Django Backend ──────────────────────────────────────────────────────────
+  be:
+    build:
+      context: ./BE
+      dockerfile: Dockerfile
+    container_name: brainboard_be
+    restart: unless-stopped
+    env_file:
+      - .env           # DB_HOST=db  (points to the db container above)
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./BE:/app
+      - be_packages:/usr/local/lib/python3.11/site-packages
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ── React / Vite Frontend ───────────────────────────────────────────────────
+  fe:
+    build:
+      context: ./FE
+      dockerfile: Dockerfile
+    container_name: brainboard_fe
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./FE:/app
+      - fe_modules:/app/node_modules
+    depends_on:
+      - be
+
+volumes:
+  postgres_data:
+  be_packages:
+  fe_modules:

@@ -1,0 +1,51 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  BrainBoard – TEAM MEMBERS (everyone except the DB host)
+#
+#  Runs: Django BE + React/Vite FE only.
+#  Connects to Prashant's shared PostgreSQL over the network.
+#
+#  Setup:
+#    1. Get the .env file from Prashant
+#    2. Set DB_HOST = Prashant's IP address in your .env
+#    3. Run: docker-compose -f docker-compose.client.yml up --build
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Django Backend ──────────────────────────────────────────────────────────
+  be:
+    build:
+      context: ./BE
+      dockerfile: Dockerfile
+    container_name: brainboard_be
+    restart: unless-stopped
+    env_file:
+      - .env           # DB_HOST = Prashant's IP (e.g. 192.168.1.10)
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./BE:/app
+      - be_packages:/usr/local/lib/python3.11/site-packages
+
+  # ── React / Vite Frontend ───────────────────────────────────────────────────
+  fe:
+    build:
+      context: ./FE
+      dockerfile: Dockerfile
+    container_name: brainboard_fe
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./FE:/app
+      - fe_modules:/app/node_modules
+    depends_on:
+      - be
+
+volumes:
+  be_packages:
+  fe_modules:
