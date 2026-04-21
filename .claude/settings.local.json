@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(rsync -av --exclude=__pycache__ --exclude=chroma_db --exclude=logs.txt '/c/Users/prashant.poonia/Downloads/JiraGenie AI/AI/' '/c/Users/prashant.poonia/OneDrive - SS Supply Chain Solutions P Ltd/Desktop/BrainBoard/AI/')"
-    ]
-  }
-}
