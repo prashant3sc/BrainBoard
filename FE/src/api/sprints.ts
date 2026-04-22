@@ -21,11 +21,17 @@ export const sprintsApi = {
       .then((r) => r.data);
   },
 
-  // Get the active sprint + its issues
-  getActive(projectId: string): Promise<ActiveSprintResponse> {
+  // Get the active sprint + its issues.
+  // Returns null (not an error) when the API responds with 404 — meaning
+  // no sprint is active yet. The KanbanBoard shows an empty state in that case.
+  getActive(projectId: string): Promise<ActiveSprintResponse | null> {
     return apiClient
       .get<ActiveSprintResponse>(`/projects/${projectId}/active-sprint`)
-      .then((r) => r.data);
+      .then((r) => r.data)
+      .catch((err) => {
+        if (err?.response?.status === 404) return null;
+        throw err;
+      });
   },
 
   // Create a new sprint (planned status by default)

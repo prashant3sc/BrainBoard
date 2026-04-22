@@ -46,7 +46,7 @@ export function DashboardPage() {
   const { toastMsg, toastVisible, toastIsError, showToast } = useToast();
 
   function handleProjectClick(project: Project) {
-    if (!project.isArchived) navigate(`/projects/${project.id}/kanban`);
+    if (!project.isArchived) navigate(`/projects/${project.id}/backlog`);
   }
 
   function handlePulse(project: Project, index: number) {

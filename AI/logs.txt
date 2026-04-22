@@ -1,0 +1,5 @@
+{"timestamp": "2026-04-21T12:40:57.268805+00:00", "level": "INFO", "logger": "jiragenie.startup", "message": "Starting JiraGenie AI v1.0.0", "module": "main", "function": "lifespan", "line": 24}
+{"timestamp": "2026-04-21T16:48:35.093688+00:00", "level": "INFO", "logger": "jiragenie.startup", "message": "Shutting down JiraGenie AI", "module": "main", "function": "lifespan", "line": 26}
+{"timestamp": "2026-04-21T16:49:34.497176+00:00", "level": "INFO", "logger": "jiragenie.startup", "message": "Starting JiraGenie AI v1.0.0", "module": "main", "function": "lifespan", "line": 24}
+{"timestamp": "2026-04-21T16:52:06.237958+00:00", "level": "INFO", "logger": "jiragenie.startup", "message": "Shutting down JiraGenie AI", "module": "main", "function": "lifespan", "line": 26}
+{"timestamp": "2026-04-21T18:29:45.404579+00:00", "level": "INFO", "logger": "jiragenie.startup", "message": "Starting JiraGenie AI v1.0.0", "module": "main", "function": "lifespan", "line": 24}

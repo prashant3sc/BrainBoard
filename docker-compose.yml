@@ -1,15 +1,18 @@
-version: "3.9"
-
 # ─────────────────────────────────────────────────────────────────────────────
 #  BrainBoard – DB HOST (Prashant's machine)
 #
-#  Runs: PostgreSQL + Django BE + React/Vite FE
-#  Your PostgreSQL is shared with the team over the network.
+#  Runs: PostgreSQL + pgAdmin + Django BE + FastAPI AI + React FE
 #
 #  First time:     docker-compose up --build
 #  After that:     docker-compose up
 #  Stop:           docker-compose down
 #  Wipe DB data:   docker-compose down -v
+#
+#  Services:
+#    Frontend  → http://localhost:5173
+#    Django BE → http://localhost:8000
+#    AI API    → http://localhost:8001
+#    pgAdmin   → http://localhost:5050
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
@@ -24,7 +27,7 @@ services:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "5432:5432"     # exposed to your local network so teammates can connect
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -32,6 +35,22 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # ── pgAdmin — Browse DB tables from browser ─────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: brainboard_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      db:
+        condition: service_healthy
 
   # ── Django Backend ──────────────────────────────────────────────────────────
   be:
@@ -41,15 +60,29 @@ services:
     container_name: brainboard_be
     restart: unless-stopped
     env_file:
-      - .env           # DB_HOST=db  (points to the db container above)
+      - .env
     ports:
       - "8000:8000"
     volumes:
-      - ./BE:/app
-      - be_packages:/usr/local/lib/python3.11/site-packages
+      - ./BE:/app    # live-reload: code changes reflect instantly
     depends_on:
       db:
         condition: service_healthy
+
+  # ── FastAPI AI Service ──────────────────────────────────────────────────────
+  ai:
+    build:
+      context: ./AI
+      dockerfile: Dockerfile.dev
+    container_name: brainboard_ai
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./AI:/app
+      - ./AI/chroma_db:/app/chroma_db
 
   # ── React / Vite Frontend ───────────────────────────────────────────────────
   fe:
@@ -64,11 +97,12 @@ services:
       - "5173:5173"
     volumes:
       - ./FE:/app
-      - fe_modules:/app/node_modules
+      - fe_modules:/app/node_modules   # node_modules must stay inside container
     depends_on:
       - be
 
+# ── Named Volumes ─────────────────────────────────────────────────────────────
 volumes:
-  postgres_data:
-  be_packages:
-  fe_modules:
+  postgres_data:    # DB data — persists across restarts
+  pgadmin_data:     # pgAdmin saved connections
+  fe_modules:       # node_modules — must not be overwritten by host mount

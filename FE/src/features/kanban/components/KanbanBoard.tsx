@@ -25,11 +25,14 @@ export function KanbanBoard({ projectId, searchQuery, onIssueClick }: Props) {
   const { mutate: updateIssue } = useUpdateIssue();
   const { data: members = [] } = useProjectMembers(projectId);
 
-  const serverIssues = activeSprintData?.issues ?? [];
-
   /* Local state for optimistic drag updates */
   const [localIssues, setLocalIssues] = useState<Issue[]>([]);
-  useEffect(() => { setLocalIssues(serverIssues); }, [serverIssues]);
+  // Depend on activeSprintData (stable object ref from react-query), NOT on
+  // `activeSprintData?.issues ?? []` which creates a new array reference on
+  // every render when there is no sprint, causing an infinite setState loop.
+  useEffect(() => {
+    setLocalIssues(activeSprintData?.issues ?? []);
+  }, [activeSprintData]);
 
   function onDragEnd(result: DropResult) {
     const { destination, source, draggableId } = result;

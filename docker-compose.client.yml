@@ -1,15 +1,15 @@
-version: "3.9"
-
 # ─────────────────────────────────────────────────────────────────────────────
 #  BrainBoard – TEAM MEMBERS (everyone except the DB host)
 #
-#  Runs: Django BE + React/Vite FE only.
+#  Runs: Django BE + FastAPI AI + React FE
 #  Connects to Prashant's shared PostgreSQL over the network.
 #
-#  Setup:
-#    1. Get the .env file from Prashant
-#    2. Set DB_HOST = Prashant's IP address in your .env
-#    3. Run: docker-compose -f docker-compose.client.yml up --build
+#  Run: docker-compose -f docker-compose.client.yml up --build
+#
+#  Services:
+#    Frontend  → http://localhost:5173
+#    Django BE → http://localhost:8000
+#    AI API    → http://localhost:8001
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
@@ -22,12 +22,26 @@ services:
     container_name: brainboard_be
     restart: unless-stopped
     env_file:
-      - .env           # DB_HOST = Prashant's IP (e.g. 192.168.1.10)
+      - .env
     ports:
       - "8000:8000"
     volumes:
       - ./BE:/app
-      - be_packages:/usr/local/lib/python3.11/site-packages
+
+  # ── FastAPI AI Service ──────────────────────────────────────────────────────
+  ai:
+    build:
+      context: ./AI
+      dockerfile: Dockerfile.dev
+    container_name: brainboard_ai
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./AI:/app
+      - ./AI/chroma_db:/app/chroma_db
 
   # ── React / Vite Frontend ───────────────────────────────────────────────────
   fe:
@@ -47,5 +61,4 @@ services:
       - be
 
 volumes:
-  be_packages:
   fe_modules:
