@@ -15,12 +15,13 @@ export const KANBAN_COLUMNS: { id: IssueStatus; label: string; cls: string }[] =
 ];
 
 interface Props {
-  projectId:    string;
-  searchQuery:  string;
-  onIssueClick: (issue: Issue) => void;
+  projectId:      string;
+  searchQuery:    string;
+  assigneeFilter: string[];
+  onIssueClick:   (issue: Issue) => void;
 }
 
-export function KanbanBoard({ projectId, searchQuery, onIssueClick }: Props) {
+export function KanbanBoard({ projectId, searchQuery, assigneeFilter, onIssueClick }: Props) {
   const { data: activeSprintData, isLoading, isError } = useActiveSprint(projectId);
   const { mutate: updateIssue } = useUpdateIssue();
   const { data: members = [] } = useProjectMembers(projectId);
@@ -62,15 +63,16 @@ export function KanbanBoard({ projectId, searchQuery, onIssueClick }: Props) {
     }
   }
 
-  /* Filter by search query */
+  /* Filter by search query then by selected assignees */
   const q = searchQuery.trim().toLowerCase();
-  const visible = q
+  const afterSearch = q
     ? localIssues.filter(
-        (i) =>
-          i.title.toLowerCase().includes(q) ||
-          i.id.toLowerCase().includes(q),
+        (i) => i.title.toLowerCase().includes(q) || i.id.toLowerCase().includes(q),
       )
     : localIssues;
+  const visible = assigneeFilter.length > 0
+    ? afterSearch.filter((i) => i.assigneeId && assigneeFilter.includes(i.assigneeId))
+    : afterSearch;
 
   /* No active sprint — show empty state */
   if (!isLoading && (isError || !activeSprintData)) {

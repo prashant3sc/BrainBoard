@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from issues.models import Issue
-from projects.models import Project, ProjectMember
+from projects.models import Project, ProjectMember, Sprint
 from wiki.models import WikiPage
 
 from . import ai_client
@@ -260,6 +260,98 @@ class ChatView(APIView):
             )
 
         return Response(result)
+
+
+class SprintPulseView(APIView):
+    """
+    GET /projects/<project_id>/ai-pulse
+
+    Returns real sprint stats (done/in_progress/todo counts, story points, team workload)
+    computed from Postgres, plus AI-generated summary and highlights.
+    Returns 404 if the project has no active sprint.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, project_id):
+        try:
+            sprint = Sprint.objects.get(project_id=project_id, status=Sprint.ACTIVE)
+        except Sprint.DoesNotExist:
+            return Response({"detail": "No active sprint."}, status=status.HTTP_404_NOT_FOUND)
+
+        issues = (
+            Issue.objects
+            .filter(sprint=sprint)
+            .select_related("assignee")
+            .prefetch_related("labels")
+        )
+
+        # ── Compute counts ────────────────────────────────────────────────────
+        done_issues = [i for i in issues if i.status == Issue.DONE]
+        ip_issues   = [i for i in issues if i.status == Issue.IN_PROGRESS]
+        rv_issues   = [i for i in issues if i.status == Issue.REVIEW]
+        todo_issues = [i for i in issues if i.status == Issue.TODO]
+
+        points_burned = sum(i.story_points or 0 for i in done_issues)
+        points_total  = sum(i.story_points or 0 for i in issues)
+
+        # ── Team workload ─────────────────────────────────────────────────────
+        team_map: dict[str, dict] = {}
+        for issue in issues:
+            if not issue.assignee:
+                continue
+            uid = str(issue.assignee_id)
+            if uid not in team_map:
+                name = issue.assignee.get_full_name().strip() or issue.assignee.email
+                team_map[uid] = {
+                    "name":       name,
+                    "role":       issue.assignee.role,
+                    "task_count": 0,
+                }
+            team_map[uid]["task_count"] += 1
+
+        # ── Build AI payload ──────────────────────────────────────────────────
+        sprint_info = {
+            "name":       sprint.name,
+            "start_date": str(sprint.start_date) if sprint.start_date else "",
+            "end_date":   str(sprint.end_date)   if sprint.end_date   else "",
+        }
+        issues_payload = [
+            {
+                "title":        i.title,
+                "status":       i.status,
+                "priority":     i.priority,
+                "labels":       list(i.labels.values_list("name", flat=True)),
+                "assignee":     (i.assignee.get_full_name().strip() or i.assignee.email) if i.assignee else "Unassigned",
+                "story_points": float(i.story_points) if i.story_points else None,
+            }
+            for i in issues
+        ]
+
+        try:
+            ai_result = ai_client.sprint_pulse(sprint_info, issues_payload)
+        except requests.RequestException as exc:
+            return Response(
+                {"detail": f"AI layer unreachable: {exc}"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        return Response({
+            "sprint": {
+                "name":          sprint.name,
+                "start":         str(sprint.start_date) if sprint.start_date else None,
+                "end":           str(sprint.end_date)   if sprint.end_date   else None,
+                "done":          len(done_issues),
+                "in_progress":   len(ip_issues),
+                "review":        len(rv_issues),
+                "todo":          len(todo_issues),
+                "points_burned": points_burned,
+                "points_total":  points_total,
+            },
+            "summary":    ai_result.get("summary", ""),
+            "highlights": ai_result.get("highlights", []),
+            "team":       list(team_map.values()),
+        })
 
 
 class AIHealthView(APIView):

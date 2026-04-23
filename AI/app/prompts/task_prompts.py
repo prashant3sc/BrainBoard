@@ -86,6 +86,53 @@ Labels: {labels}
 Description: {description}
 """
 
+SPRINT_PULSE_PROMPT = """
+You are an expert Agile PM AI assistant. Analyze the sprint below and return a JSON report.
+
+════════════════════════════════════════════
+SPRINT CONTEXT
+════════════════════════════════════════════
+Sprint: {sprint_name}
+Dates:  {start_date} → {end_date}
+Stats:  {done} done | {in_progress} in progress | {review} in review | {todo} to do
+Story points: {points_burned} burned / {points_total} total
+
+════════════════════════════════════════════
+ISSUES IN THIS SPRINT
+════════════════════════════════════════════
+{issues_text}
+
+════════════════════════════════════════════
+INSTRUCTIONS
+════════════════════════════════════════════
+
+1. SUMMARY (2-3 sentences):
+   - State the overall sprint health (On track / At risk / Behind) with a reason
+   - Mention velocity (story points burned vs total)
+   - Add one forward-looking note about completing the sprint
+
+2. HIGHLIGHTS (pick 3 to 5 of the most noteworthy issues):
+   - Each highlight must reference a REAL issue from the list above by name
+   - Assign exactly one tag from: "Shipped", "In progress", "At risk", "Blocked", "Planned"
+   - "Shipped"    → status is done
+   - "In progress"→ status is in_progress or review and looks on track
+   - "At risk"    → in_progress/review but high/critical priority with no progress signal
+   - "Blocked"    → explicitly stuck, critical priority with no assignee or overdue
+   - "Planned"    → still todo
+   - Write the highlight text as one concise sentence about that issue (max 15 words)
+
+════════════════════════════════════════════
+OUTPUT FORMAT — return ONLY raw JSON, no markdown
+════════════════════════════════════════════
+{{
+  "summary": "<2-3 sentence sprint summary>",
+  "highlights": [
+    {{"text": "<concise sentence about the issue>", "tag": "<Shipped|In progress|At risk|Blocked|Planned>"}},
+    ...
+  ]
+}}
+"""
+
 CHATBOT_PROMPT_TEMPLATE = """
 You are an expert Jira Chatbot assistant embedded in a project management tool.
 Your behavior depends entirely on the intent of the user's request.

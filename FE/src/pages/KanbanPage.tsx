@@ -31,12 +31,19 @@ function getInitials(name: string) {
 export function KanbanPage() {
   const { projectId } = useParams<{ projectId: string }>();
 
-  const [searchQuery,   setSearchQuery]   = useState('');
-  const [modalOpen,     setModalOpen]     = useState(false);
-  const [viewMode,      setViewMode]      = useState<'board' | 'list'>('board');
+  const [searchQuery,        setSearchQuery]        = useState('');
+  const [modalOpen,          setModalOpen]          = useState(false);
+  const [viewMode,           setViewMode]           = useState<'board' | 'list'>('board');
+  const [assigneeFilter,     setAssigneeFilter]     = useState<string[]>([]);
   const { data: members  = [] } = useProjectMembers(projectId ?? '');
   const { data: activeSprintData, isLoading: issuesLoading } = useActiveSprint(projectId ?? '');
   const allIssues = activeSprintData?.issues ?? [];
+
+  function toggleAssignee(userId: string) {
+    setAssigneeFilter((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId],
+    );
+  }
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
 
   const { data: project } = useQuery({
@@ -91,21 +98,32 @@ export function KanbanPage() {
 
         {/* Right controls */}
         <div className="kb-topbar-right">
-          {/* Member avatar stack — real project members */}
+          {/* Member avatar stack — clickable to filter by assignee */}
           <div style={{ display: 'flex', alignItems: 'center' }}>
             {members.slice(0, 5).map((m, i) => {
               const { bg, text } = memberColor(m.user.id);
+              const selected = assigneeFilter.includes(m.user.id);
               return (
                 <div
                   key={m.user.id}
+                  role="button"
+                  tabIndex={0}
                   className="kb-t-avatar"
+                  onClick={() => toggleAssignee(m.user.id)}
+                  onKeyDown={(e) => e.key === 'Enter' && toggleAssignee(m.user.id)}
+                  title={selected ? `Remove ${m.user.name} filter` : `Filter by ${m.user.name}`}
                   style={{
                     background: bg,
                     color:      text,
                     marginLeft: i === 0 ? 0 : -6,
-                    zIndex:     members.length - i,
+                    zIndex:     selected ? members.length + 1 : members.length - i,
+                    cursor:     'pointer',
+                    boxShadow:  selected
+                      ? `0 0 0 2px var(--bb-content-bg), 0 0 0 4px ${text}`
+                      : undefined,
+                    transform:  selected ? 'scale(1.15)' : undefined,
+                    transition: 'box-shadow 0.15s, transform 0.15s',
                   }}
-                  title={m.user.name}
                 >
                   {getInitials(m.user.name)}
                 </div>
@@ -119,6 +137,22 @@ export function KanbanPage() {
               >
                 +{members.length - 5}
               </div>
+            )}
+            {/* Clear filter indicator */}
+            {assigneeFilter.length > 0 && (
+              <button
+                onClick={() => setAssigneeFilter([])}
+                title="Clear assignee filter"
+                style={{
+                  marginLeft: 8, fontSize: 11, fontWeight: 600,
+                  color: '#E75026', background: '#FFF3F0',
+                  border: '1px solid #FFD9CC', borderRadius: 20,
+                  padding: '2px 8px', cursor: 'pointer', fontFamily: 'inherit',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                ✕ {assigneeFilter.length} {assigneeFilter.length === 1 ? 'user' : 'users'}
+              </button>
             )}
           </div>
 
@@ -175,6 +209,7 @@ export function KanbanPage() {
         <KanbanBoard
           projectId={projectId}
           searchQuery={searchQuery}
+          assigneeFilter={assigneeFilter}
           onIssueClick={openEdit}
         />
       ) : (
@@ -183,6 +218,7 @@ export function KanbanPage() {
           members={members}
           isLoading={issuesLoading}
           searchQuery={searchQuery}
+          assigneeFilter={assigneeFilter}
           projectId={projectId}
           onIssueClick={openEdit}
         />

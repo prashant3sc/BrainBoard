@@ -53,3 +53,45 @@ class ChatbotJiraResponse(BaseModel):
     logical_thinking: str
     jira_summary: str
     jira_description: str
+
+
+class SprintIssueItem(BaseModel):
+    title: str
+    status: str
+    priority: str
+    labels: List[str] = []
+    assignee: str = ""
+    story_points: Optional[float] = None
+
+
+class SprintInfo(BaseModel):
+    name: str
+    start_date: str
+    end_date: str
+
+
+class SprintPulseRequest(BaseModel):
+    sprint: SprintInfo
+    issues: List[SprintIssueItem]
+
+
+class SprintHighlight(BaseModel):
+    text: str
+    tag: str
+
+
+class SprintPulseResponse(BaseModel):
+    summary: str
+    highlights: List[SprintHighlight]
+
+
+class SemanticSearchRequest(BaseModel):
+    query: str
+    k: int = 10
+
+
+class SemanticSearchResult(BaseModel):
+    id: str
+    type: str
+    title: str
+    excerpt: str

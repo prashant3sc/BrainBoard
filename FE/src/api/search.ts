@@ -35,4 +35,19 @@ export const searchApi = {
     }
     return apiClient.post<SearchResult[]>('/search', { query }).then((r) => r.data);
   },
+
+  semanticSearch(query: string): Promise<SearchResult[]> {
+    if (USE_MOCK) {
+      // No vector DB in mock mode — fall back to regular keyword search
+      const lower = query.toLowerCase();
+      const issueResults: SearchResult[] = mockIssues
+        .filter((i) => i.title.toLowerCase().includes(lower))
+        .map((i) => ({ id: i.id, type: 'issue', title: i.title, excerpt: i.description.slice(0, 120), projectId: i.projectId }));
+      const wikiResults: SearchResult[] = mockWikiPages
+        .filter((p) => p.title.toLowerCase().includes(lower))
+        .map((p) => ({ id: p.id, type: 'wiki', title: p.title, excerpt: p.content.replace(/^#+ .+\n+/, '').slice(0, 120), projectId: p.projectId }));
+      return Promise.resolve([...issueResults, ...wikiResults]);
+    }
+    return apiClient.post<SearchResult[]>('/search/semantic', { query }).then((r) => r.data);
+  },
 };

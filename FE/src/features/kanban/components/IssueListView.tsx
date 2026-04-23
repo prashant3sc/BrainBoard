@@ -6,12 +6,13 @@ import type { Issue, IssueStatus, ProjectMember } from '@/types';
 import { KANBAN_COLUMNS } from './KanbanBoard';
 
 interface Props {
-  issues:       Issue[];
-  members:      ProjectMember[];
-  isLoading:    boolean;
-  searchQuery:  string;
-  projectId:    string;
-  onIssueClick: (issue: Issue) => void;
+  issues:         Issue[];
+  members:        ProjectMember[];
+  isLoading:      boolean;
+  searchQuery:    string;
+  assigneeFilter: string[];
+  projectId:      string;
+  onIssueClick:   (issue: Issue) => void;
 }
 
 /* ── Helpers ── */
@@ -120,7 +121,7 @@ function UserCell({ userId, members, fallback }: { userId: string | null | undef
 }
 
 /* ── Main Component ── */
-export function IssueListView({ issues, members, isLoading, searchQuery, projectId, onIssueClick }: Props) {
+export function IssueListView({ issues, members, isLoading, searchQuery, assigneeFilter, projectId, onIssueClick }: Props) {
   const qc = useQueryClient();
   const currentUser = useAuthStore((s) => s.user);
 
@@ -133,10 +134,13 @@ export function IssueListView({ issues, members, isLoading, searchQuery, project
       .catch(() => qc.invalidateQueries({ queryKey: ['issues', projectId] }));
   }
 
-  const q        = searchQuery.trim().toLowerCase();
-  const filtered = q
+  const q           = searchQuery.trim().toLowerCase();
+  const afterSearch = q
     ? issues.filter((i) => i.title.toLowerCase().includes(q) || i.id.toLowerCase().includes(q))
     : issues;
+  const filtered = assigneeFilter.length > 0
+    ? afterSearch.filter((i) => i.assigneeId && assigneeFilter.includes(i.assigneeId))
+    : afterSearch;
 
   if (isLoading) {
     return (

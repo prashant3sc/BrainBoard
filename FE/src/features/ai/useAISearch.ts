@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { searchApi } from '@/api/search';
+import useAppStore from '@/store/useAppStore';
 import type { SearchResult } from '@/types';
 
 export function useAISearch() {
-  const [query, setQuery]     = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const semanticEnabled = useAppStore((s) => s.semanticEnabled);
+  const [query, setQuery]       = useState('');
+  const [results, setResults]   = useState<SearchResult[]>([]);
   const [isLoading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -15,14 +17,17 @@ export function useAISearch() {
     }
 
     setLoading(true);
+    // Semantic search has higher latency — use a slightly longer debounce
+    const debounce = semanticEnabled ? 500 : 300;
     const timer = setTimeout(() => {
-      searchApi.search(query)
+      const searchFn = semanticEnabled ? searchApi.semanticSearch : searchApi.search;
+      searchFn(query)
         .then((data) => setResults(data))
         .finally(() => setLoading(false));
-    }, 300);
+    }, debounce);
 
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, semanticEnabled]);
 
   return { query, setQuery, results, isLoading };
 }

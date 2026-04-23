@@ -175,6 +175,14 @@ class ActiveSprintView(APIView):
             return Response({"detail": "No active sprint"}, status=status.HTTP_404_NOT_FOUND)
 
         issues = annotate_issues(Issue.objects.filter(sprint=sprint).select_related("assignee", "reporter"))
+
+        # Optional multi-assignee filter: ?assignee_ids=uuid1,uuid2,...
+        raw = request.query_params.get("assignee_ids", "").strip()
+        if raw:
+            ids = [uid.strip() for uid in raw.split(",") if uid.strip()]
+            if ids:
+                issues = issues.filter(assignee_id__in=ids)
+
         return Response({
             "sprint": SprintSerializer(sprint).data,
             "issues": IssueSerializer(issues, many=True).data,

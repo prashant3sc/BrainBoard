@@ -1,14 +1,15 @@
 """
-Basic full-text search across Issues and WikiPages.
-For semantic/vector search the DS team will expose a FastAPI endpoint;
-this view does a DB-level icontains search as the fallback/stub.
+Search views: basic full-text (icontains) and semantic (vector via AI service).
 """
 
+import requests
 from django.db.models import Q
+from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from ai_integration import ai_client
 from issues.models import Issue
 from wiki.models import WikiPage
 
@@ -80,3 +81,63 @@ class SearchView(APIView):
             )
 
         return Response(results)
+
+
+class SemanticSearchView(APIView):
+    """
+    POST /search/semantic
+    Body: { "query": "..." }
+    Calls the AI service for vector similarity search, then enriches each result
+    with the projectId from Postgres before returning.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        query = request.data.get("query", "").strip()
+        if not query:
+            return Response([])
+
+        try:
+            raw_results = ai_client.semantic_search(query)
+        except requests.RequestException as exc:
+            return Response(
+                {"detail": f"AI layer unreachable: {exc}"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        # Bulk-fetch matching issues and wiki pages to resolve projectId in 2 queries
+        issue_ids = [r["id"] for r in raw_results if r.get("type") == "issue" and r.get("id")]
+        wiki_ids  = [r["id"] for r in raw_results if r.get("type") == "wiki"  and r.get("id")]
+
+        issue_map = {
+            str(i.pk): str(i.project_id)
+            for i in Issue.objects.filter(pk__in=issue_ids).only("id", "project_id")
+        }
+        wiki_map = {
+            str(p.pk): str(p.project_id)
+            for p in WikiPage.objects.filter(pk__in=wiki_ids).only("id", "project_id")
+        }
+
+        enriched = []
+        for item in raw_results:
+            item_id   = item.get("id", "")
+            item_type = item.get("type", "")
+            if item_type == "issue" and item_id in issue_map:
+                enriched.append({
+                    "id":        item_id,
+                    "type":      "issue",
+                    "title":     item.get("title", ""),
+                    "excerpt":   item.get("excerpt", ""),
+                    "projectId": issue_map[item_id],
+                })
+            elif item_type == "wiki" and item_id in wiki_map:
+                enriched.append({
+                    "id":        item_id,
+                    "type":      "wiki",
+                    "title":     item.get("title", ""),
+                    "excerpt":   item.get("excerpt", ""),
+                    "projectId": wiki_map[item_id],
+                })
+
+        return Response(enriched)

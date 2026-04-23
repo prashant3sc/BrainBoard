@@ -1,4 +1,5 @@
 import axios from 'axios';
+import useAuthStore from '@/store/useAuthStore';
 
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8000',
@@ -14,12 +15,11 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Zustand persists {user, token} to localStorage via the 'auth-store' key.
-    // After the 8-hour access-token expiry the user remains "logged in" locally
-    // until the next API call returns 401.  We rely on this interceptor to clear
-    // the stale token and redirect — no proactive /auth/me polling is needed.
+    // On 401 we must clear the full Zustand auth store (not just auth_token), otherwise
+    // the persisted `user` object keeps isLoggedIn() returning true and LoginPage
+    // immediately redirects back to /dashboard — causing an infinite loop.
     if (error.response?.status === 401) {
-      localStorage.removeItem('auth_token');
+      useAuthStore.getState().logout();
       window.location.href = '/login';
     }
     return Promise.reject(error);
