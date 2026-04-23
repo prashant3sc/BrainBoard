@@ -5,16 +5,24 @@ from users.serializers import UserSerializer
 
 
 class ProjectSerializer(serializers.ModelSerializer):
-    ownerId = serializers.PrimaryKeyRelatedField(source="owner", read_only=True)
+    ownerId   = serializers.PrimaryKeyRelatedField(source="owner", read_only=True)
+    memberIds = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
-        fields = ["id", "name", "description", "ownerId", "is_archived", "created_at"]
+        fields = ["id", "name", "description", "ownerId", "memberIds", "is_archived", "created_at"]
+
+    def get_memberIds(self, instance):
+        return list(
+            ProjectMember.objects.filter(project=instance).values_list("user_id", flat=True)
+        )
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
         rep["isArchived"] = rep.pop("is_archived")
-        rep["createdAt"] = rep.pop("created_at")
+        rep["createdAt"]  = rep.pop("created_at")
+        # Cast UUIDs to strings so FE receives plain string[]
+        rep["memberIds"]  = [str(uid) for uid in rep["memberIds"]]
         return rep
 
 
@@ -27,6 +35,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         from users.models import User
+        from issues.models import Label
 
         owner_id = validated_data.pop("ownerId", None)
         request = self.context.get("request")
@@ -38,7 +47,19 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
                 pass
         if not owner and request:
             owner = request.user
-        return Project.objects.create(owner=owner, **validated_data)
+        project = Project.objects.create(owner=owner, **validated_data)
+
+        # Seed the 4 default labels for every new project
+        DEFAULT_LABELS = [
+            {"name": "Frontend",     "color": "#0052CC"},
+            {"name": "Backend",      "color": "#00875A"},
+            {"name": "Data Science", "color": "#6554C0"},
+            {"name": "QA Testing",   "color": "#FF8B00"},
+        ]
+        for label in DEFAULT_LABELS:
+            Label.objects.create(project=project, **label)
+
+        return project
 
 
 class ProjectUpdateSerializer(serializers.ModelSerializer):

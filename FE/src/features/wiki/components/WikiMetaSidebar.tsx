@@ -1,10 +1,14 @@
 import { useState, useMemo } from 'react';
-import type { WikiPage, TocItem } from '@/types';
-import { useWikiHistory } from '@/features/wiki/useWiki';
+import { useQuery } from '@tanstack/react-query';
+import type { WikiPage, TocItem, Issue } from '@/types';
+import { useWikiHistory, useWikiLinks, useLinkTicket, useUnlinkTicket } from '@/features/wiki/useWiki';
+import { issuesApi } from '@/api/issues';
+import { IssueModal } from '@/features/kanban/components/IssueModal';
 
 interface Props {
   page: WikiPage;
   allPages: WikiPage[];
+  projectId: string;
 }
 
 function extractToc(html: string): TocItem[] {
@@ -30,12 +34,30 @@ function issueEmoji(type: 'bug' | 'story' | 'task') {
   return '✅';
 }
 
-export function WikiMetaSidebar({ page, allPages }: Props) {
-  const [activeToc, setActiveToc] = useState<string | null>(null);
+export function WikiMetaSidebar({ page, allPages, projectId }: Props) {
+  const [activeToc,      setActiveToc]      = useState<string | null>(null);
+  const [linkPickerOpen, setLinkPickerOpen] = useState(false);
+  const [linkSearch,     setLinkSearch]     = useState('');
+  const [selectedIssue,  setSelectedIssue]  = useState<Issue | null>(null);
+  const [modalOpen,      setModalOpen]      = useState(false);
 
   const toc = useMemo(() => extractToc(page.content), [page.content, page.id]);
 
-  const { data: history = [] } = useWikiHistory(page.id);
+  const { data: history     = [] } = useWikiHistory(page.id);
+  const { data: linkedItems = [] } = useWikiLinks(page.id);
+  const { data: allIssues   = [] } = useQuery({
+    queryKey: ['issues', projectId],
+    queryFn:  () => issuesApi.getAll(projectId),
+    enabled:  !!projectId,
+  });
+  const { mutate: linkTicket,   isPending: linking   } = useLinkTicket();
+  const { mutate: unlinkTicket, isPending: unlinking } = useUnlinkTicket();
+
+  const linkedIssueIds = new Set(linkedItems.map((l) => l.issue.id));
+  const pickableIssues = allIssues.filter(
+    (i) => !linkedIssueIds.has(i.id) &&
+      (!linkSearch.trim() || i.title.toLowerCase().includes(linkSearch.toLowerCase()))
+  );
 
   const relatedPages = useMemo(
     () => (page.relatedPageIds ?? []).map((id) => allPages.find((p) => p.id === id)).filter(Boolean) as WikiPage[],
@@ -107,19 +129,93 @@ export function WikiMetaSidebar({ page, allPages }: Props) {
       )}
 
       {/* Linked issues */}
-      {page.linkedIssues && page.linkedIssues.length > 0 && (
-        <div className="ds-section">
-          <span className="ds-label">Linked issues</span>
-          <div className="ds-related">
-            {page.linkedIssues.map((issue) => (
-              <div className="ds-link" key={issue.id}>
-                <span>{issueEmoji(issue.type)}</span>
-                {issue.id} — {issue.title}
-              </div>
-            ))}
-          </div>
+      <div className="ds-section">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <span className="ds-label" style={{ margin: 0 }}>Linked issues</span>
+          <button
+            className="wiki-link-btn"
+            onClick={() => { setLinkPickerOpen((v) => !v); setLinkSearch(''); }}
+          >
+            {linkPickerOpen ? '✕ Cancel' : '+ Link issue'}
+          </button>
         </div>
-      )}
+
+        {/* Issue picker dropdown */}
+        {linkPickerOpen && (
+          <div className="wiki-link-picker">
+            <input
+              autoFocus
+              className="wiki-link-search"
+              placeholder="Search issues…"
+              value={linkSearch}
+              onChange={(e) => setLinkSearch(e.target.value)}
+            />
+            <div className="wiki-link-list">
+              {pickableIssues.length === 0 && (
+                <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--bb-text-muted)' }}>
+                  {linkSearch ? 'No matches' : 'All issues already linked'}
+                </div>
+              )}
+              {pickableIssues.map((i) => (
+                <button
+                  key={i.id}
+                  className="wiki-link-pick-item"
+                  disabled={linking}
+                  onClick={() => {
+                    linkTicket({ pageId: page.id, issueId: i.id }, {
+                      onSuccess: () => setLinkPickerOpen(false),
+                    });
+                  }}
+                >
+                  <span>{issueEmoji((i.issueType ?? 'task') as 'bug' | 'story' | 'task')}</span>
+                  <span style={{ flex: 1, textAlign: 'left' }}>{i.title}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Linked issue rows */}
+        {linkedItems.length === 0 && !linkPickerOpen && (
+          <div style={{ fontSize: 12, color: 'var(--bb-text-muted)', fontStyle: 'italic' }}>No linked issues yet.</div>
+        )}
+        <div className="ds-related">
+          {linkedItems.map((link) => {
+            const fullIssue = allIssues.find((i) => i.id === link.issue.id);
+            return (
+              <div className="ds-link wiki-linked-issue-row" key={link.id}>
+                <span>{issueEmoji((link.issue.issueType ?? 'task') as 'bug' | 'story' | 'task')}</span>
+                <button
+                  className="wiki-issue-title-btn"
+                  title="View issue"
+                  onClick={() => {
+                    if (fullIssue) { setSelectedIssue(fullIssue); setModalOpen(true); }
+                  }}
+                >
+                  {link.issue.title}
+                </button>
+                <button
+                  className="wiki-unlink-btn"
+                  disabled={unlinking}
+                  title="Unlink"
+                  onClick={() => unlinkTicket({ pageId: page.id, issueId: link.issue.id })}
+                >
+                  ✕
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Issue detail modal — opened when a linked issue is clicked */}
+      <IssueModal
+        issue={selectedIssue}
+        isOpen={modalOpen}
+        projectId={projectId}
+        onClose={() => { setModalOpen(false); setSelectedIssue(null); }}
+        onNavigate={(issue) => { setSelectedIssue(issue); setModalOpen(true); }}
+      />
 
       {/* Related pages */}
       {relatedPages.length > 0 && (

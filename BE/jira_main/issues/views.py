@@ -143,3 +143,19 @@ class LabelListView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         label = serializer.save()
         return Response(LabelSerializer(label).data, status=status.HTTP_201_CREATED)
+
+
+class LabelDetailView(APIView):
+    """DELETE /projects/:projectId/labels/:label_id (admin, pm only)"""
+
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, project_id, label_id):
+        if not request.user.can_manage_projects:
+            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            label = Label.objects.get(pk=label_id, project_id=project_id)
+        except Label.DoesNotExist:
+            return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        label.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

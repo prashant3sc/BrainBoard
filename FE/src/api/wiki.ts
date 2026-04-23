@@ -63,6 +63,12 @@ export const wikiApi = {
     return apiClient.get<WikiPageVersion[]>(`/wiki/${id}/history`).then((r) => r.data);
   },
 
+  // Fetch all issues linked to a wiki page
+  getLinks(id: string): Promise<{ id: string; issue: { id: string; title: string; issueType: string }; wikiPage: string; createdAt: string }[]> {
+    if (USE_MOCK) return Promise.resolve([]);
+    return apiClient.get(`/wiki/${id}/link-ticket`).then((r) => r.data);
+  },
+
   // Link an issue to a wiki page
   linkTicket(id: string, issueId: string): Promise<void> {
     if (USE_MOCK) return Promise.resolve();
