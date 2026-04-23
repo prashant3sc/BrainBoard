@@ -1,5 +1,4 @@
-import os
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 from app.schemas import ChatRequest, ChatbotJiraResponse
 from app.services.chat_service import simple_chat
 from app.core.logging import get_logger
@@ -15,9 +14,10 @@ async def chat(request: ChatRequest):
     - If the user asks a technical question: returns detailed answer in 'logical_thinking'.
     - If the user asks to create a Jira task: returns a concise summary and description.
     """
-    if not os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY") == "your_openai_api_key_here":
-        raise HTTPException(status_code=500, detail="OpenAI API Key not configured in .env file.")
-
     logger.info(f"Chat request received: {request.message[:60]}...")
-    response_data = simple_chat(request.message)
+    try:
+        response_data = simple_chat(request.message)
+    except Exception as exc:
+        logger.error(f"Chat failed: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
     return response_data

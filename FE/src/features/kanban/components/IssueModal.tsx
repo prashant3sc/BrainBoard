@@ -7,6 +7,9 @@ import { useActiveSprint, useSprints } from '@/features/projects/useSprints';
 import useAuthStore from '@/store/useAuthStore';
 import type { Issue, IssueStatus, Priority, IssueType } from '@/types';
 import { KANBAN_COLUMNS } from './KanbanBoard';
+import { useAIAnalysis } from '@/features/ai/useAIAnalysis';
+import { AIAnalysisPanel } from '@/features/ai/components/AIAnalysisPanel';
+import type { RecommendedUser } from '@/api/ai';
 
 type Destination = 'backlog' | 'sprint';
 
@@ -40,6 +43,8 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
   const qc      = useQueryClient();
   const canEdit = can('editIssue');
   const canDel  = can('deleteIssue');
+  const canAI   = can('analyzeIssue');
+  const { analysis: aiResult, isLoading: aiLoading, error: aiError, analyze, clear: clearAI } = useAIAnalysis();
   const { data: members = [] } = useProjectMembers(projectId);
   const { data: activeSprintData } = useActiveSprint(projectId);
   const activeSprintId = activeSprintData?.sprint?.id ?? null;
@@ -78,6 +83,9 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
   const [parentErr,   setParentErr]   = useState(false);
   const [destination, setDestination] = useState<Destination>('backlog');
 
+  /* Clear AI state when modal closes or switches issue */
+  useEffect(() => { clearAI(); }, [issue?.id, isOpen]);
+
   /* Sync form when opening */
   useEffect(() => {
     if (!isOpen) return;
@@ -113,6 +121,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
       issuesApi.create({
         title,
         description: desc,
+        status:      'todo',
         priority,
         storyPoints: points,
         assigneeId:  assigneeId || null,
@@ -249,6 +258,66 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                   onChange={(e) => setDesc(e.target.value)}
                 />
               </div>
+
+              {/* AI Analyze — edit mode only, for users who can edit */}
+              {isEdit && canAI && !isReadOnly && (
+                <div className="kb-field">
+                  {!aiResult && (
+                    <button
+                      type="button"
+                      disabled={aiLoading}
+                      onClick={() => analyze(issue!.id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 7,
+                        padding: '7px 14px', borderRadius: 7,
+                        border: '1.5px solid #6366F1',
+                        background: aiLoading ? '#EEF2FF' : 'white',
+                        color: '#4F46E5', fontSize: 12, fontWeight: 600,
+                        cursor: aiLoading ? 'not-allowed' : 'pointer',
+                        width: 'fit-content', transition: 'background 0.15s',
+                      }}
+                    >
+                      {aiLoading ? (
+                        <>
+                          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style={{ animation: 'spin 1s linear infinite' }}>
+                            <circle cx="8" cy="8" r="6" stroke="#6366F1" strokeWidth="2" strokeDasharray="20 18"/>
+                          </svg>
+                          Analyzing…
+                        </>
+                      ) : (
+                        <>
+                          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                            <path d="M8 1l1.8 3.6L14 5.6l-3 2.9.7 4.1L8 10.5l-3.7 2.1.7-4.1L2 5.6l4.2-.9L8 1z"
+                              fill="#6366F1" strokeLinejoin="round"/>
+                          </svg>
+                          Analyze with AI
+                        </>
+                      )}
+                    </button>
+                  )}
+                  {aiError && (
+                    <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                        <circle cx="7" cy="7" r="5.5" stroke="#DC2626" strokeWidth="1.3"/>
+                        <path d="M7 4.5v3M7 9.5v.5" stroke="#DC2626" strokeWidth="1.3" strokeLinecap="round"/>
+                      </svg>
+                      {aiError}
+                      <button type="button" onClick={() => analyze(issue!.id)}
+                        style={{ background: 'none', border: 'none', color: '#4F46E5', fontSize: 12, cursor: 'pointer', padding: 0, marginLeft: 4 }}>
+                        Retry
+                      </button>
+                    </div>
+                  )}
+                  {aiResult && (
+                    <AIAnalysisPanel
+                      result={aiResult}
+                      onApplyPoints={(pts) => setPoints(pts)}
+                      onApplyAssignee={(user: RecommendedUser) => setAssigneeId(user.id)}
+                      onClose={clearAI}
+                    />
+                  )}
+                </div>
+              )}
 
               {/* Destination — create mode; Location — edit mode */}
               {(!isEdit || (isEdit && !isReadOnly)) && (

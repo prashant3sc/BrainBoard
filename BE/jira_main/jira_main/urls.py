@@ -8,4 +8,5 @@ urlpatterns = [
     path("", include("issues.urls")),
     path("", include("wiki.urls")),
     path("", include("search.urls")),
+    path("", include("ai_integration.urls")),
 ]

@@ -9,6 +9,7 @@ export const PERMISSIONS: Record<string, Role[]> = {
   manageProjectMembers: ['admin', 'pm'],
   createWikiPage:       ['admin', 'pm', 'developer'],
   editWikiPage:         ['admin', 'pm', 'developer'],
+  analyzeIssue:         ['admin', 'pm', 'developer'],
 };
 
 export const PRIORITY_COLORS: Record<Priority, string> = {

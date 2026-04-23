@@ -344,7 +344,7 @@ export function AiPulse({ project, projectIndex, onClose }: AiPulseProps) {
             style={{
               padding: '10px 16px',
               fontSize: 12, fontWeight: 500,
-              cursor: 'pointer', border: 'none', background: 'none',
+              cursor: 'pointer', border: 'none',
               fontFamily: 'inherit',
               color: activeTab === t.id ? '#E75026' : 'var(--bb-pulse-muted)',
               borderBottom: activeTab === t.id ? '2px solid #E75026' : '2px solid transparent',

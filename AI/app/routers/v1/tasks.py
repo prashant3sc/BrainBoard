@@ -1,23 +1,24 @@
-import os
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 from app.schemas import JiraTaskRequest, JiraTaskResponse
 from app.services.rag_pipeline import analyze_task_with_rag
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
-router = APIRouter(tags=["Jira Task Analysis"])
+router = APIRouter(tags=["Task Analysis"])
 
 
 @router.post("/analyze-task", response_model=JiraTaskResponse)
 async def analyze_task(request: JiraTaskRequest):
     """
-    Takes a Jira Task heading and description.
-    Uses RAG to retrieve team context, then calls the LLM to estimate story points
-    and recommend the best-fit team member based on capacity and skills.
+    Analyze a Jira issue using label-aware RAG:
+    - Retrieves past issues with matching labels from ChromaDB
+    - Estimates story points based on label + description
+    - Recommends an assignee based on who handled similar labeled issues
     """
-    if not os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY") == "your_openai_api_key_here":
-        raise HTTPException(status_code=500, detail="OpenAI API Key not configured in .env file.")
-
-    logger.info(f"Analyzing task: {request.heading}")
-    result_data = analyze_task_with_rag(request.heading, request.description)
+    logger.info(f"Analyzing task: {request.heading} | labels={request.labels}")
+    try:
+        result_data = analyze_task_with_rag(request.heading, request.description, request.labels)
+    except Exception as exc:
+        logger.error(f"Task analysis failed: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
     return result_data

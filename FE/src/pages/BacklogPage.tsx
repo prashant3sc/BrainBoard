@@ -238,7 +238,7 @@ interface SprintBlockProps {
   onIssueClick: (issue: Issue) => void;
 }
 
-function SprintBlock({ sprint, issues, search, collapsed, onToggle, canManage, plannedSprints, onStart, onComplete, onIssueClick }: SprintBlockProps) {
+function SprintBlock({ sprint, issues, search, collapsed, onToggle, canManage, onStart, onComplete, onIssueClick }: SprintBlockProps) {
   const q = search.toLowerCase();
   const filtered = search.trim()
     ? issues.filter((i) => i.title.toLowerCase().includes(q))

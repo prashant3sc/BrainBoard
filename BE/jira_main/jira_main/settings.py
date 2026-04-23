@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load .env from repo root (three levels up: settings.py → jira_main pkg → jira_main proj → BE → root)
-load_dotenv(BASE_DIR.parent.parent / ".env")
+# Load .env from BE directory (one level up from jira_main project)
+load_dotenv(BASE_DIR.parent / ".env")
 
 SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY",
@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "issues",
     "wiki",
     "search",
+    "ai_integration",
 ]
 
 MIDDLEWARE = [
@@ -160,3 +161,9 @@ USE_TZ = True
 STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# ---------------------------------------------------------------------------
+# AI Layer
+# ---------------------------------------------------------------------------
+
+AI_SERVICE_URL = os.environ.get("AI_SERVICE_URL", "http://localhost:8001")
