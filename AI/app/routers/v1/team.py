@@ -1,22 +1,43 @@
-import os
-from fastapi import APIRouter, HTTPException, Depends
-from app.schemas import TeamContextRequest
-from app.services.rag_pipeline import add_team_member
+from fastapi import APIRouter, HTTPException
+from app.schemas import FullSyncRequest
+from app.services.rag_pipeline import full_sync, get_sync_status
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
-router = APIRouter(tags=["Team Management"])
+router = APIRouter(tags=["Sync"])
 
 
-@router.post("/upload-context")
-async def upload_context(context: TeamContextRequest):
+@router.post("/sync")
+async def sync_all(payload: FullSyncRequest):
     """
-    Save a team member's capacity, skills, and workload into the Vector Database.
-    This builds the 'knowledge base' for the RAG component.
-    """
-    if not os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY") == "your_openai_api_key_here":
-        raise HTTPException(status_code=500, detail="OpenAI API Key not configured in .env file.")
+    Full resync from Postgres → ChromaDB.
 
-    logger.info(f"Uploading context for team member: {context.member_name}")
-    result_message = add_team_member(context)
-    return {"success": True, "message": result_message}
+    Sent by Django BE's POST /ai/sync endpoint.
+    Clears ALL existing ChromaDB data, then re-embeds:
+      - All issues (with labels, assignee, story points)
+      - All wiki pages (title + content)
+
+    Use this whenever ChromaDB may have drifted from Postgres.
+    """
+    logger.info(
+        f"Full sync requested: {len(payload.issues)} issues, {len(payload.wiki_pages)} wiki pages"
+    )
+    try:
+        result = full_sync(payload.issues, payload.wiki_pages)
+        return {"success": True, **result}
+    except Exception as exc:
+        logger.error(f"Full sync failed: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/sync/status")
+async def sync_status():
+    """
+    Returns ChromaDB document counts by type.
+    Compare against Postgres counts to check if sync is needed.
+    """
+    try:
+        return {"success": True, "chroma": get_sync_status()}
+    except Exception as exc:
+        logger.error(f"Sync status check failed: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))

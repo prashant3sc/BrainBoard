@@ -75,9 +75,9 @@ export const WikiEditor = forwardRef<WikiEditorHandle, Props>(function WikiEdito
   useEffect(() => {
     setTitle(page?.title ?? '');
     if (editor && page) {
-      editor.commands.setContent(page.content ?? '', false);
+      editor.commands.setContent(page.content ?? '', { emitUpdate: false });
     } else if (editor && !page) {
-      editor.commands.setContent('', false);
+      editor.commands.setContent('', { emitUpdate: false });
     }
     setReactions(REACTIONS_DEFAULT);
   // eslint-disable-next-line react-hooks/exhaustive-deps

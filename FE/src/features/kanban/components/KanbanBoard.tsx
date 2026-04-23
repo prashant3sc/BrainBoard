@@ -5,7 +5,7 @@ import { useUpdateIssue } from '../useKanban';
 import { useActiveSprint } from '@/features/projects/useSprints';
 import { KanbanColumn } from './KanbanColumn';
 import { useProjectMembers } from '@/features/projects/useProjects';
-import type { Issue, IssueStatus, ProjectMember } from '@/types';
+import type { Issue, IssueStatus } from '@/types';
 
 export const KANBAN_COLUMNS: { id: IssueStatus; label: string; cls: string }[] = [
   { id: 'todo',        label: 'To Do',       cls: 'kb-col-todo'   },

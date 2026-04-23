@@ -7,6 +7,7 @@ langchain
 langchain-openai
 langchain-groq
 langchain-community
+langchain-chroma
 chromadb
 tiktoken
 langchain-core

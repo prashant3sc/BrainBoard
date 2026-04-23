@@ -2716,3 +2716,9 @@
 .dark .kb-btn-danger { color: #FF8B6A; border-color: rgba(255,139,106,.3); }
 .dark .kb-btn-danger:hover { background: rgba(222,53,11,.12); border-color: #FF8B6A; }
 .kb-btn-danger:disabled { opacity: .5; cursor: not-allowed; }
+
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}

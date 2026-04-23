@@ -22,11 +22,7 @@ function extractToc(html: string): TocItem[] {
   return items;
 }
 
-function issueDot(type: 'bug' | 'story' | 'task') {
-  if (type === 'bug') return 'var(--error, #BF2600)';
-  if (type === 'story') return 'var(--info, #0747A6)';
-  return 'var(--success, #006644)';
-}
+
 
 function issueEmoji(type: 'bug' | 'story' | 'task') {
   if (type === 'bug') return '🐛';

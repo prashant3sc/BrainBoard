@@ -19,7 +19,7 @@ export function CreateProjectModal({ isOpen, onClose }: Props) {
     e.preventDefault();
     if (!user) return;
     mutate(
-      { name, description, ownerId: user.id },
+      { name, description, ownerId: user.id, memberIds: [user.id], isArchived: false },
       {
         onSuccess: () => {
           setName('');

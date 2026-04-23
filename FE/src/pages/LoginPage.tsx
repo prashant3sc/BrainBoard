@@ -25,17 +25,6 @@ function BrainBoardIcon() {
   );
 }
 
-/* ── OR divider ── */
-function OrDivider() {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <div style={{ height: 1, flex: 1, background: 'var(--bb-border)' }} />
-      <span style={{ fontSize: 12, color: 'var(--bb-text-muted)', fontWeight: 400 }}>OR</span>
-      <div style={{ height: 1, flex: 1, background: 'var(--bb-border)' }} />
-    </div>
-  );
-}
-
 /* ── Field-level error ── */
 function FieldError({ message }: { message: string }) {
   return (
@@ -187,35 +176,6 @@ function LoginButton({ loading }: { loading: boolean }) {
       }}
     >
       {loading ? 'Logging in…' : 'Log in'}
-    </button>
-  );
-}
-
-/* ── SSO button ── */
-function SSOButton() {
-  const [hovered, setHovered] = useState(false);
-  const theme = useAppStore((s) => s.theme);
-  const isDark = theme === 'dark';
-
-  return (
-    <button
-      type="button"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        width: '100%', height: 44,
-        background: hovered
-          ? (isDark ? 'rgba(231,80,38,0.10)' : '#FFF3F0')
-          : 'var(--bb-bg-input)',
-        border: `1.5px solid ${hovered ? '#E75026' : 'var(--bb-border)'}`,
-        borderRadius: 8,
-        color: 'var(--bb-text-secondary)',
-        fontWeight: 500, fontSize: 14,
-        cursor: 'pointer',
-        transition: 'border-color 0.15s, background 0.15s',
-      }}
-    >
-      Continue with SSO account
     </button>
   );
 }

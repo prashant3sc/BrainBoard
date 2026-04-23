@@ -1,23 +1,43 @@
-# Environment – never commit real credentials
+# ── Environment — never commit real credentials ───────────────────────────────
 .env
+.env.*
+!.env.example
+!.env.client.example
 
-# Python
+# ── Claude Code ───────────────────────────────────────────────────────────────
+.claude/
+
+# ── Python ────────────────────────────────────────────────────────────────────
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
-venv/
-BE/venv/
+*.pyd
 *.egg-info/
+venv/
+.venv/
+env/
+BE/venv/
+BE/hack_env/
+AI/venv/
 
-# Node
+# ── ChromaDB — local vector DB, rebuilt via POST /ai/sync ────────────────────
+AI/chroma_db/
+
+# ── Node ──────────────────────────────────────────────────────────────────────
 node_modules/
 FE/node_modules/
 FE/dist/
+*.local
 
-# Django
+# ── Django ────────────────────────────────────────────────────────────────────
 *.log
 db.sqlite3
+local_settings.py
 
-# OS
+# ── OS ────────────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
