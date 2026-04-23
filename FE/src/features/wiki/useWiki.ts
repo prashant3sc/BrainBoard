@@ -28,7 +28,10 @@ export function useUpdateWikiPage() {
   return useMutation({
     mutationFn: ({ id, dto }: { id: string; dto: UpdateWikiPageDto; projectId: string }) =>
       wikiApi.update(id, dto),
-    onSuccess: (_data, { projectId }) => qc.invalidateQueries({ queryKey: ['wiki', projectId] }),
+    onSuccess: (_data, { id, projectId }) => {
+      qc.invalidateQueries({ queryKey: ['wiki', projectId] });
+      qc.invalidateQueries({ queryKey: ['wiki-history', id] }); // refresh history panel after save
+    },
   });
 }
 

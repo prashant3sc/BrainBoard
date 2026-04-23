@@ -31,14 +31,47 @@ class WikiDocument(BaseModel):
     created_by: Optional[str] = None
 
 
+class UserDocument(BaseModel):
+    user_id: str
+    name: str
+    email: str
+    role: str
+    projects: List[str] = []
+
+
+class ProjectDocument(BaseModel):
+    project_id: str
+    name: str
+    description: str
+    owner: str
+    members: List[str] = []
+    is_archived: bool = False
+
+
+class SprintDocument(BaseModel):
+    sprint_id: str
+    name: str
+    project: str
+    status: str
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    total_issues: int = 0
+    done_issues: int = 0
+
+
 class FullSyncRequest(BaseModel):
-    """Full resync payload sent by Django BE — clears ChromaDB and rebuilds from scratch."""
-    issues: List[IssueDocument]
+    """Full resync payload — clears ChromaDB and rebuilds from all Postgres data."""
+    issues: List[IssueDocument] = []
     wiki_pages: List[WikiDocument] = []
+    users: List[UserDocument] = []
+    projects: List[ProjectDocument] = []
+    sprints: List[SprintDocument] = []
 
 
 class ChatRequest(BaseModel):
     message: str
+    project_id: Optional[str] = None
+    project_name: Optional[str] = None
 
 
 class JiraTaskResponse(BaseModel):
@@ -49,10 +82,14 @@ class JiraTaskResponse(BaseModel):
     recommended_team: Dict[str, str]
 
 
-class ChatbotJiraResponse(BaseModel):
-    logical_thinking: str
-    jira_summary: str
-    jira_description: str
+class ChatbotResponse(BaseModel):
+    answer: str
+    sources: List[str] = []
+    out_of_scope: bool = False
+
+
+# Keep old name as alias so existing imports don't break
+ChatbotJiraResponse = ChatbotResponse
 
 
 class SprintIssueItem(BaseModel):

@@ -27,6 +27,7 @@ export function useDeleteLabel() {
       labelsApi.remove(projectId, labelId),
     onSuccess: (_data, { projectId }) => {
       qc.invalidateQueries({ queryKey: ['labels', projectId] });
+      qc.invalidateQueries({ queryKey: ['issues',  projectId] }); // issues may reference deleted label
     },
   });
 }

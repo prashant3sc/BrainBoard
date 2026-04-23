@@ -23,12 +23,19 @@ export interface AnalyzeIssueResponse {
   recommended_user: RecommendedUser | null;
 }
 
+export interface ChatResponse {
+  answer: string;
+  sources: string[];
+  out_of_scope: boolean;
+}
+
 export const aiApi = {
   analyzeIssue: (issueId: string): Promise<AnalyzeIssueResponse> =>
     apiClient.post(`/ai/analyze-issue/${issueId}`, undefined, { timeout: 60_000 }).then((r: { data: AnalyzeIssueResponse }) => r.data),
 
-  chat: (message: string) =>
-    apiClient.post('/ai/chat', { message }).then((r: { data: unknown }) => r.data),
+  chat: (message: string, projectId?: string): Promise<ChatResponse> =>
+    apiClient.post('/ai/chat', { message, project_id: projectId }, { timeout: 60_000 })
+      .then((r: { data: ChatResponse }) => r.data),
 
   sync: (projectId?: string) =>
     apiClient.post('/ai/sync', projectId ? { project_id: projectId } : {}).then((r: { data: unknown }) => r.data),

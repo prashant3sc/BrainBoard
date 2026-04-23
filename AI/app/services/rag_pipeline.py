@@ -5,7 +5,7 @@ from langchain_core.documents import Document
 from langchain_core.prompts import PromptTemplate
 from langchain_core.language_models import BaseChatModel
 
-from app.schemas import IssueDocument, WikiDocument
+from app.schemas import IssueDocument, WikiDocument, UserDocument, ProjectDocument, SprintDocument
 from app.prompts.task_prompts import SYSTEM_PROMPT_TEMPLATE
 from app.config import get_settings
 from app.core.logging import get_logger
@@ -109,7 +109,76 @@ def _wiki_to_document(wiki: WikiDocument) -> Document:
     )
 
 
-def full_sync(issues: list[IssueDocument], wiki_pages: list[WikiDocument]) -> dict:
+def _user_to_document(user: UserDocument) -> Document:
+    projects_str = ", ".join(user.projects) if user.projects else "none"
+    return Document(
+        page_content=(
+            f"[USER] Name: {user.name}\n"
+            f"Email: {user.email}\n"
+            f"Role: {user.role}\n"
+            f"Projects: {projects_str}"
+        ),
+        metadata={
+            "doc_type": "user",
+            "user_id": user.user_id,
+            "name": user.name,
+            "role": user.role,
+            "email": user.email,
+        },
+    )
+
+
+def _project_to_document(project: ProjectDocument) -> Document:
+    members_str = ", ".join(project.members) if project.members else "none"
+    archived_str = "Yes" if project.is_archived else "No"
+    return Document(
+        page_content=(
+            f"[PROJECT] Name: {project.name}\n"
+            f"Owner: {project.owner}\n"
+            f"Members: {members_str}\n"
+            f"Archived: {archived_str}\n"
+            f"Description: {project.description[:400]}"
+        ),
+        metadata={
+            "doc_type": "project",
+            "project_id": project.project_id,
+            "name": project.name,
+            "owner": project.owner,
+            "is_archived": str(project.is_archived),
+        },
+    )
+
+
+def _sprint_to_document(sprint: SprintDocument) -> Document:
+    dates = ""
+    if sprint.start_date and sprint.end_date:
+        dates = f"{sprint.start_date} → {sprint.end_date}"
+    elif sprint.start_date:
+        dates = f"Started {sprint.start_date}"
+    return Document(
+        page_content=(
+            f"[SPRINT] Name: {sprint.name}\n"
+            f"Project: {sprint.project}\n"
+            f"Status: {sprint.status}\n"
+            f"Dates: {dates or 'Not set'}\n"
+            f"Issues: {sprint.done_issues} done / {sprint.total_issues} total"
+        ),
+        metadata={
+            "doc_type": "sprint",
+            "sprint_id": sprint.sprint_id,
+            "project": sprint.project,
+            "status": sprint.status,
+        },
+    )
+
+
+def full_sync(
+    issues: list[IssueDocument],
+    wiki_pages: list[WikiDocument],
+    users: list[UserDocument] | None = None,
+    projects: list[ProjectDocument] | None = None,
+    sprints: list[SprintDocument] | None = None,
+) -> dict:
     """
     Full resync:
     1. Clears ALL existing ChromaDB documents
@@ -127,22 +196,28 @@ def full_sync(issues: list[IssueDocument], wiki_pages: list[WikiDocument]) -> di
         docs.append(_issue_to_document(issue))
     for wiki in wiki_pages:
         docs.append(_wiki_to_document(wiki))
+    for user in (users or []):
+        docs.append(_user_to_document(user))
+    for project in (projects or []):
+        docs.append(_project_to_document(project))
+    for sprint in (sprints or []):
+        docs.append(_sprint_to_document(sprint))
 
-    # Embed in batches of 50 to avoid memory/timeout issues
     batch_size = 50
     for i in range(0, len(docs), batch_size):
         vector_store.add_documents(docs[i:i + batch_size])
 
-    issues_count = len(issues)
-    wiki_count = len(wiki_pages)
-    logger.info(f"Full sync complete: {issues_count} issues + {wiki_count} wiki pages = {len(docs)} total documents")
-
-    return {
-        "deleted_before_sync": deleted,
-        "issues_synced": issues_count,
-        "wiki_pages_synced": wiki_count,
+    counts = {
+        "issues": len(issues),
+        "wiki_pages": len(wiki_pages),
+        "users": len(users or []),
+        "projects": len(projects or []),
+        "sprints": len(sprints or []),
         "total_documents": len(docs),
+        "deleted_before_sync": deleted,
     }
+    logger.info(f"Full sync complete: {counts}")
+    return counts
 
 
 def get_sync_status() -> dict:
@@ -151,15 +226,19 @@ def get_sync_status() -> dict:
     all_docs = vector_store._collection.get(include=["metadatas"])
     metadatas = all_docs.get("metadatas", [])
 
-    issue_count = sum(1 for m in metadatas if m.get("doc_type") == "issue")
-    wiki_count = sum(1 for m in metadatas if m.get("doc_type") == "wiki")
-    total = len(metadatas)
+    counts: dict[str, int] = {}
+    for m in metadatas:
+        doc_type = m.get("doc_type", "other")
+        counts[doc_type] = counts.get(doc_type, 0) + 1
 
+    total = len(metadatas)
     return {
         "total_documents": total,
-        "issues": issue_count,
-        "wiki_pages": wiki_count,
-        "other": total - issue_count - wiki_count,
+        "issues":   counts.get("issue", 0),
+        "wiki_pages": counts.get("wiki", 0),
+        "users":    counts.get("user", 0),
+        "projects": counts.get("project", 0),
+        "sprints":  counts.get("sprint", 0),
     }
 
 

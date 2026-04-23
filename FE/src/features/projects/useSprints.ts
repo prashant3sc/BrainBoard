@@ -32,6 +32,7 @@ export function useCreateSprint() {
     }) => sprintsApi.create(projectId, { name, goal, startDate, endDate }),
     onSuccess: (_data, { projectId }) => {
       qc.invalidateQueries({ queryKey: ['sprints', projectId] });
+      qc.invalidateQueries({ queryKey: ['issues',  projectId] });
     },
   });
 }

@@ -34,8 +34,8 @@ export function useUpdateIssue() {
     },
 
     onSettled: (_data, _err, { projectId }) => {
-      queryClient.invalidateQueries({ queryKey: ['issues', projectId] });
-      // TODO: toast({ title: 'Issue updated' })
+      queryClient.invalidateQueries({ queryKey: ['issues',  projectId] });
+      queryClient.invalidateQueries({ queryKey: ['sprints', projectId] }); // refresh active sprint on kanban
     },
   });
 }

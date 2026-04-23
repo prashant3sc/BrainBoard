@@ -20,9 +20,21 @@ def _get(path: str, timeout: int = _TIMEOUT_SHORT) -> dict:
     return response.json()
 
 
-def full_sync(issues: list[dict], wiki_pages: list[dict]) -> dict:
-    """Full Postgres → ChromaDB resync: clears and re-embeds all issues + wiki pages."""
-    return _post("/sync", {"issues": issues, "wiki_pages": wiki_pages})
+def full_sync(
+    issues: list[dict],
+    wiki_pages: list[dict],
+    users: list[dict] | None = None,
+    projects: list[dict] | None = None,
+    sprints: list[dict] | None = None,
+) -> dict:
+    """Full Postgres → ChromaDB resync: clears and re-embeds all data."""
+    return _post("/sync", {
+        "issues":    issues,
+        "wiki_pages": wiki_pages,
+        "users":     users or [],
+        "projects":  projects or [],
+        "sprints":   sprints or [],
+    })
 
 
 def sync_status() -> dict:
@@ -39,8 +51,11 @@ def analyze_task(heading: str, description: str, labels: list[str]) -> dict:
     })
 
 
-def chat(message: str) -> dict:
-    return _post("/chat", {"message": message})
+def chat(message: str, project_name: str | None = None) -> dict:
+    payload: dict = {"message": message}
+    if project_name:
+        payload["project_name"] = project_name
+    return _post("/chat", payload)
 
 
 def sprint_pulse(sprint: dict, issues: list[dict]) -> dict:

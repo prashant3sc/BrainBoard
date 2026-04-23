@@ -4,9 +4,13 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from django.contrib.auth import get_user_model
+
 from issues.models import Issue
 from projects.models import Project, ProjectMember, Sprint
 from wiki.models import WikiPage
+
+User = get_user_model()
 
 from . import ai_client
 
@@ -45,6 +49,52 @@ def _build_wiki_payload(page: WikiPage) -> dict:
     }
 
 
+def _build_user_payload(user, project_names: list[str]) -> dict:
+    return {
+        "user_id": str(user.id),
+        "name": user.get_full_name().strip() or user.email,
+        "email": user.email,
+        "role": user.role,
+        "projects": project_names,
+    }
+
+
+def _build_project_payload(project: Project) -> dict:
+    members = (
+        ProjectMember.objects
+        .filter(project=project)
+        .select_related("user")
+    )
+    member_names = [
+        pm.user.get_full_name().strip() or pm.user.email
+        for pm in members
+    ]
+    owner_name = (project.owner.get_full_name().strip() or project.owner.email) if project.owner else "Unknown"
+    return {
+        "project_id": str(project.id),
+        "name": project.name,
+        "description": project.description or "",
+        "owner": owner_name,
+        "members": member_names,
+        "is_archived": project.is_archived,
+    }
+
+
+def _build_sprint_payload(sprint: Sprint) -> dict:
+    issues = Issue.objects.filter(sprint=sprint)
+    done_count = issues.filter(status=Issue.DONE).count()
+    return {
+        "sprint_id": str(sprint.id),
+        "name": sprint.name,
+        "project": sprint.project.name,
+        "status": sprint.status,
+        "start_date": str(sprint.start_date) if sprint.start_date else None,
+        "end_date": str(sprint.end_date) if sprint.end_date else None,
+        "total_issues": issues.count(),
+        "done_issues": done_count,
+    }
+
+
 class SyncView(APIView):
     """
     POST /ai/sync
@@ -68,21 +118,26 @@ class SyncView(APIView):
 
         if project_id:
             try:
-                project = Project.objects.get(pk=project_id)
+                scoped_project = Project.objects.get(pk=project_id)
             except Project.DoesNotExist:
                 return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
 
             issues_qs = (
                 Issue.objects
-                .filter(project=project)
+                .filter(project=scoped_project)
                 .select_related("project", "assignee")
                 .prefetch_related("labels")
             )
             wiki_qs = (
                 WikiPage.objects
-                .filter(project=project)
+                .filter(project=scoped_project)
                 .select_related("project", "space", "parent", "created_by")
             )
+            projects_qs = Project.objects.filter(pk=scoped_project.pk).select_related("owner")
+            sprints_qs = Sprint.objects.filter(project=scoped_project).select_related("project")
+            # Users scoped to this project's members
+            member_ids = ProjectMember.objects.filter(project=scoped_project).values_list("user_id", flat=True)
+            users_qs = User.objects.filter(id__in=member_ids)
         else:
             issues_qs = (
                 Issue.objects
@@ -95,15 +150,33 @@ class SyncView(APIView):
                 .select_related("project", "space", "parent", "created_by")
                 .all()
             )
+            projects_qs = Project.objects.select_related("owner").all()
+            sprints_qs = Sprint.objects.select_related("project").all()
+            users_qs = User.objects.all()
 
-        issues_payload = [_build_issue_payload(i) for i in issues_qs]
-        wiki_payload = [_build_wiki_payload(p) for p in wiki_qs]
+        # Build user payloads with their project names
+        user_project_map: dict[str, list[str]] = {}
+        for pm in ProjectMember.objects.select_related("user", "project").filter(user__in=users_qs):
+            uid = str(pm.user_id)
+            user_project_map.setdefault(uid, []).append(pm.project.name)
 
-        if not issues_payload and not wiki_payload:
-            return Response({"detail": "No data found to sync.", "synced": 0})
+        issues_payload   = [_build_issue_payload(i) for i in issues_qs]
+        wiki_payload     = [_build_wiki_payload(p) for p in wiki_qs]
+        projects_payload = [_build_project_payload(p) for p in projects_qs]
+        sprints_payload  = [_build_sprint_payload(s) for s in sprints_qs]
+        users_payload    = [
+            _build_user_payload(u, user_project_map.get(str(u.id), []))
+            for u in users_qs
+        ]
 
         try:
-            result = ai_client.full_sync(issues_payload, wiki_payload)
+            result = ai_client.full_sync(
+                issues_payload,
+                wiki_payload,
+                users=users_payload,
+                projects=projects_payload,
+                sprints=sprints_payload,
+            )
         except requests.RequestException as exc:
             return Response(
                 {"detail": f"AI layer unreachable: {exc}"},
@@ -112,8 +185,11 @@ class SyncView(APIView):
 
         return Response({
             "postgres": {
-                "issues": len(issues_payload),
+                "issues":   len(issues_payload),
                 "wiki_pages": len(wiki_payload),
+                "users":    len(users_payload),
+                "projects": len(projects_payload),
+                "sprints":  len(sprints_payload),
             },
             "chroma": result,
         })
@@ -131,8 +207,11 @@ class SyncStatusView(APIView):
 
     def get(self, request):
         postgres_counts = {
-            "issues": Issue.objects.count(),
+            "issues":    Issue.objects.count(),
             "wiki_pages": WikiPage.objects.count(),
+            "users":     User.objects.count(),
+            "projects":  Project.objects.count(),
+            "sprints":   Sprint.objects.count(),
         }
 
         try:
@@ -240,8 +319,8 @@ class ChatView(APIView):
     """
     POST /ai/chat
 
-    Body: { "message": "<user query>" }
-    Proxies to AI chatbot — answers technical questions or drafts Jira tickets.
+    Body: { "message": "<user query>", "project_id": "<uuid>" (optional) }
+    RAG-powered read-only assistant scoped to BrainBoard data.
     """
 
     permission_classes = [IsAuthenticated]
@@ -251,8 +330,17 @@ class ChatView(APIView):
         if not message:
             return Response({"detail": "message is required."}, status=status.HTTP_400_BAD_REQUEST)
 
+        project_id = request.data.get("project_id", "").strip()
+        project_name = None
+        if project_id:
+            try:
+                project = Project.objects.get(pk=project_id)
+                project_name = project.name
+            except Project.DoesNotExist:
+                pass
+
         try:
-            result = ai_client.chat(message)
+            result = ai_client.chat(message, project_name=project_name)
         except requests.RequestException as exc:
             return Response(
                 {"detail": f"AI layer unreachable: {exc}"},

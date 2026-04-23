@@ -20,10 +20,17 @@ async def sync_all(payload: FullSyncRequest):
     Use this whenever ChromaDB may have drifted from Postgres.
     """
     logger.info(
-        f"Full sync requested: {len(payload.issues)} issues, {len(payload.wiki_pages)} wiki pages"
+        f"Full sync: {len(payload.issues)} issues, {len(payload.wiki_pages)} wiki, "
+        f"{len(payload.users)} users, {len(payload.projects)} projects, {len(payload.sprints)} sprints"
     )
     try:
-        result = full_sync(payload.issues, payload.wiki_pages)
+        result = full_sync(
+            issues=payload.issues,
+            wiki_pages=payload.wiki_pages,
+            users=payload.users,
+            projects=payload.projects,
+            sprints=payload.sprints,
+        )
         return {"success": True, **result}
     except Exception as exc:
         logger.error(f"Full sync failed: {exc}")

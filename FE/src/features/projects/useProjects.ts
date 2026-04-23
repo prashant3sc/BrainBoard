@@ -54,8 +54,9 @@ export function useUpdateProject() {
   return useMutation({
     mutationFn: ({ id, name, description }: { id: string; name: string; description: string }) =>
       projectsApi.update(id, { name, description }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
+    onSuccess: (_data, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });        // list
+      queryClient.invalidateQueries({ queryKey: ['projects', id] });   // detail
     },
   });
 }
@@ -65,8 +66,9 @@ export function useArchiveProject() {
   return useMutation({
     mutationFn: ({ id, isArchived }: { id: string; isArchived: boolean }) =>
       projectsApi.archive(id, isArchived),
-    onSuccess: () => {
+    onSuccess: (_data, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['projects', id] });
     },
   });
 }
@@ -75,8 +77,9 @@ export function useDeleteProject() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => projectsApi.remove(id),
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.removeQueries({ queryKey: ['projects', id] });        // remove deleted project from cache
     },
   });
 }

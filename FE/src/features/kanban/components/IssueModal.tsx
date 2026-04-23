@@ -203,7 +203,9 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
   function close() { onClose(); }
 
   function invalidateAndClose() {
-    qc.invalidateQueries({ queryKey: ['issues', projectId] });
+    // Refresh every query that could show stale data after an issue change
+    qc.invalidateQueries({ queryKey: ['issues',  projectId] });
+    qc.invalidateQueries({ queryKey: ['sprints', projectId] }); // covers active-sprint + sprint list
     close();
   }
 
@@ -302,7 +304,6 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
     ? issue!.id.slice(0, 8).toUpperCase()
     : null;
 
-  const pColor = PRIORITY_COLOR[priority];
   const tColor = TYPE_COLOR[issueType];
 
   /* helper: initials avatar */
@@ -671,7 +672,6 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
 
                         {members.map((m) => {
                           const active = assigneeId === m.user.id;
-                          const nameParts = m.user.name.trim().split(' ');
                           const role = (m as any).role ?? '';
                           return (
                             <button
