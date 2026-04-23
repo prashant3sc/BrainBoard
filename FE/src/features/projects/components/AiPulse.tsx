@@ -1,126 +1,76 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Project } from '@/types';
-
-// ── Types ───────────────────────────────────────────────────────────────────
+import type { AiPulseData, AiPulseHighlight, AiPulseTeamMember } from '@/api/projects';
+import { useAiPulse } from '../useAiPulse';
 
 type Tab = 'sprint' | 'highlights' | 'team';
 
-interface SprintData {
-  name: string;
-  start: string;
-  end: string;
-  done: number;
-  inProgress: number;
-  todo: number;
-  pointsBurned: number;
-  pointsTotal: number;
-}
+// ── Highlight tag styling ────────────────────────────────────────────────────
 
-interface Highlight {
-  text: string;
-  tag: string;
-  dotColor: string;
-  tagBg: string;
-  tagColor: string;
-}
-
-interface TeamMember {
-  initials: string;
-  name: string;
-  role: string;
-  taskCount: number;
-  avatarBg: string;
-  avatarColor: string;
-}
-
-interface PulseData {
-  sprint: SprintData;
-  highlights: Highlight[];
-  team: TeamMember[];
-}
-
-// ── Mock data (two templates, cycled by index % 2) ──────────────────────────
-
-const MOCK_A: PulseData = {
-  sprint: {
-    name: 'Sprint 7 — Dashboard refresh',
-    start: 'Apr 7',
-    end: 'Apr 21',
-    done: 14,
-    inProgress: 6,
-    todo: 4,
-    pointsBurned: 68,
-    pointsTotal: 89,
-  },
-  highlights: [
-    { dotColor: '#006644', tag: 'Shipped',   tagBg: '#E3FCEF', tagColor: '#006644', text: 'New analytics dashboard with date-range filter is live in staging' },
-    { dotColor: '#0052CC', tag: 'In review', tagBg: '#DEEBFF', tagColor: '#0747A6', text: 'CSV export for order history — PR #214 under code review' },
-    { dotColor: '#7A5800', tag: 'At risk',   tagBg: '#FFFAE6', tagColor: '#7A5800', text: 'SSO integration blocked on vendor API key — escalated to lead' },
-    { dotColor: '#172B4D', tag: 'Planned',   tagBg: '#F4F5F7', tagColor: '#42526E', text: 'Mobile-responsive layout pass scoped for next sprint' },
-  ],
-  team: [
-    { initials: 'RV', name: 'Rohan Verma', role: 'Frontend', taskCount: 6, avatarBg: '#DBEAFE', avatarColor: '#1D4ED8' },
-    { initials: 'PK', name: 'Priya K.',    role: 'Backend',  taskCount: 5, avatarBg: '#FCE7F3', avatarColor: '#9D174D' },
-    { initials: 'AM', name: 'Alex M.',     role: 'Design',   taskCount: 3, avatarBg: '#D1FAE5', avatarColor: '#065F46' },
-    { initials: 'SJ', name: 'Sara J.',     role: 'QA',       taskCount: 4, avatarBg: '#FEF3C7', avatarColor: '#92400E' },
-  ],
+const TAG_STYLE: Record<AiPulseHighlight['tag'], { dot: string; bg: string; color: string }> = {
+  'Shipped':     { dot: '#006644', bg: '#E3FCEF', color: '#006644' },
+  'In progress': { dot: '#0052CC', bg: '#DEEBFF', color: '#0747A6' },
+  'At risk':     { dot: '#7A5800', bg: '#FFFAE6', color: '#7A5800' },
+  'Blocked':     { dot: '#BF2600', bg: '#FFEBE6', color: '#BF2600' },
+  'Planned':     { dot: '#172B4D', bg: '#F4F5F7', color: '#42526E' },
 };
 
-const MOCK_B: PulseData = {
-  sprint: {
-    name: 'Sprint 4 — Admin panel v2',
-    start: 'Apr 10',
-    end: 'Apr 24',
-    done: 8,
-    inProgress: 9,
-    todo: 7,
-    pointsBurned: 41,
-    pointsTotal: 72,
-  },
-  highlights: [
-    { dotColor: '#006644', tag: 'Shipped',     tagBg: '#E3FCEF', tagColor: '#006644', text: 'User role management UI redesigned and merged to main' },
-    { dotColor: '#0052CC', tag: 'In progress', tagBg: '#DEEBFF', tagColor: '#0747A6', text: 'Automation workflow builder — 60% complete, on track' },
-    { dotColor: '#BF2600', tag: 'Blocked',     tagBg: '#FFEBE6', tagColor: '#BF2600', text: 'Reporting scripts failing on staging DB — needs DevOps attention' },
-  ],
-  team: [
-    { initials: 'NK', name: 'Neel K.',  role: 'Fullstack', taskCount: 8, avatarBg: '#EDE9FE', avatarColor: '#5B21B6' },
-    { initials: 'DM', name: 'Dev M.',   role: 'Backend',   taskCount: 6, avatarBg: '#DBEAFE', avatarColor: '#1D4ED8' },
-    { initials: 'TS', name: 'Tara S.',  role: 'QA',        taskCount: 3, avatarBg: '#FEF3C7', avatarColor: '#92400E' },
-  ],
-};
+// ── Avatar colours derived deterministically from the member's name ──────────
 
-function getMockData(index: number): PulseData {
-  return index % 2 === 0 ? MOCK_A : MOCK_B;
+const AVATAR_PALETTES = [
+  { bg: '#DBEAFE', color: '#1D4ED8' },
+  { bg: '#FCE7F3', color: '#9D174D' },
+  { bg: '#D1FAE5', color: '#065F46' },
+  { bg: '#FEF3C7', color: '#92400E' },
+  { bg: '#EDE9FE', color: '#5B21B6' },
+  { bg: '#FEE2E2', color: '#991B1B' },
+  { bg: '#CCFBF1', color: '#0F766E' },
+];
+
+function avatarPalette(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
+  return AVATAR_PALETTES[h % AVATAR_PALETTES.length];
 }
 
-// ── Sub-renderers ────────────────────────────────────────────────────────────
+function initials(name: string) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join('');
+}
 
-function SprintTab({ data }: { data: PulseData }) {
+// ── Sprint Health tab ────────────────────────────────────────────────────────
+
+function SprintTab({ data }: { data: AiPulseData }) {
   const s = data.sprint;
-  const total = s.done + s.inProgress + s.todo;
-  const pct = Math.round((s.done / total) * 100);
+  const total = s.done + s.in_progress + s.review + s.todo;
+  const pct = total > 0 ? Math.round((s.done / total) * 100) : 0;
   const [health, healthColor] =
     pct >= 60 ? ['On track', 'var(--bb-pulse-health-green)']
-    : pct >= 40 ? ['At risk',   'var(--bb-pulse-health-amber)']
-    :             ['Behind',    'var(--bb-pulse-health-red)'];
-  const ptPct = Math.round((s.pointsBurned / s.pointsTotal) * 100);
-  const velocityNote = pct >= 60 ? 'healthy' : 'slightly below target';
+    : pct >= 35 ? ['At risk',  'var(--bb-pulse-health-amber)']
+    :             ['Behind',   'var(--bb-pulse-health-red)'];
+  const ptPct = s.points_total > 0 ? Math.round((s.points_burned / s.points_total) * 100) : 0;
+
+  const fmt = (d: string | null) =>
+    d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—';
 
   return (
     <div>
-      {/* Sprint header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--bb-pulse-title)' }}>{s.name}</span>
-        <span style={{ fontSize: 11, color: 'var(--bb-pulse-muted)' }}>{s.start} – {s.end}</span>
+        <span style={{ fontSize: 11, color: 'var(--bb-pulse-muted)' }}>{fmt(s.start)} – {fmt(s.end)}</span>
       </div>
 
       {/* Metric cards */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
         {[
-          { label: 'Sprint health', value: health,       valueColor: healthColor },
-          { label: 'Completed',     value: String(s.done),      valueColor: 'var(--bb-pulse-title)' },
-          { label: 'In progress',   value: String(s.inProgress), valueColor: 'var(--bb-pulse-health-amber)' },
-          { label: 'To do',         value: String(s.todo),      valueColor: 'var(--bb-pulse-title)' },
+          { label: 'Sprint health', value: health,             valueColor: healthColor },
+          { label: 'Completed',     value: String(s.done),     valueColor: 'var(--bb-pulse-title)' },
+          { label: 'In progress',   value: String(s.in_progress + s.review), valueColor: 'var(--bb-pulse-health-amber)' },
+          { label: 'To do',         value: String(s.todo),     valueColor: 'var(--bb-pulse-title)' },
         ].map((m) => (
           <div key={m.label} style={{
             flex: 1, background: 'var(--bb-pulse-metric-bg)',
@@ -133,14 +83,17 @@ function SprintTab({ data }: { data: PulseData }) {
         ))}
       </div>
 
-      {/* Progress bar */}
+      {/* Story points progress bar */}
       <div style={{ marginBottom: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--bb-pulse-muted)', marginBottom: 6 }}>
           <span>Story points burned</span>
-          <span><strong style={{ color: 'var(--bb-pulse-title)' }}>{s.pointsBurned}</strong> / {s.pointsTotal} pts</span>
+          <span>
+            <strong style={{ color: 'var(--bb-pulse-title)' }}>{s.points_burned}</strong>
+            {' '}/ {s.points_total} pts
+          </span>
         </div>
         <div style={{ height: 6, background: 'var(--bb-pulse-inner-border)', borderRadius: 20, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${ptPct}%`, background: '#E75026', borderRadius: 20 }} />
+          <div style={{ height: '100%', width: `${ptPct}%`, background: '#E75026', borderRadius: 20, transition: 'width 0.5s ease' }} />
         </div>
       </div>
 
@@ -149,80 +102,93 @@ function SprintTab({ data }: { data: PulseData }) {
         background: 'var(--bb-pulse-metric-bg)',
         border: '1px solid var(--bb-pulse-inner-border)',
         borderRadius: 8, padding: '10px 12px',
-        fontSize: 11, color: 'var(--bb-pulse-text)', lineHeight: 1.6,
+        fontSize: 11, color: 'var(--bb-pulse-text)', lineHeight: 1.65,
       }}>
         <strong style={{ color: 'var(--bb-pulse-title)', display: 'block', marginBottom: 4 }}>AI summary</strong>
-        Sprint is {health.toLowerCase()} with {pct}% of issues resolved.{' '}
-        {s.inProgress} tasks are actively being worked on. Velocity is {velocityNote} —{' '}
-        team should be able to close the sprint on time.
+        {data.summary}
       </div>
     </div>
   );
 }
 
-function HighlightsTab({ data }: { data: PulseData }) {
+// ── Highlights tab ───────────────────────────────────────────────────────────
+
+function HighlightsTab({ highlights }: { highlights: AiPulseHighlight[] }) {
+  if (highlights.length === 0) {
+    return <p style={{ fontSize: 12, color: 'var(--bb-pulse-muted)', padding: '12px 0' }}>No highlights available.</p>;
+  }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {data.highlights.map((h, i) => (
-        <div key={i} style={{
-          display: 'flex', alignItems: 'flex-start', gap: 10,
-          padding: '10px 12px',
-          background: 'var(--bb-pulse-metric-bg)',
-          border: '1px solid var(--bb-pulse-inner-border)',
-          borderRadius: 8,
-        }}>
-          <div style={{
-            width: 8, height: 8, borderRadius: '50%',
-            background: h.dotColor, flexShrink: 0, marginTop: 3,
-          }} />
-          <div style={{ fontSize: 12, color: 'var(--bb-pulse-text)', lineHeight: 1.5 }}>
-            {h.text}
-            <span style={{
-              display: 'inline-block', fontSize: 10, fontWeight: 600,
-              padding: '1px 7px', borderRadius: 10, marginLeft: 8,
-              background: h.tagBg, color: h.tagColor,
-              verticalAlign: 'middle',
-            }}>
-              {h.tag}
-            </span>
+      {highlights.map((h, i) => {
+        const style = TAG_STYLE[h.tag] ?? TAG_STYLE['Planned'];
+        return (
+          <div key={i} style={{
+            display: 'flex', alignItems: 'flex-start', gap: 10,
+            padding: '10px 12px',
+            background: 'var(--bb-pulse-metric-bg)',
+            border: '1px solid var(--bb-pulse-inner-border)',
+            borderRadius: 8,
+          }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: style.dot, flexShrink: 0, marginTop: 3 }} />
+            <div style={{ fontSize: 12, color: 'var(--bb-pulse-text)', lineHeight: 1.5 }}>
+              {h.text}
+              <span style={{
+                display: 'inline-block', fontSize: 10, fontWeight: 600,
+                padding: '1px 7px', borderRadius: 10, marginLeft: 8,
+                background: style.bg, color: style.color, verticalAlign: 'middle',
+              }}>
+                {h.tag}
+              </span>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
-function TeamTab({ data }: { data: PulseData }) {
+// ── Team tab ─────────────────────────────────────────────────────────────────
+
+function TeamTab({ team }: { team: AiPulseTeamMember[] }) {
+  if (team.length === 0) {
+    return <p style={{ fontSize: 12, color: 'var(--bb-pulse-muted)', padding: '12px 0' }}>No assigned team members in this sprint.</p>;
+  }
+  const sorted = [...team].sort((a, b) => b.task_count - a.task_count);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {data.team.map((m, i) => (
-        <div key={i} style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          padding: '8px 12px',
-          background: 'var(--bb-pulse-metric-bg)',
-          border: '1px solid var(--bb-pulse-inner-border)',
-          borderRadius: 8,
-        }}>
-          <div style={{
-            width: 30, height: 30, borderRadius: '50%',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 11, fontWeight: 700, flexShrink: 0,
-            background: m.avatarBg, color: m.avatarColor,
+      {sorted.map((m) => {
+        const { bg, color } = avatarPalette(m.name);
+        return (
+          <div key={m.name} style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '8px 12px',
+            background: 'var(--bb-pulse-metric-bg)',
+            border: '1px solid var(--bb-pulse-inner-border)',
+            borderRadius: 8,
           }}>
-            {m.initials}
+            <div style={{
+              width: 30, height: 30, borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 11, fontWeight: 700, flexShrink: 0,
+              background: bg, color,
+            }}>
+              {initials(m.name)}
+            </div>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--bb-pulse-title)' }}>{m.name}</div>
+              <div style={{ fontSize: 11, color: 'var(--bb-pulse-muted)', textTransform: 'capitalize' }}>{m.role}</div>
+            </div>
+            <div style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--bb-pulse-muted)' }}>
+              <strong style={{ color: 'var(--bb-pulse-title)' }}>{m.task_count}</strong> tasks
+            </div>
           </div>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--bb-pulse-title)' }}>{m.name}</div>
-            <div style={{ fontSize: 11, color: 'var(--bb-pulse-muted)' }}>{m.role}</div>
-          </div>
-          <div style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--bb-pulse-muted)' }}>
-            <strong style={{ color: 'var(--bb-pulse-title)' }}>{m.taskCount}</strong> tasks
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
+
+// ── Loading / Error states ───────────────────────────────────────────────────
 
 function LoadingDots() {
   return (
@@ -230,6 +196,18 @@ function LoadingDots() {
       {[0, 1, 2].map((i) => (
         <div key={i} className="bb-pulse-dot" style={{ animationDelay: `${i * 0.15}s` }} />
       ))}
+    </div>
+  );
+}
+
+function ErrorState({ message }: { message: string }) {
+  return (
+    <div style={{
+      padding: '20px 16px', textAlign: 'center',
+      fontSize: 12, color: 'var(--bb-pulse-muted)', lineHeight: 1.6,
+    }}>
+      <div style={{ fontSize: 22, marginBottom: 8 }}>⚠️</div>
+      {message}
     </div>
   );
 }
@@ -242,18 +220,21 @@ interface AiPulseProps {
   onClose: () => void;
 }
 
-export function AiPulse({ project, projectIndex, onClose }: AiPulseProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('sprint');
-  const [loading, setLoading] = useState(true);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const mockData = getMockData(projectIndex);
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'sprint',     label: 'Sprint health' },
+  { id: 'highlights', label: 'Highlights' },
+  { id: 'team',       label: 'Team' },
+];
 
-  // Simulate loading on mount (initial sprint tab)
+export function AiPulse({ project, onClose }: AiPulseProps) {
+  const [activeTab, setActiveTab] = useState<Tab>('sprint');
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  const { data, isLoading, isError, error } = useAiPulse(project.id, true);
+
+  // Reset to sprint tab whenever the panel opens for a new project
   useEffect(() => {
-    setLoading(true);
     setActiveTab('sprint');
-    const t = setTimeout(() => setLoading(false), 1200);
-    return () => clearTimeout(t);
   }, [project.id]);
 
   // Smooth scroll into view on open
@@ -261,18 +242,11 @@ export function AiPulse({ project, projectIndex, onClose }: AiPulseProps) {
     panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [project.id]);
 
-  function handleTabSwitch(tab: Tab) {
-    if (tab === activeTab) return;
-    setActiveTab(tab);
-    setLoading(true);
-    setTimeout(() => setLoading(false), 750);
-  }
-
-  const TABS: { id: Tab; label: string }[] = [
-    { id: 'sprint',     label: 'Sprint health' },
-    { id: 'highlights', label: 'Highlights' },
-    { id: 'team',       label: 'Team' },
-  ];
+  const errorMessage = isError
+    ? (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail === 'No active sprint.'
+      ? 'This project has no active sprint yet. Start a sprint from the Backlog to see AI Pulse.'
+      : 'Could not load AI Pulse. Make sure the AI service is running.'
+    : null;
 
   return (
     <div
@@ -292,7 +266,6 @@ export function AiPulse({ project, projectIndex, onClose }: AiPulseProps) {
         borderBottom: '1px solid var(--bb-pulse-inner-border)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* Heartbeat icon */}
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <circle cx="8" cy="8" r="7" stroke="#E75026" strokeWidth="1.5" />
             <path d="M3 8h2l2-4 2.5 8L12 8h2" stroke="#E75026" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
@@ -300,7 +273,6 @@ export function AiPulse({ project, projectIndex, onClose }: AiPulseProps) {
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--bb-pulse-title)' }}>
             {project.name}
           </span>
-          {/* AI badge */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 4,
             fontSize: 10, fontWeight: 600, color: '#E75026',
@@ -313,16 +285,13 @@ export function AiPulse({ project, projectIndex, onClose }: AiPulseProps) {
             AI Pulse
           </div>
         </div>
-
-        {/* Close button */}
         <button
           onClick={onClose}
           aria-label="Close AI Pulse"
           style={{
             background: 'none', border: 'none', cursor: 'pointer',
             fontSize: 18, lineHeight: 1, color: 'var(--bb-pulse-muted)',
-            padding: '0 2px', display: 'flex', alignItems: 'center',
-            fontFamily: 'inherit',
+            padding: '0 2px', display: 'flex', alignItems: 'center', fontFamily: 'inherit',
           }}
           onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--bb-pulse-title)')}
           onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--bb-pulse-muted)')}
@@ -331,41 +300,41 @@ export function AiPulse({ project, projectIndex, onClose }: AiPulseProps) {
         </button>
       </div>
 
-      {/* Tabs */}
-      <div style={{
-        display: 'flex',
-        borderBottom: '1px solid var(--bb-pulse-inner-border)',
-        background: 'var(--bb-pulse-tab-bg)',
-      }}>
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => handleTabSwitch(t.id)}
-            style={{
-              padding: '10px 16px',
-              fontSize: 12, fontWeight: 500,
-              cursor: 'pointer', border: 'none',
-              fontFamily: 'inherit',
-              color: activeTab === t.id ? '#E75026' : 'var(--bb-pulse-muted)',
-              borderBottom: activeTab === t.id ? '2px solid #E75026' : '2px solid transparent',
-              background: activeTab === t.id ? 'var(--bb-pulse-bg)' : 'none',
-              transition: 'color 0.15s, border-color 0.15s',
-            } as React.CSSProperties}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/* Tabs — hidden while loading or on error */}
+      {!isLoading && !errorMessage && (
+        <div style={{
+          display: 'flex',
+          borderBottom: '1px solid var(--bb-pulse-inner-border)',
+          background: 'var(--bb-pulse-tab-bg)',
+        }}>
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              style={{
+                padding: '10px 16px', fontSize: 12, fontWeight: 500,
+                cursor: 'pointer', border: 'none', fontFamily: 'inherit',
+                color: activeTab === t.id ? '#E75026' : 'var(--bb-pulse-muted)',
+                borderBottom: activeTab === t.id ? '2px solid #E75026' : '2px solid transparent',
+                background: activeTab === t.id ? 'var(--bb-pulse-bg)' : 'none',
+                transition: 'color 0.15s, border-color 0.15s',
+              } as React.CSSProperties}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Body */}
       <div style={{ padding: 16 }}>
-        {loading ? (
-          <LoadingDots />
-        ) : (
+        {isLoading && <LoadingDots />}
+        {errorMessage && <ErrorState message={errorMessage} />}
+        {data && !isLoading && (
           <>
-            {activeTab === 'sprint'     && <SprintTab     data={mockData} />}
-            {activeTab === 'highlights' && <HighlightsTab data={mockData} />}
-            {activeTab === 'team'       && <TeamTab       data={mockData} />}
+            {activeTab === 'sprint'     && <SprintTab data={data} />}
+            {activeTab === 'highlights' && <HighlightsTab highlights={data.highlights} />}
+            {activeTab === 'team'       && <TeamTab team={data.team} />}
           </>
         )}
       </div>

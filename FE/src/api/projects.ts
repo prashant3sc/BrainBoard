@@ -7,6 +7,36 @@ const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 type CreateProjectDto = Omit<Project, 'id' | 'createdAt'>;
 type UpdateProjectDto = Partial<CreateProjectDto>;
 
+export interface AiPulseSprintStats {
+  name: string;
+  start: string | null;
+  end: string | null;
+  done: number;
+  in_progress: number;
+  review: number;
+  todo: number;
+  points_burned: number;
+  points_total: number;
+}
+
+export interface AiPulseHighlight {
+  text: string;
+  tag: 'Shipped' | 'In progress' | 'At risk' | 'Blocked' | 'Planned';
+}
+
+export interface AiPulseTeamMember {
+  name: string;
+  role: string;
+  task_count: number;
+}
+
+export interface AiPulseData {
+  sprint: AiPulseSprintStats;
+  summary: string;
+  highlights: AiPulseHighlight[];
+  team: AiPulseTeamMember[];
+}
+
 export const projectsApi = {
   // Fetch all projects visible to the current user
   getAll(isArchived?: boolean): Promise<Project[]> {
@@ -110,6 +140,11 @@ export const projectsApi = {
       return Promise.resolve({ ...mockProjects[index] });
     }
     return apiClient.patch<Project>(`/projects/${id}`, { is_archived: isArchived }).then((r) => r.data);
+  },
+
+  // Fetch AI Pulse data (sprint stats + AI summary + highlights + team)
+  getAiPulse(projectId: string): Promise<AiPulseData> {
+    return apiClient.get<AiPulseData>(`/projects/${projectId}/ai-pulse`).then((r) => r.data);
   },
 
   // Delete a project by id

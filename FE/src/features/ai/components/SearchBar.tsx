@@ -7,7 +7,7 @@ import { SearchResults } from './SearchResults';
 import type { SearchResult } from '@/types';
 
 export function SearchBar() {
-  const { paletteOpen, togglePalette, closePalette } = useAppStore();
+  const { paletteOpen, togglePalette, closePalette, semanticEnabled, toggleSemantic } = useAppStore();
   const { query, setQuery, results, isLoading } = useAISearch();
   const navigate = useNavigate();
 
@@ -51,16 +51,35 @@ export function SearchBar() {
             <Command.Input
               value={query}
               onValueChange={setQuery}
-              placeholder="Search issues and wiki pages…"
+              placeholder={semanticEnabled ? 'Semantic search…' : 'Search issues and wiki pages…'}
               className="flex-1 bg-transparent py-3 text-sm text-gray-900 placeholder:text-gray-400 outline-none dark:text-[#E6EDF3] dark:placeholder:text-[#6E7681]"
               autoFocus
             />
-            <kbd className="hidden rounded border border-gray-200 px-1.5 py-0.5 text-xs text-gray-400 sm:block dark:border-[#30363D] dark:text-[#6E7681]">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); toggleSemantic(); }}
+              title={semanticEnabled ? 'Semantic search ON — click to disable' : 'Enable AI semantic search'}
+              className={[
+                'ml-2 flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors',
+                semanticEnabled
+                  ? 'border border-[#E75026] bg-[#E75026]/10 text-[#E75026]'
+                  : 'border border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-600 dark:border-[#30363D] dark:text-[#6E7681] dark:hover:border-[#6E7681] dark:hover:text-[#8B949E]',
+              ].join(' ')}
+            >
+              <span>✦</span>
+              <span>Semantic</span>
+            </button>
+            <kbd className="ml-2 hidden rounded border border-gray-200 px-1.5 py-0.5 text-xs text-gray-400 sm:block dark:border-[#30363D] dark:text-[#6E7681]">
               esc
             </kbd>
           </div>
 
           <Command.List className="max-h-80 overflow-y-auto py-2">
+            {semanticEnabled && query.length < 2 && (
+              <p className="px-4 py-3 text-xs text-[#E75026]/80">
+                ✦ Semantic mode — finds conceptually related results, not just keyword matches
+              </p>
+            )}
             <SearchResults
               results={results}
               isLoading={isLoading}

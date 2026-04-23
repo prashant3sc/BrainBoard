@@ -43,5 +43,15 @@ def chat(message: str) -> dict:
     return _post("/chat", {"message": message})
 
 
+def sprint_pulse(sprint: dict, issues: list[dict]) -> dict:
+    """Generate AI sprint summary + highlights for the AI Pulse panel."""
+    return _post("/sprint-pulse", {"sprint": sprint, "issues": issues}, timeout=_TIMEOUT_LONG)
+
+
+def semantic_search(query: str, k: int = 10) -> list[dict]:
+    """Semantic similarity search: returns id, type, title, excerpt (no projectId yet)."""
+    return _post("/search/semantic", {"query": query, "k": k}, timeout=_TIMEOUT_LONG)
+
+
 def health_check() -> dict:
     return _get("/health", timeout=_TIMEOUT_SHORT)

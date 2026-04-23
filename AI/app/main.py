@@ -11,7 +11,7 @@ from app.core.exceptions import (
     validation_exception_handler,
     generic_exception_handler,
 )
-from app.routers.v1 import team, tasks, chat
+from app.routers.v1 import team, tasks, chat, search, sprint_pulse
 
 settings = get_settings()
 
@@ -66,6 +66,8 @@ app.add_exception_handler(Exception, generic_exception_handler)
 app.include_router(team.router)
 app.include_router(tasks.router)
 app.include_router(chat.router)
+app.include_router(search.router)
+app.include_router(sprint_pulse.router)
 
 
 @app.get("/", tags=["Health"])

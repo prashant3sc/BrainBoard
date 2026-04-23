@@ -163,6 +163,49 @@ def get_sync_status() -> dict:
     }
 
 
+def semantic_search(query: str, k: int = 10) -> list[dict]:
+    """Semantic similarity search across issues and wiki pages stored in ChromaDB."""
+    vector_store = get_vector_store()
+    docs = vector_store.similarity_search(query, k=k)
+
+    results = []
+    for doc in docs:
+        meta = doc.metadata
+        doc_type = meta.get("doc_type", "issue")
+
+        title = ""
+        for line in doc.page_content.split("\n"):
+            if line.startswith("Title: "):
+                title = line[7:].strip()
+                break
+
+        excerpt = ""
+        for prefix in ("Description: ", "Content: "):
+            for line in doc.page_content.split("\n"):
+                if line.startswith(prefix):
+                    excerpt = line[len(prefix):].strip()[:200]
+                    break
+            if excerpt:
+                break
+
+        if doc_type == "issue":
+            results.append({
+                "id": meta.get("issue_id", ""),
+                "type": "issue",
+                "title": title,
+                "excerpt": excerpt,
+            })
+        elif doc_type == "wiki":
+            results.append({
+                "id": meta.get("wiki_id", ""),
+                "type": "wiki",
+                "title": title or meta.get("title", ""),
+                "excerpt": excerpt,
+            })
+
+    return results
+
+
 def analyze_task_with_rag(heading: str, description: str, labels: list[str]) -> dict:
     """
     Label-aware RAG analysis:
