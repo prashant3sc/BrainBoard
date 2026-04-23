@@ -162,7 +162,7 @@ export function WikiPage() {
 
         {/* Right: metadata sidebar — only shown when a page is selected */}
         {selectedPage && (
-          <WikiMetaSidebar page={selectedPage} allPages={pages} />
+          <WikiMetaSidebar page={selectedPage} allPages={pages} projectId={projectId!} />
         )}
 
       </div>

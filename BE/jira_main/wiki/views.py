@@ -125,6 +125,14 @@ class TicketPageLinkView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    def get(self, request, pk):
+        try:
+            page = WikiPage.objects.get(pk=pk)
+        except WikiPage.DoesNotExist:
+            return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        links = TicketPageLink.objects.filter(wiki_page=page).select_related("issue")
+        return Response(TicketPageLinkSerializer(links, many=True).data)
+
     def post(self, request, pk):
         try:
             page = WikiPage.objects.get(pk=pk)
@@ -145,3 +153,25 @@ class TicketPageLinkView(APIView):
             issue=issue, wiki_page=page, defaults={"linked_by": request.user}
         )
         return Response(TicketPageLinkSerializer(link).data, status=status.HTTP_201_CREATED)
+
+    def delete(self, request, pk):
+        try:
+            page = WikiPage.objects.get(pk=pk)
+        except WikiPage.DoesNotExist:
+            return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        from issues.models import Issue
+
+        issue_id = request.data.get("issueId")
+        if not issue_id:
+            return Response({"detail": "issueId required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            issue = Issue.objects.get(pk=issue_id)
+        except Issue.DoesNotExist:
+            return Response({"detail": "Issue not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        deleted, _ = TicketPageLink.objects.filter(issue=issue, wiki_page=page).delete()
+        if not deleted:
+            return Response({"detail": "Link not found"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(status=status.HTTP_204_NO_CONTENT)

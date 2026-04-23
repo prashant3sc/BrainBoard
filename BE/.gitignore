@@ -27,6 +27,7 @@ db.sqlite3
 # Environment variables
 .env
 .env.*
+!.env.example
 
 # OS
 .DS_Store

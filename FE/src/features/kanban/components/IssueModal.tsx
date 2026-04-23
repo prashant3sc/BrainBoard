@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { issuesApi } from '@/api/issues';
 import { useRBAC } from '@/hooks/useRBAC';
 import { useProjectMembers } from '@/features/projects/useProjects';
 import { useActiveSprint, useSprints } from '@/features/projects/useSprints';
+import { useLabels } from '@/features/projects/useLabels';
 import useAuthStore from '@/store/useAuthStore';
 import type { Issue, IssueStatus, Priority, IssueType } from '@/types';
 import { KANBAN_COLUMNS } from './KanbanBoard';
@@ -37,6 +38,85 @@ const PRIORITY_LABELS: Record<Priority, string> = {
   low:      'Low',
 };
 
+const PRIORITY_COLOR: Record<Priority, { bg: string; text: string; dot: string }> = {
+  critical: { bg: '#FFEBE6', text: '#DE350B', dot: '#DE350B' },
+  high:     { bg: '#FFF0E6', text: '#FF5630', dot: '#FF5630' },
+  medium:   { bg: '#FFFAE6', text: '#FF8B00', dot: '#FF8B00' },
+  low:      { bg: '#E3FCEF', text: '#00875A', dot: '#00875A' },
+};
+
+const TYPE_COLOR: Record<IssueType, { bg: string; text: string }> = {
+  task:    { bg: '#DEEBFF', text: '#0052CC' },
+  subtask: { bg: '#EAE6FF', text: '#6554C0' },
+  bug:     { bg: '#FFEBE6', text: '#DE350B' },
+};
+
+const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string }> = {
+  todo:        { label: 'To Do',       bg: '#F4F5F7', text: '#42526E', border: '#C1C7D0' },
+  in_progress: { label: 'In Progress', bg: '#DEEBFF', text: '#0052CC', border: '#4C9AFF' },
+  in_review:   { label: 'In Review',   bg: '#EAE6FF', text: '#6554C0', border: '#8777D9' },
+  done:        { label: 'Done',        bg: '#E3FCEF', text: '#006644', border: '#36B37E' },
+  cancelled:   { label: 'Cancelled',   bg: '#FFEBE6', text: '#BF2600', border: '#FF5630' },
+};
+
+/* ── tiny SVG icons ─────────────────────────────── */
+const IcoStatus = () => (
+  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+    <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.4"/>
+    <path d="M4.5 7l2 2 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+const IcoType = () => (
+  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+    <rect x="2" y="2" width="4" height="4" rx="1" fill="currentColor"/>
+    <rect x="8" y="2" width="4" height="4" rx="1" fill="currentColor"/>
+    <rect x="2" y="8" width="4" height="4" rx="1" fill="currentColor"/>
+    <rect x="8" y="8" width="4" height="4" rx="1" fill="currentColor"/>
+  </svg>
+);
+const IcoPriority = () => (
+  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+    <path d="M7 2v6M7 10v2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+    <path d="M4 4.5l3-2.5 3 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+const IcoAssignee = () => (
+  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+    <circle cx="7" cy="4.5" r="2.5" stroke="currentColor" strokeWidth="1.4"/>
+    <path d="M2 12c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+  </svg>
+);
+const IcoReporter = () => (
+  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+    <circle cx="7" cy="4.5" r="2.5" stroke="currentColor" strokeWidth="1.4"/>
+    <path d="M2 12c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+    <circle cx="10.5" cy="10.5" r="2" fill="#00875A"/>
+    <path d="M9.5 10.5l.7.7 1.3-1.2" stroke="white" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+const IcoPoints = () => (
+  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+    <path d="M7 2l1.5 3 3.5.5-2.5 2.5.5 3.5L7 10l-3 1.5.5-3.5L2 5.5l3.5-.5L7 2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+  </svg>
+);
+const IcoDue = () => (
+  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+    <rect x="2" y="3" width="10" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
+    <path d="M5 2v2M9 2v2M2 6h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+  </svg>
+);
+const IcoLabel = () => (
+  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+    <path d="M2 2h5l5 5-5 5-5-5V2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+    <circle cx="5" cy="5" r="1" fill="currentColor"/>
+  </svg>
+);
+const IcoParent = () => (
+  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+    <path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Props) {
   const isEdit  = issue !== null;
   const { can } = useRBAC();
@@ -56,7 +136,6 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
   const isReadOnly = isInPlannedSprint || isInCompletedSprint;
   const currentUser = useAuthStore((s) => s.user);
 
-  /* All non-subtask issues in this project — used as parent candidates */
   const { data: allIssues = [] } = useQuery({
     queryKey: ['issues', projectId],
     queryFn:  () => issuesApi.getAll(projectId),
@@ -79,14 +158,28 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
   const [parentId,    setParentId]    = useState('');
   const [due,         setDue]         = useState('');
   const [points,      setPoints]      = useState(3);
-  const [titleErr,    setTitleErr]    = useState(false);
-  const [parentErr,   setParentErr]   = useState(false);
-  const [destination, setDestination] = useState<Destination>('backlog');
+  const [labelIds,      setLabelIds]      = useState<string[]>([]);
+  const [titleErr,      setTitleErr]      = useState(false);
+  const [parentErr,     setParentErr]     = useState(false);
+  const [destination,   setDestination]   = useState<Destination>('backlog');
+  const [assigneeOpen,  setAssigneeOpen]  = useState(false);
+  const [parentSearch,  setParentSearch]  = useState('');
+  const assigneeRef    = useRef<HTMLDivElement>(null);
+  const { data: projectLabels = [] }  = useLabels(projectId);
 
-  /* Clear AI state when modal closes or switches issue */
+  /* Close dropdowns on outside click */
+  useEffect(() => {
+    if (!assigneeOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (assigneeRef.current && !assigneeRef.current.contains(e.target as Node)) setAssigneeOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [assigneeOpen]);
+
+
   useEffect(() => { clearAI(); }, [issue?.id, isOpen]);
 
-  /* Sync form when opening */
   useEffect(() => {
     if (!isOpen) return;
     setTitle(issue?.title       ?? '');
@@ -99,14 +192,12 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
     setParentId(issue?.parentId ?? '');
     setDue(issue?.due ?? '');
     setPoints(issue?.storyPoints ?? 3);
+    setLabelIds(issue?.labelIds ?? []);
     setTitleErr(false);
     setParentErr(false);
-    // In edit mode, pre-select based on issue's current sprint
-    if (issue?.sprintId) {
-      setDestination('sprint');
-    } else {
-      setDestination('backlog');
-    }
+    setParentSearch('');
+    if (issue?.sprintId) setDestination('sprint');
+    else setDestination('backlog');
   }, [issue, isOpen]);
 
   function close() { onClose(); }
@@ -131,6 +222,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
         issueType,
         due: due || null,
         sprintId: destination === 'sprint' ? activeSprintId : null,
+        labelIds,
       }),
     onSuccess: invalidateAndClose,
   });
@@ -149,6 +241,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
         issueType,
         due: due || null,
         sprintId: destination === 'sprint' ? activeSprintId : null,
+        labelIds,
       }),
     onSuccess: invalidateAndClose,
   });
@@ -160,6 +253,27 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
 
   const isPending = createMut.isPending || updateMut.isPending;
 
+  /* Dirty check — compare every field against the original issue */
+  const isDirty = isEdit ? (() => {
+    if (!issue) return false;
+    const origDestination = issue.sprintId ? 'sprint' : 'backlog';
+    const origLabels = [...(issue.labelIds ?? [])].sort().join(',');
+    const currLabels  = [...labelIds].sort().join(',');
+    return (
+      title       !== (issue.title        ?? '')        ||
+      desc        !== (issue.description  ?? '')        ||
+      status      !== (issue.status       ?? 'todo')    ||
+      priority    !== (issue.priority     ?? 'medium')  ||
+      issueType   !== (issue.issueType    ?? 'task')    ||
+      assigneeId  !== (issue.assigneeId   ?? '')        ||
+      parentId    !== (issue.parentId     ?? '')        ||
+      due         !== (issue.due          ?? '')        ||
+      points      !== (issue.storyPoints  ?? 3)         ||
+      destination !== origDestination                   ||
+      currLabels  !== origLabels
+    );
+  })() : true; // create mode is always "dirty"
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) { setTitleErr(true); return; }
@@ -167,12 +281,10 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
     isEdit ? updateMut.mutate() : createMut.mutate();
   }
 
-  /* Overlay click → close */
   function handleOverlay(e: React.MouseEvent<HTMLDivElement>) {
     if (e.target === e.currentTarget) close();
   }
 
-  /* Escape key → close */
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
@@ -186,23 +298,54 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
     ? (members.find((m) => m.user.id === reporterId)?.user.name ?? currentUser?.name ?? '—')
     : (currentUser?.name ?? '—');
 
+  const issueKey = isEdit
+    ? issue!.id.slice(0, 8).toUpperCase()
+    : null;
+
+  const pColor = PRIORITY_COLOR[priority];
+  const tColor = TYPE_COLOR[issueType];
+
+  /* helper: initials avatar */
+  function Initials({ name }: { name: string }) {
+    const parts = name.trim().split(' ');
+    const ini = (parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '');
+    return (
+      <span className="im-avatar" title={name}>
+        {ini.toUpperCase() || '?'}
+      </span>
+    );
+  }
+
   return (
     <div className="kb-modal-overlay" onClick={handleOverlay}>
-      <div className="kb-modal-wide bb-modal-animate">
+      <div className="kb-modal-wide bb-modal-animate im-modal">
 
-        {/* Header */}
-        <div className="kb-modal-header">
-          <div className="kb-modal-header-left">
-            <div className="kb-modal-icon">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <rect x="1" y="1" width="4" height="14" rx="1" fill="#E75026"/>
-                <rect x="7" y="4" width="4" height="11" rx="1" fill="#E75026"/>
-                <rect x="13" y="7" width="2" height="8"  rx="1" fill="#E75026"/>
-              </svg>
-            </div>
-            <span className="kb-modal-title">
-              {isEdit ? 'Edit issue' : 'Create new card'}
+        {/* ── Header ── */}
+        <div className="im-header">
+          <div className="im-header-left">
+            {/* Type badge */}
+            <span className="im-type-badge" style={{ background: tColor.bg, color: tColor.text }}>
+              {issueType === 'bug' && (
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                  <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.3"/>
+                  <path d="M4 4.5c.5-.8 1.2-1.5 2-1.5s1.5.7 2 1.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+                </svg>
+              )}
+              {issueType === 'task' && (
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                  <rect x="1.5" y="1.5" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
+                  <path d="M3.5 6l2 2 3-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+              {issueType === 'subtask' && (
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                  <path d="M2 2h4l4 4-4 4-4-4V2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+                </svg>
+              )}
+              {TYPE_LABELS[issueType]}
             </span>
+            {issueKey && <span className="im-issue-key">{issueKey}</span>}
+            <span className="im-header-title">{isEdit ? 'View / Edit Issue' : 'Create New Issue'}</span>
           </div>
           <button className="kb-modal-close" onClick={close}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -211,84 +354,79 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
           </button>
         </div>
 
-        {/* Read-only banners */}
+        {/* ── Read-only banners ── */}
         {isInPlannedSprint && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 20px', background: '#FFF9E6', borderBottom: '1px solid #FFE58F', fontSize: 12, color: '#7A5200' }}>
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <div className="im-banner im-banner-warn">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
               <circle cx="8" cy="8" r="6.5" stroke="#F5A623" strokeWidth="1.4"/>
               <path d="M8 5v4M8 11v.5" stroke="#F5A623" strokeWidth="1.4" strokeLinecap="round"/>
             </svg>
-            This issue is in a planned sprint that hasn't started yet. Editing is disabled.
+            This issue is in a <strong>planned sprint</strong> that hasn't started yet. Editing is disabled.
           </div>
         )}
         {isInCompletedSprint && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 20px', background: '#F4F5F7', borderBottom: '1px solid #DFE1E6', fontSize: 12, color: '#6B778C' }}>
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <div className="im-banner im-banner-neutral">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
               <circle cx="8" cy="8" r="6.5" stroke="#6B778C" strokeWidth="1.4"/>
               <path d="M5 8l2 2 4-4" stroke="#6B778C" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            This issue belongs to a completed sprint and is read-only.
+            This issue belongs to a <strong>completed sprint</strong> and is read-only.
           </div>
         )}
 
-        {/* Two-column body */}
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-          <div className="kb-modal-cols">
+        {/* ── Body ── */}
+        <form onSubmit={handleSubmit} className="im-form">
+          <div className="im-body">
 
-            {/* ── Left: Title + Description ── */}
-            <div className="kb-modal-col-main">
-              <div className="kb-field">
-                <label className="kb-label">Title <span className="kb-required">*</span></label>
-                <input
-                  className={`kb-input${titleErr ? ' kb-input-error' : ''}`}
-                  placeholder="e.g. Fix login timeout on Safari"
+            {/* ═══ LEFT — content ═══ */}
+            <div className="im-col-main">
+
+              {/* Title */}
+              <div className="im-title-wrap">
+                <textarea
+                  className={`im-title-input${titleErr ? ' kb-input-error' : ''}`}
+                  placeholder="Issue title…"
+                  rows={2}
                   value={title}
                   disabled={!canEdit || isReadOnly}
                   onChange={(e) => { setTitle(e.target.value); setTitleErr(false); }}
                 />
+                {titleErr && <span className="im-field-err">Title is required.</span>}
               </div>
 
-              <div className="kb-field" style={{ flex: 1 }}>
-                <label className="kb-label">Description</label>
+              {/* Description */}
+              <div className="im-section">
+                <div className="im-section-label">Description</div>
                 <textarea
-                  className="kb-input kb-textarea-tall"
-                  placeholder="What needs to be done? Add context, steps to reproduce, acceptance criteria…"
+                  className="kb-input im-desc"
+                  placeholder="Add details, steps to reproduce, acceptance criteria…"
                   value={desc}
                   disabled={!canEdit || isReadOnly}
                   onChange={(e) => setDesc(e.target.value)}
                 />
               </div>
 
-              {/* AI Analyze — edit mode only, for users who can edit */}
+              {/* AI analyze */}
               {isEdit && canAI && !isReadOnly && (
-                <div className="kb-field">
+                <div className="im-section">
                   {!aiResult && (
                     <button
                       type="button"
                       disabled={aiLoading}
-                      onClick={() => analyze(issue!.id)}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 7,
-                        padding: '7px 14px', borderRadius: 7,
-                        border: '1.5px solid #6366F1',
-                        background: aiLoading ? '#EEF2FF' : 'white',
-                        color: '#4F46E5', fontSize: 12, fontWeight: 600,
-                        cursor: aiLoading ? 'not-allowed' : 'pointer',
-                        width: 'fit-content', transition: 'background 0.15s',
-                      }}
+                      className="im-ai-btn"
+                    onClick={() => analyze(issue!.id)}
                     >
                       {aiLoading ? (
                         <>
-                          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style={{ animation: 'spin 1s linear infinite' }}>
+                          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ animation: 'spin 1s linear infinite' }}>
                             <circle cx="8" cy="8" r="6" stroke="#6366F1" strokeWidth="2" strokeDasharray="20 18"/>
                           </svg>
                           Analyzing…
                         </>
                       ) : (
                         <>
-                          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                            <path d="M8 1l1.8 3.6L14 5.6l-3 2.9.7 4.1L8 10.5l-3.7 2.1.7-4.1L2 5.6l4.2-.9L8 1z"
-                              fill="#6366F1" strokeLinejoin="round"/>
+                          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                            <path d="M8 1l1.8 3.6L14 5.6l-3 2.9.7 4.1L8 10.5l-3.7 2.1.7-4.1L2 5.6l4.2-.9L8 1z" fill="#6366F1" strokeLinejoin="round"/>
                           </svg>
                           Analyze with AI
                         </>
@@ -296,16 +434,13 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                     </button>
                   )}
                   {aiError && (
-                    <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <div className="im-ai-error">
                       <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
                         <circle cx="7" cy="7" r="5.5" stroke="#DC2626" strokeWidth="1.3"/>
                         <path d="M7 4.5v3M7 9.5v.5" stroke="#DC2626" strokeWidth="1.3" strokeLinecap="round"/>
                       </svg>
                       {aiError}
-                      <button type="button" onClick={() => analyze(issue!.id)}
-                        style={{ background: 'none', border: 'none', color: '#4F46E5', fontSize: 12, cursor: 'pointer', padding: 0, marginLeft: 4 }}>
-                        Retry
-                      </button>
+                      <button type="button" className="im-ai-retry" onClick={() => analyze(issue!.id)}>Retry</button>
                     </div>
                   )}
                   {aiResult && (
@@ -319,138 +454,457 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                 </div>
               )}
 
-              {/* Destination — create mode; Location — edit mode */}
+              {/* Location / Destination */}
               {(!isEdit || (isEdit && !isReadOnly)) && (
-                <div className="kb-field">
-                  <label className="kb-label">{isEdit ? 'Location' : 'Add to'} {!isEdit && <span className="kb-required">*</span>}</label>
-                  <div className="kb-destination-group">
-                    <label className={`kb-dest-option${destination === 'backlog' ? ' kb-dest-active' : ''}${isReadOnly ? ' kb-dest-disabled' : ''}`}>
+                <div className="im-section">
+                  <div className="im-section-label">{isEdit ? 'Location' : 'Add to'}</div>
+                  <div className="im-dest-row">
+                    <label className={`im-dest-pill${destination === 'backlog' ? ' im-dest-active' : ''}`}>
                       <input type="radio" name="destination" value="backlog" checked={destination === 'backlog'} disabled={isReadOnly} onChange={() => setDestination('backlog')} />
-                      <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                      <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
                         <rect x="1" y="3" width="12" height="2" rx="1" fill="currentColor"/>
                         <rect x="1" y="7" width="12" height="2" rx="1" fill="currentColor"/>
                         <rect x="1" y="11" width="7" height="2" rx="1" fill="currentColor"/>
                       </svg>
                       Backlog
                     </label>
-                    <label className={`kb-dest-option${destination === 'sprint' ? ' kb-dest-active' : ''}${(!activeSprintId || isReadOnly) ? ' kb-dest-disabled' : ''}`}>
+                    <label className={`im-dest-pill${destination === 'sprint' ? ' im-dest-active' : ''}${!activeSprintId ? ' im-dest-disabled' : ''}`}>
                       <input type="radio" name="destination" value="sprint" checked={destination === 'sprint'} disabled={!activeSprintId || isReadOnly} onChange={() => setDestination('sprint')} />
-                      <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-                        <path d="M2 7a5 5 0 0 1 9.5-2.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                        <path d="M12 7a5 5 0 0 1-9.5 2.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                        <path d="M11.5 2.5l.5 2.3-2.3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                      <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+                        <path d="M2 7a5 5 0 0 1 9.5-2.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                        <path d="M12 7a5 5 0 0 1-9.5 2.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                        <path d="M11.5 2.5l.5 2.3-2.3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
-                      Current Sprint{!activeSprintId && <span style={{ fontSize: 10, opacity: 0.5, marginLeft: 4 }}>(none active)</span>}
+                      Current Sprint
+                      {!activeSprintId && <span className="im-dest-note">(none active)</span>}
                     </label>
                   </div>
                 </div>
               )}
+
             </div>
 
-            {/* ── Divider ── */}
-            <div className="kb-modal-col-divider" />
+            {/* ═══ DIVIDER ═══ */}
+            <div className="im-col-divider" />
 
-            {/* ── Right: All metadata ── */}
-            <div className="kb-modal-col-meta">
+            {/* ═══ RIGHT — properties ═══ */}
+            <div className="im-col-props">
 
+              {/* STATUS */}
               {isEdit && (
-                <div className="kb-field">
-                  <label className="kb-label">Status</label>
-                  <select className="kb-input kb-select" value={status} disabled={!canEdit || isReadOnly} onChange={(e) => setStatus(e.target.value as IssueStatus)}>
-                    {KANBAN_COLUMNS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-                  </select>
+                <div className="im-props-section">
+                  <div className="im-field-heading">
+                    <IcoStatus /> Status
+                  </div>
+                  <div className="im-status-pills">
+                    {KANBAN_COLUMNS.map((col) => {
+                      const cfg = STATUS_CONFIG[col.id] ?? STATUS_CONFIG['todo'];
+                      const active = status === col.id;
+                      return (
+                        <button
+                          key={col.id}
+                          type="button"
+                          disabled={!canEdit || isReadOnly}
+                          onClick={() => setStatus(col.id as IssueStatus)}
+                          className="im-status-pill"
+                          style={{
+                            background: active ? cfg.bg : 'transparent',
+                            color:      active ? cfg.text : 'var(--kb-field-label)',
+                            border:     active ? `1.5px solid ${cfg.border}` : '1.5px solid transparent',
+                            fontWeight: active ? 600 : 400,
+                            opacity: (!canEdit || isReadOnly) ? 0.55 : 1,
+                            cursor: (!canEdit || isReadOnly) ? 'default' : 'pointer',
+                          }}
+                        >
+                          {active && (
+                            <span className="im-status-dot" style={{ background: cfg.border }} />
+                          )}
+                          {col.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
-              <div className="kb-field">
-                <label className="kb-label">Type</label>
-                <select
-                  className="kb-input kb-select"
-                  value={issueType}
-                  disabled={!canEdit || isReadOnly}
-                  onChange={(e) => {
-                    setIssueType(e.target.value as IssueType);
-                    setParentErr(false);
-                    if (e.target.value !== 'subtask') setParentId('');
-                  }}
-                >
-                  {ISSUE_TYPES.map((t) => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
-                </select>
-              </div>
-
-              <div className="kb-field">
-                <label className="kb-label">Priority</label>
-                <select className="kb-input kb-select" value={priority} disabled={!canEdit || isReadOnly} onChange={(e) => setPriority(e.target.value as Priority)}>
-                  {PRIORITIES.map((p) => <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>)}
-                </select>
-              </div>
-
-              <div className="kb-field">
-                <label className="kb-label">Assignee</label>
-                <select className="kb-input kb-select" value={assigneeId} disabled={!canEdit || isReadOnly} onChange={(e) => setAssigneeId(e.target.value)}>
-                  <option value="">Unassigned</option>
-                  {members.map((m) => <option key={m.user.id} value={m.user.id}>{m.user.name}</option>)}
-                </select>
-              </div>
-
-              <div className="kb-field">
-                <label className="kb-label">Reporter</label>
-                <div className="kb-reporter-display">{reporterName}</div>
-              </div>
-
-              <div className="kb-row2">
-                <div className="kb-field">
-                  <label className="kb-label">Story points</label>
-                  <input type="number" min={1} max={13} className="kb-input" value={points} disabled={!canEdit || isReadOnly} onChange={(e) => setPoints(Number(e.target.value))} />
+              {/* TYPE */}
+              <div className="im-props-section">
+                <div className="im-field-heading">
+                  <IcoType /> Issue Type
                 </div>
-                <div className="kb-field">
-                  <label className="kb-label">Due date</label>
-                  <input type="date" className="kb-input" value={due} disabled={!canEdit || isReadOnly} onChange={(e) => setDue(e.target.value)} />
-                </div>
-              </div>
-
-              {/* Parent issue — subtask only */}
-              {issueType === 'subtask' && (
-                <div className="kb-field">
-                  <label className="kb-label">Parent issue <span className="kb-required">*</span></label>
-                  <select
-                    className={`kb-input kb-select${parentErr ? ' kb-input-error' : ''}`}
-                    value={parentId}
-                    disabled={!canEdit || isReadOnly}
-                    onChange={(e) => { setParentId(e.target.value); setParentErr(false); }}
-                  >
-                    <option value="">— Select parent issue —</option>
-                    {parentCandidates.map((i) => (
-                      <option key={i.id} value={i.id}>
-                        {i.id.startsWith('issue-') ? `BB-${i.id.replace('issue-', '')}` : i.id.slice(0, 8).toUpperCase()} — {i.title}
-                      </option>
-                    ))}
-                  </select>
-                  {parentErr && <span style={{ fontSize: 12, color: '#DE350B', marginTop: 2 }}>Parent issue is required for subtasks.</span>}
-                  {isEdit && parentId && onNavigate && (() => {
-                    const parent = allIssues.find((i) => i.id === parentId);
-                    return parent ? (
-                      <button type="button" className="kb-parent-link" onClick={() => { close(); onNavigate(parent); }}>
-                        <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-                          <path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                        Go to parent issue
+                <div className="im-pill-group">
+                  {ISSUE_TYPES.map((t) => {
+                    const tc = TYPE_COLOR[t];
+                    const active = issueType === t;
+                    const disabled = !canEdit || isReadOnly;
+                    return (
+                      <button
+                        key={t} type="button"
+                        disabled={disabled}
+                        className={`im-option-pill${active ? ' im-option-pill-active' : ''}`}
+                        style={active ? { background: tc.bg, color: tc.text, borderColor: tc.text } : {}}
+                        onClick={() => {
+                          if (disabled) return;
+                          setIssueType(t);
+                          setParentErr(false);
+                          if (t !== 'subtask') setParentId('');
+                        }}
+                      >
+                        {t === 'task' && (
+                          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                            <rect x="1.5" y="1.5" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
+                            <path d="M3.5 6l2 2 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                        {t === 'subtask' && (
+                          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                            <rect x="1.5" y="1.5" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.4" strokeDasharray="2.5 1.5"/>
+                            <path d="M4 6h4M6 4v4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                          </svg>
+                        )}
+                        {t === 'bug' && (
+                          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                            <circle cx="6" cy="6.5" r="3.5" stroke="currentColor" strokeWidth="1.4"/>
+                            <path d="M4.5 3.5C4.5 2.67 5.17 2 6 2s1.5.67 1.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                            <path d="M2.5 5.5h1M8.5 5.5h1M2.5 8h1M8.5 8h1M6 10v1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                          </svg>
+                        )}
+                        <span>{TYPE_LABELS[t]}</span>
+                        {t === 'subtask' && <span className="im-pill-hint">child issue</span>}
+                        {t === 'bug' && <span className="im-pill-hint">defect</span>}
+                        {t === 'task' && <span className="im-pill-hint">work item</span>}
                       </button>
-                    ) : null;
-                  })()}
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* PRIORITY */}
+              <div className="im-props-section">
+                <div className="im-field-heading">
+                  <IcoPriority /> Priority
+                </div>
+                <div className="im-pill-group">
+                  {PRIORITIES.map((p) => {
+                    const pc = PRIORITY_COLOR[p];
+                    const active = priority === p;
+                    const disabled = !canEdit || isReadOnly;
+                    return (
+                      <button
+                        key={p} type="button"
+                        disabled={disabled}
+                        className={`im-option-pill${active ? ' im-option-pill-active' : ''}`}
+                        style={active ? { background: pc.bg, color: pc.text, borderColor: pc.dot } : {}}
+                        onClick={() => { if (!disabled) setPriority(p); }}
+                      >
+                        <span className="im-prio-dot" style={{ background: pc.dot }} />
+                        <span>{PRIORITY_LABELS[p]}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* PEOPLE */}
+              <div className="im-props-section">
+                <div className="im-field-heading"><IcoAssignee /> People</div>
+
+                {/* Assignee — custom picker */}
+                <div className="im-prop-row">
+                  <span className="im-prop-label"><IcoAssignee /> Assignee</span>
+                  <div className="im-assignee-picker" ref={assigneeRef}>
+                    <button
+                      type="button"
+                      className={`im-assignee-trigger${assigneeOpen ? ' im-assignee-trigger-open' : ''}`}
+                      disabled={!canEdit || isReadOnly}
+                      onClick={() => setAssigneeOpen((v) => !v)}
+                    >
+                      {assigneeId ? (() => {
+                        const member = members.find((m) => m.user.id === assigneeId);
+                        return member ? (
+                          <>
+                            <Initials name={member.user.name} />
+                            <span className="im-assignee-name">{member.user.name}</span>
+                          </>
+                        ) : null;
+                      })() : (
+                        <>
+                          <span className="im-assignee-empty-avatar">
+                            <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                              <circle cx="7" cy="4.5" r="2.5" stroke="currentColor" strokeWidth="1.4"/>
+                              <path d="M2 12c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                            </svg>
+                          </span>
+                          <span className="im-assignee-placeholder">Unassigned</span>
+                        </>
+                      )}
+                      <svg className="im-assignee-chevron" width="10" height="10" viewBox="0 0 12 12" fill="none">
+                        <path d="M3 4.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+
+                    {assigneeOpen && (
+                      <div className="im-assignee-dropdown">
+                        {/* Unassign option */}
+                        <button
+                          type="button"
+                          className={`im-assignee-option${!assigneeId ? ' im-assignee-option-active' : ''}`}
+                          onClick={() => { setAssigneeId(''); setAssigneeOpen(false); }}
+                        >
+                          <span className="im-assignee-empty-avatar">
+                            <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                              <circle cx="7" cy="4.5" r="2.5" stroke="currentColor" strokeWidth="1.4"/>
+                              <path d="M2 12c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                            </svg>
+                          </span>
+                          <div className="im-assignee-info">
+                            <span className="im-assignee-opt-name">Unassigned</span>
+                          </div>
+                          {!assigneeId && (
+                            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{ marginLeft: 'auto', flexShrink: 0, color: '#E75026' }}>
+                              <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                        </button>
+
+                        {members.length > 0 && <div className="im-assignee-sep" />}
+
+                        {members.map((m) => {
+                          const active = assigneeId === m.user.id;
+                          const nameParts = m.user.name.trim().split(' ');
+                          const role = (m as any).role ?? '';
+                          return (
+                            <button
+                              key={m.user.id}
+                              type="button"
+                              className={`im-assignee-option${active ? ' im-assignee-option-active' : ''}`}
+                              onClick={() => { setAssigneeId(m.user.id); setAssigneeOpen(false); }}
+                            >
+                              <Initials name={m.user.name} />
+                              <div className="im-assignee-info">
+                                <span className="im-assignee-opt-name">{m.user.name}</span>
+                                {role && <span className="im-assignee-opt-role">{role}</span>}
+                              </div>
+                              {active && (
+                                <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{ marginLeft: 'auto', flexShrink: 0, color: '#E75026' }}>
+                                  <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Reporter */}
+                <div className="im-prop-row">
+                  <span className="im-prop-label"><IcoReporter /> Reporter</span>
+                  <div className="im-reporter-val">
+                    <Initials name={reporterName} />
+                    <span>{reporterName}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* STORY POINTS + DUE DATE */}
+              <div className="im-props-section">
+                <div className="im-field-heading"><IcoPoints /> Details</div>
+                <div className="im-prop-row">
+                  <span className="im-prop-label"><IcoPoints /> Story pts</span>
+                  <input
+                    type="number" min={1} max={13}
+                    className="im-prop-input"
+                    value={points}
+                    disabled={!canEdit || isReadOnly}
+                    onChange={(e) => setPoints(Number(e.target.value))}
+                  />
+                </div>
+                <div className="im-prop-row">
+                  <span className="im-prop-label"><IcoDue /> Due date</span>
+                  <input
+                    type="date"
+                    className="im-prop-input"
+                    value={due}
+                    disabled={!canEdit || isReadOnly}
+                    onChange={(e) => setDue(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* LABELS */}
+              {projectLabels.length > 0 && (
+                <div className="im-props-section">
+                  <div className="im-field-heading">
+                    <IcoLabel /> Labels
+                  </div>
+                  <div className="im-labels-wrap">
+                    {projectLabels.map((lbl) => {
+                      const selected = labelIds.includes(lbl.id);
+                      return (
+                        <button
+                          key={lbl.id}
+                          type="button"
+                          disabled={isReadOnly || !canEdit}
+                          onClick={() => {
+                            if (isReadOnly || !canEdit) return;
+                            setLabelIds((prev) =>
+                              selected ? prev.filter((id) => id !== lbl.id) : [...prev, lbl.id]
+                            );
+                          }}
+                          className="im-label-chip"
+                          style={{
+                            border: `1.5px solid ${lbl.color}`,
+                            background: selected ? lbl.color : 'transparent',
+                            color: selected ? '#fff' : lbl.color,
+                            opacity: isReadOnly || !canEdit ? 0.55 : 1,
+                            cursor: isReadOnly || !canEdit ? 'default' : 'pointer',
+                          }}
+                        >
+                          {selected && (
+                            <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
+                              <path d="M2 5l2 2 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                          {lbl.name}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
-              {/* Subtasks — shown on parent issues in edit mode */}
+              {/* PARENT ISSUE — subtask only */}
+              {issueType === 'subtask' && (
+                <div className="im-props-section">
+                  <div className="im-field-heading">
+                    <IcoParent /> Parent Issue <span className="kb-required" style={{ marginLeft: 2 }}>*</span>
+                  </div>
+
+                  {/* Selected parent display */}
+                  {parentId && (() => {
+                    const p = allIssues.find((i) => i.id === parentId);
+                    if (!p) return null;
+                    const tc = TYPE_COLOR[p.issueType as IssueType] ?? TYPE_COLOR.task;
+                    return (
+                      <div className="im-parent-selected-card">
+                        <span className="im-parent-type-dot" style={{ background: tc.text }} />
+                        <div className="im-parent-selected-info">
+                          <span className="im-parent-key">{p.id.slice(0, 8).toUpperCase()}</span>
+                          <span className="im-parent-title">{p.title}</span>
+                        </div>
+                        <span className="im-parent-opt-type" style={{ background: tc.bg, color: tc.text }}>
+                          {TYPE_LABELS[p.issueType as IssueType]}
+                        </span>
+                        {(!isReadOnly && canEdit) && (
+                          <button
+                            type="button"
+                            className="im-parent-clear"
+                            onClick={() => setParentId('')}
+                            title="Clear parent"
+                          >
+                            <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                              <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                            </svg>
+                          </button>
+                        )}
+                        {isEdit && onNavigate && (
+                          <button
+                            type="button"
+                            className="im-goto-parent"
+                            onClick={() => { close(); onNavigate(p); }}
+                            title="Open parent"
+                          >
+                            <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                              <path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                            Open
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Inline search + list — always visible when no parent selected or editing */}
+                  {(!parentId || !isReadOnly) && canEdit && !isReadOnly && (
+                    <div className={`im-parent-panel${parentErr ? ' im-parent-panel-err' : ''}`}>
+                      {/* Search */}
+                      <div className="im-parent-search-wrap">
+                        <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                          <circle cx="6" cy="6" r="4" stroke="currentColor" strokeWidth="1.4"/>
+                          <path d="M9 9l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                        </svg>
+                        <input
+                          className="im-parent-search"
+                          placeholder="Search issues…"
+                          value={parentSearch}
+                          onChange={(e) => setParentSearch(e.target.value)}
+                        />
+                      </div>
+
+                      {/* Issue list */}
+                      <div className="im-parent-list">
+                        {parentCandidates
+                          .filter((i) =>
+                            !parentSearch ||
+                            i.title.toLowerCase().includes(parentSearch.toLowerCase()) ||
+                            i.id.toLowerCase().includes(parentSearch.toLowerCase())
+                          )
+                          .map((i) => {
+                            const tc = TYPE_COLOR[i.issueType as IssueType] ?? TYPE_COLOR.task;
+                            const active = parentId === i.id;
+                            return (
+                              <button
+                                key={i.id}
+                                type="button"
+                                className={`im-parent-option${active ? ' im-parent-option-active' : ''}`}
+                                onClick={() => { setParentId(i.id); setParentErr(false); setParentSearch(''); }}
+                              >
+                                <span className="im-parent-opt-dot" style={{ background: tc.text }} />
+                                <div className="im-parent-opt-info">
+                                  <span className="im-parent-opt-key">{i.id.slice(0, 8).toUpperCase()}</span>
+                                  <span className="im-parent-opt-title">{i.title}</span>
+                                </div>
+                                <span className="im-parent-opt-type" style={{ background: tc.bg, color: tc.text }}>
+                                  {TYPE_LABELS[i.issueType as IssueType]}
+                                </span>
+                                {active && (
+                                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, color: '#E75026' }}>
+                                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                )}
+                              </button>
+                            );
+                          })}
+                        {parentCandidates.filter((i) =>
+                          !parentSearch ||
+                          i.title.toLowerCase().includes(parentSearch.toLowerCase()) ||
+                          i.id.toLowerCase().includes(parentSearch.toLowerCase())
+                        ).length === 0 && (
+                          <div className="im-parent-empty">No matching issues</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {parentErr && <span className="im-field-err">Parent issue is required.</span>}
+                </div>
+              )}
+
+              {/* SUBTASKS */}
               {subtasks.length > 0 && (
-                <div className="kb-field">
-                  <label className="kb-label">
+                <div className="im-props-section">
+                  <div className="im-field-heading">
+                    <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                      <path d="M3 3h8M3 7h6M3 11h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                    </svg>
                     Subtasks
-                    <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 400, color: 'var(--bb-bl-count)' }}>
+                    <span className="im-subtask-progress">
                       {subtasks.filter((s) => s.status === 'done').length}/{subtasks.length} done
                     </span>
-                  </label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 2 }}>
+                  </div>
+                  <div className="im-subtask-list">
                     {subtasks.map((s) => (
                       <button
                         key={s.id}
@@ -461,7 +915,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                         <span className={`kb-subtask-dot kb-subtask-dot-${s.status}`} />
                         <span className="kb-subtask-key">{s.id.slice(0, 8).toUpperCase()}</span>
                         <span className="kb-subtask-title">{s.title}</span>
-                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" style={{ marginLeft: 'auto', flexShrink: 0, opacity: 0.4 }}>
+                        <svg width="9" height="9" viewBox="0 0 12 12" fill="none" style={{ marginLeft: 'auto', flexShrink: 0, opacity: 0.35 }}>
                           <path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       </button>
@@ -473,8 +927,8 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
             </div>
           </div>
 
-          {/* Footer */}
-          <div className="kb-modal-footer">
+          {/* ── Footer ── */}
+          <div className="im-footer">
             {isEdit ? (
               <>
                 <div>
@@ -483,14 +937,19 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                       <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
                         <path d="M2 3.5h10M5.5 3.5V2.5h3v1M11 3.5l-.75 8.5H3.75L3 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
-                      {deleteMut.isPending ? 'Deleting…' : 'Delete issue'}
+                      {deleteMut.isPending ? 'Deleting…' : 'Delete'}
                     </button>
                   )}
                 </div>
                 <div className="kb-modal-footer-right">
                   <button type="button" className="kb-btn-ghost" onClick={close}>Cancel</button>
                   {canEdit && !isReadOnly && (
-                    <button type="submit" className="kb-btn-create" disabled={isPending}>
+                    <button
+                      type="submit"
+                      className={`kb-btn-create${!isDirty ? ' kb-btn-create-idle' : ''}`}
+                      disabled={isPending || !isDirty}
+                      title={!isDirty ? 'No changes to save' : undefined}
+                    >
                       <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
                         <path d="M2 7l3.5 3.5L12 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
@@ -511,7 +970,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                       <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
                         <path d="M7 2v10M2 7h10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
                       </svg>
-                      {isPending ? 'Creating…' : 'Create card'}
+                      {isPending ? 'Creating…' : 'Create issue'}
                     </button>
                   )}
                 </div>

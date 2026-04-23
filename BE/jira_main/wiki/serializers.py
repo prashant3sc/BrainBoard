@@ -110,7 +110,25 @@ class WikiPageVersionSerializer(serializers.ModelSerializer):
         fields = ["id", "version_number", "title", "content", "created_by", "created_at"]
 
 
+class LinkedIssueSerializer(serializers.Serializer):
+    """Minimal issue shape returned inside a TicketPageLink response."""
+    id        = serializers.UUIDField()
+    title     = serializers.CharField()
+    issueType = serializers.CharField(source="issue_type")
+
+
 class TicketPageLinkSerializer(serializers.ModelSerializer):
+    issue = LinkedIssueSerializer(read_only=True)
+
     class Meta:
         model = TicketPageLink
         fields = ["id", "issue", "wiki_page", "created_at"]
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        rep["createdAt"] = rep.pop("created_at")
+        rep["wikiPage"]  = rep.pop("wiki_page")
+        # Cast UUIDs to strings
+        rep["issue"]["id"] = str(rep["issue"]["id"])
+        rep["wikiPage"]    = str(rep["wikiPage"])
+        return rep

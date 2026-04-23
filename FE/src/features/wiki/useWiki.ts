@@ -48,16 +48,32 @@ export function useWikiHistory(pageId: string | null) {
   });
 }
 
+export function useWikiLinks(pageId: string | null) {
+  return useQuery({
+    queryKey: ['wiki-links', pageId],
+    queryFn:  () => wikiApi.getLinks(pageId!),
+    enabled:  !!pageId,
+  });
+}
+
 export function useLinkTicket() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ pageId, issueId }: { pageId: string; issueId: string }) =>
       wikiApi.linkTicket(pageId, issueId),
+    onSuccess: (_data, { pageId }) => {
+      qc.invalidateQueries({ queryKey: ['wiki-links', pageId] });
+    },
   });
 }
 
 export function useUnlinkTicket() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ pageId, issueId }: { pageId: string; issueId: string }) =>
       wikiApi.unlinkTicket(pageId, issueId),
+    onSuccess: (_data, { pageId }) => {
+      qc.invalidateQueries({ queryKey: ['wiki-links', pageId] });
+    },
   });
 }

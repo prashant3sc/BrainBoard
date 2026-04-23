@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, NavLink } from 'react-router-dom';
 import { useProject, useProjectMembers, useAddMember, useRemoveMember } from '@/features/projects/useProjects';
+import { useLabels, useCreateLabel, useDeleteLabel } from '@/features/projects/useLabels';
 import { useUsers } from '@/features/users/useUsers';
 import useAuthStore from '@/store/useAuthStore';
 import useAppStore from '@/store/useAppStore';
+import { useRBAC } from '@/hooks/useRBAC';
 import type { User, Role } from '@/types';
 
 /* ─── helpers ─── */
@@ -58,17 +60,28 @@ function useToast() {
    PAGE
 ═══════════════════════════════════════════════ */
 
+type SettingsTab = 'members' | 'labels';
+
 export default function ProjectSettingsPage() {
   const { projectId = '' } = useParams<{ projectId: string }>();
   const currentUser = useAuthStore((s) => s.user);
   const { togglePalette } = useAppStore();
+  const { can } = useRBAC();
   const { toastMsg, toastVisible, showToast } = useToast();
+  const [activeTab, setActiveTab] = useState<SettingsTab>('members');
 
   const { data: project, isLoading: projectLoading } = useProject(projectId);
   const { data: projectMembers = [], isLoading: membersLoading } = useProjectMembers(projectId);
   const { data: allUsers = [], isLoading: usersLoading } = useUsers();
   const { mutate: addMember,    isPending: adding   } = useAddMember();
   const { mutate: removeMember, isPending: removing } = useRemoveMember();
+
+  /* Labels */
+  const { data: labels = [], isLoading: labelsLoading } = useLabels(projectId);
+  const { mutate: createLabel, isPending: creatingLabel } = useCreateLabel();
+  const { mutate: deleteLabel, isPending: deletingLabel } = useDeleteLabel();
+  const [newLabelName,  setNewLabelName]  = useState('');
+  const [newLabelColor, setNewLabelColor] = useState('#0052CC');
 
   const [addOpen,       setAddOpen]       = useState(false);
   const [removeTarget,  setRemoveTarget]  = useState<User | null>(null);
@@ -200,43 +213,136 @@ export default function ProjectSettingsPage() {
         </div>
 
         {/* ── Tab bar ── */}
-        <div style={{
-          display: 'flex', gap: 2,
-          borderBottom: '1px solid var(--bb-tbl-wrap-border)',
-          marginBottom: 24,
-        }}>
-          {/* Members tab — active */}
-          <div style={{
-            padding: '8px 16px',
-            fontSize: 13, fontWeight: 600,
-            color: '#E75026',
-            borderBottom: '2px solid #E75026',
-            marginBottom: -1,
-            cursor: 'default',
-          }}>
-            Members
-          </div>
-          {/* General tab — coming soon */}
-          <div style={{
-            padding: '8px 16px',
-            fontSize: 13,
-            color: 'var(--bb-page-subtitle)',
-            cursor: 'default',
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}>
-            General
-            <span style={{
-              fontSize: 10, fontWeight: 600,
-              background: 'var(--bb-nav-badge-bg)',
-              color: 'var(--bb-nav-badge-color)',
-              padding: '1px 6px', borderRadius: 10,
-            }}>
-              Soon
-            </span>
-          </div>
+        <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid var(--bb-tbl-wrap-border)', marginBottom: 24 }}>
+          {(['members', 'labels'] as SettingsTab[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                padding: '8px 16px', background: 'none', border: 'none',
+                fontSize: 13, fontWeight: activeTab === tab ? 600 : 400,
+                color: activeTab === tab ? '#E75026' : 'var(--bb-page-subtitle)',
+                borderBottom: activeTab === tab ? '2px solid #E75026' : '2px solid transparent',
+                marginBottom: -1, cursor: 'pointer', fontFamily: 'inherit',
+                textTransform: 'capitalize', transition: 'color .12s',
+              }}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
 
         {/* ── Members section ── */}
+        {activeTab === 'labels' && (
+          <div>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--bb-page-title)', marginBottom: 4 }}>Project Labels</div>
+              <div style={{ fontSize: 13, color: 'var(--bb-page-subtitle)' }}>
+                Labels help categorise tickets. The 4 default labels are created automatically for every project.
+              </div>
+            </div>
+
+            {/* Create label form */}
+            {can('createProject') && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20,
+                background: 'var(--bb-tbl-wrap-bg)', border: '1px solid var(--bb-tbl-wrap-border)',
+                borderRadius: 10, padding: '14px 20px',
+              }}>
+                <input
+                  className="kb-input"
+                  placeholder="Label name…"
+                  value={newLabelName}
+                  onChange={(e) => setNewLabelName(e.target.value)}
+                  style={{ flex: 1, maxWidth: 220 }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newLabelName.trim()) {
+                      createLabel({ projectId, name: newLabelName.trim(), color: newLabelColor }, {
+                        onSuccess: () => { setNewLabelName(''); showToast('Label created'); },
+                      });
+                    }
+                  }}
+                />
+                {/* Color picker */}
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 6, background: newLabelColor, border: '2px solid var(--bb-tbl-wrap-border)', flexShrink: 0 }} />
+                  <input
+                    type="color"
+                    value={newLabelColor}
+                    onChange={(e) => setNewLabelColor(e.target.value)}
+                    style={{ position: 'absolute', opacity: 0, width: 34, height: 34, cursor: 'pointer', left: 0 }}
+                    title="Pick color"
+                  />
+                  <span style={{ fontSize: 11, color: 'var(--bb-page-subtitle)' }}>Color</span>
+                </div>
+                <button
+                  className="kb-btn-primary"
+                  disabled={creatingLabel || !newLabelName.trim()}
+                  onClick={() => {
+                    if (!newLabelName.trim()) return;
+                    createLabel({ projectId, name: newLabelName.trim(), color: newLabelColor }, {
+                      onSuccess: () => { setNewLabelName(''); showToast('Label created'); },
+                    });
+                  }}
+                >
+                  {creatingLabel ? 'Creating…' : '+ Create label'}
+                </button>
+              </div>
+            )}
+
+            {/* Labels list */}
+            {labelsLoading ? (
+              <div style={{ fontSize: 13, color: 'var(--bb-page-subtitle)', padding: '20px 0' }}>Loading…</div>
+            ) : labels.length === 0 ? (
+              <div style={{ fontSize: 13, color: 'var(--bb-page-subtitle)', fontStyle: 'italic' }}>No labels yet.</div>
+            ) : (
+              <div style={{
+                background: 'var(--bb-tbl-wrap-bg)', border: '1px solid var(--bb-tbl-wrap-border)',
+                borderRadius: 10, overflow: 'hidden',
+              }}>
+                {labels.map((label, idx) => (
+                  <div
+                    key={label.id}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '12px 20px',
+                      borderBottom: idx < labels.length - 1 ? '1px solid var(--bb-tbl-row-border)' : 'none',
+                    }}
+                  >
+                    <div style={{ width: 14, height: 14, borderRadius: 4, background: label.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--bb-page-title)', flex: 1 }}>
+                      {label.name}
+                    </span>
+                    <span style={{
+                      fontSize: 11, padding: '2px 8px', borderRadius: 20,
+                      background: label.color + '22', color: label.color,
+                      border: `1px solid ${label.color}44`, fontWeight: 600,
+                    }}>
+                      {label.color}
+                    </span>
+                    {can('createProject') && (
+                      <button
+                        className="bb-action-btn bb-action-danger"
+                        disabled={deletingLabel}
+                        onClick={() => deleteLabel({ projectId, labelId: label.id }, {
+                          onSuccess: () => showToast(`"${label.name}" deleted`),
+                        })}
+                      >
+                        <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+                          <path d="M2 3.5h10M5.5 3.5V2.5h3v1M11 3.5l-.75 8.5H3.75L3 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'members' && (
+        /* ── Members section ── */
         <div>
           {/* Section header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -300,6 +406,7 @@ export default function ProjectSettingsPage() {
               border: '1px solid var(--bb-tbl-wrap-border)',
               borderRadius: 10, overflow: 'hidden',
             }}>
+
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
@@ -353,6 +460,7 @@ export default function ProjectSettingsPage() {
             </div>
           )}
         </div>
+        )} {/* end activeTab === 'members' */}
       </div>
 
       {/* ══ Add Member Modal ══ */}

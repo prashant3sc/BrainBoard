@@ -71,10 +71,11 @@ class IssueSerializer(serializers.ModelSerializer):
 
 
 class IssueCreateSerializer(serializers.ModelSerializer):
-    assigneeId = serializers.UUIDField(required=False, allow_null=True, write_only=True)
-    projectId  = serializers.UUIDField(write_only=True)
-    parentId   = serializers.UUIDField(required=False, allow_null=True, write_only=True)
-    sprintId   = serializers.UUIDField(required=False, allow_null=True, write_only=True)
+    assigneeId  = serializers.UUIDField(required=False, allow_null=True, write_only=True)
+    projectId   = serializers.UUIDField(write_only=True)
+    parentId    = serializers.UUIDField(required=False, allow_null=True, write_only=True)
+    sprintId    = serializers.UUIDField(required=False, allow_null=True, write_only=True)
+    labelIds    = serializers.ListField(child=serializers.UUIDField(), required=False, write_only=True)
     storyPoints = serializers.IntegerField(
         required=False, allow_null=True, write_only=True, source="story_points"
     )
@@ -96,6 +97,7 @@ class IssueCreateSerializer(serializers.ModelSerializer):
             "projectId",
             "parentId",
             "sprintId",
+            "labelIds",
         ]
 
     def validate(self, attrs):
@@ -112,6 +114,7 @@ class IssueCreateSerializer(serializers.ModelSerializer):
         assignee_id = validated_data.pop("assigneeId", None)
         parent_id   = validated_data.pop("parentId", None)
         sprint_id   = validated_data.pop("sprintId", None)
+        label_ids   = validated_data.pop("labelIds", [])
         request     = self.context.get("request")
 
         try:
@@ -141,7 +144,7 @@ class IssueCreateSerializer(serializers.ModelSerializer):
             except Issue.DoesNotExist:
                 raise serializers.ValidationError({"parentId": "Parent issue not found."})
 
-        return Issue.objects.create(
+        issue = Issue.objects.create(
             project=project,
             sprint=sprint,
             status=Issue.TODO,
@@ -150,12 +153,16 @@ class IssueCreateSerializer(serializers.ModelSerializer):
             parent=parent,
             **validated_data,
         )
+        if label_ids:
+            issue.labels.set(Label.objects.filter(pk__in=label_ids, project=project))
+        return issue
 
 
 class IssueUpdateSerializer(serializers.ModelSerializer):
-    assigneeId = serializers.UUIDField(required=False, allow_null=True, write_only=True)
-    sprintId   = serializers.UUIDField(required=False, allow_null=True, write_only=True)
-    parentId   = serializers.UUIDField(required=False, allow_null=True, write_only=True)
+    assigneeId  = serializers.UUIDField(required=False, allow_null=True, write_only=True)
+    sprintId    = serializers.UUIDField(required=False, allow_null=True, write_only=True)
+    parentId    = serializers.UUIDField(required=False, allow_null=True, write_only=True)
+    labelIds    = serializers.ListField(child=serializers.UUIDField(), required=False, write_only=True)
     storyPoints = serializers.IntegerField(
         required=False, allow_null=True, write_only=True, source="story_points"
     )
@@ -166,7 +173,7 @@ class IssueUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Issue
-        fields = ["title", "description", "status", "priority", "issueType", "storyPoints", "dueDate", "assigneeId", "sprintId", "parentId"]
+        fields = ["title", "description", "status", "priority", "issueType", "storyPoints", "dueDate", "assigneeId", "sprintId", "parentId", "labelIds"]
 
     def update(self, instance, validated_data):
         from projects.models import Sprint
@@ -204,6 +211,11 @@ class IssueUpdateSerializer(serializers.ModelSerializer):
                     instance.parent = Issue.objects.get(pk=parent_id)
                 except Issue.DoesNotExist:
                     pass
+
+        # Handle label change — replaces the full set
+        if "labelIds" in validated_data:
+            label_ids = validated_data.pop("labelIds")
+            instance.labels.set(Label.objects.filter(pk__in=label_ids, project=instance.project))
 
         for attr, val in validated_data.items():
             setattr(instance, attr, val)
