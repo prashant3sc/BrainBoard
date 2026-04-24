@@ -1,3 +1,4 @@
+jira_main/seed_data.py
 venv/
 __pycache__/
 *.pyc

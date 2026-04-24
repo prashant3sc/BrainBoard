@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load .env from BE directory (one level up from jira_main project)
-load_dotenv(BASE_DIR.parent / ".env")
+# Load .env from BrainBoard root (shared across BE, AI, FE)
+load_dotenv(BASE_DIR.parent.parent / ".env")
 
 SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY",
