@@ -132,10 +132,11 @@ export default function Sidebar() {
   const { projectId } = useParams();
   const { theme, toggleTheme } = useAppStore();
 
-  const backlogHref   = projectId ? `/projects/${projectId}/backlog`   : null;
-  const kanbanHref    = projectId ? `/projects/${projectId}/kanban`    : null;
-  const wikiHref      = projectId ? `/projects/${projectId}/wiki`      : null;
-  const settingsHref  = projectId ? `/projects/${projectId}/settings`  : null;
+  const backlogHref    = projectId ? `/projects/${projectId}/backlog`    : null;
+  const kanbanHref     = projectId ? `/projects/${projectId}/kanban`     : null;
+  const wikiHref       = projectId ? `/projects/${projectId}/wiki`       : null;
+  const analyticsHref  = projectId ? `/projects/${projectId}/analytics`  : null;
+  const settingsHref   = projectId ? `/projects/${projectId}/settings`   : null;
 
   return (
     <aside
@@ -264,18 +265,37 @@ export default function Sidebar() {
           Reports
         </span>
 
-        <div className="bb-nav-item">
-          <span className="bb-nav-icon"><AnalyticsIcon /></span>
-          Analytics
-          <span style={{
-            marginLeft: 'auto',
-            background: 'var(--bb-nav-badge-bg)',
-            color: 'var(--bb-nav-badge-color)',
-            fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 10,
-          }}>
-            New
-          </span>
-        </div>
+        {analyticsHref ? (
+          <NavLink
+            to={analyticsHref}
+            className={({ isActive }) => isActive ? 'bb-nav-item bb-nav-active' : 'bb-nav-item'}
+          >
+            <span className="bb-nav-icon"><AnalyticsIcon /></span>
+            Analytics
+            <span style={{
+              marginLeft: 'auto',
+              background: 'var(--bb-nav-badge-bg)',
+              color: 'var(--bb-nav-badge-color)',
+              fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 10,
+            }}>
+              New
+            </span>
+          </NavLink>
+        ) : (
+          <div className="bb-nav-item bb-nav-disabled bb-tooltip-host">
+            <span className="bb-nav-icon"><AnalyticsIcon /></span>
+            Analytics
+            <span style={{
+              marginLeft: 'auto',
+              background: 'var(--bb-nav-badge-bg)',
+              color: 'var(--bb-nav-badge-color)',
+              fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 10,
+            }}>
+              New
+            </span>
+            <span className="bb-tooltip">Open a project first</span>
+          </div>
+        )}
       </nav>
 
       {/* ── Footer ── */}

@@ -10,6 +10,7 @@ from projects.views import (
     ProjectMemberListView,
     SprintDetailView,
     SprintListView,
+    VelocityView,
 )
 
 urlpatterns = [
@@ -25,4 +26,6 @@ urlpatterns = [
     path("projects/<uuid:project_id>/sprints", SprintListView.as_view(), name="sprint-list"),
     path("projects/<uuid:project_id>/active-sprint", ActiveSprintView.as_view(), name="active-sprint"),
     path("sprints/<uuid:pk>", SprintDetailView.as_view(), name="sprint-detail"),
+    # Analytics
+    path("projects/<uuid:project_id>/analytics/velocity", VelocityView.as_view(), name="analytics-velocity"),
 ]
