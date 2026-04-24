@@ -51,12 +51,12 @@ const TYPE_COLOR: Record<IssueType, { bg: string; text: string }> = {
   bug:     { bg: '#FFEBE6', text: '#DE350B' },
 };
 
-const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string }> = {
-  todo:        { label: 'To Do',       bg: '#F4F5F7', text: '#42526E', border: '#C1C7D0' },
-  in_progress: { label: 'In Progress', bg: '#DEEBFF', text: '#0052CC', border: '#4C9AFF' },
-  in_review:   { label: 'In Review',   bg: '#EAE6FF', text: '#6554C0', border: '#8777D9' },
-  done:        { label: 'Done',        bg: '#E3FCEF', text: '#006644', border: '#36B37E' },
-  cancelled:   { label: 'Cancelled',   bg: '#FFEBE6', text: '#BF2600', border: '#FF5630' },
+const STATUS_CONFIG: Record<string, { label: string; dot: string }> = {
+  todo:        { label: 'To Do',       dot: '#B3BAC5' },
+  in_progress: { label: 'In Progress', dot: '#E75026' },
+  in_review:   { label: 'In Review',   dot: '#0052CC' },
+  done:        { label: 'Done',        dot: '#006644' },
+  cancelled:   { label: 'Cancelled',   dot: '#BF2600' },
 };
 
 /* ── tiny SVG icons ─────────────────────────────── */
@@ -304,7 +304,6 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
     ? issue!.id.slice(0, 8).toUpperCase()
     : null;
 
-  const tColor = TYPE_COLOR[issueType];
 
   /* helper: initials avatar */
   function Initials({ name }: { name: string }) {
@@ -325,28 +324,28 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
         <div className="im-header">
           <div className="im-header-left">
             {/* Type badge */}
-            <span className="im-type-badge" style={{ background: tColor.bg, color: tColor.text }}>
-              {issueType === 'bug' && (
-                <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                  <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.3"/>
-                  <path d="M4 4.5c.5-.8 1.2-1.5 2-1.5s1.5.7 2 1.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
-                </svg>
-              )}
+            <span className="im-type-badge">
               {issueType === 'task' && (
-                <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                  <rect x="1.5" y="1.5" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
-                  <path d="M3.5 6l2 2 3-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                  <rect x="1" y="1" width="11" height="11" rx="2" stroke="#A32E0E" strokeWidth="1.3"/>
+                  <path d="M4 6.5l2 2 3-3" stroke="#A32E0E" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               )}
               {issueType === 'subtask' && (
-                <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                  <path d="M2 2h4l4 4-4 4-4-4V2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                  <circle cx="6.5" cy="6.5" r="5.5" stroke="#A32E0E" strokeWidth="1.3"/>
+                  <circle cx="6.5" cy="6.5" r="2" stroke="#A32E0E" strokeWidth="1.3"/>
+                </svg>
+              )}
+              {issueType === 'bug' && (
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                  <path d="M6.5 1.5L12.5 12.5H.5L6.5 1.5Z" stroke="#A32E0E" strokeWidth="1.3" strokeLinejoin="round"/>
+                  <path d="M6.5 5.5v3M6.5 10v.5" stroke="#A32E0E" strokeWidth="1.3" strokeLinecap="round"/>
                 </svg>
               )}
               {TYPE_LABELS[issueType]}
             </span>
             {issueKey && <span className="im-issue-key">{issueKey}</span>}
-            <span className="im-header-title">{isEdit ? 'View / Edit Issue' : 'Create New Issue'}</span>
           </div>
           <button className="kb-modal-close" onClick={close}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -383,16 +382,19 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
             <div className="im-col-main">
 
               {/* Title */}
-              <div className="im-title-wrap">
-                <textarea
-                  className={`im-title-input${titleErr ? ' kb-input-error' : ''}`}
-                  placeholder="Issue title…"
-                  rows={2}
-                  value={title}
-                  disabled={!canEdit || isReadOnly}
-                  onChange={(e) => { setTitle(e.target.value); setTitleErr(false); }}
-                />
-                {titleErr && <span className="im-field-err">Title is required.</span>}
+              <div className="im-section">
+                <div className="im-section-label">Title <span style={{ color: '#DE350B' }}>*</span></div>
+                <div className="im-title-wrap">
+                  <textarea
+                    className={`im-title-input${titleErr ? ' kb-input-error' : ''}`}
+                    placeholder="Enter issue title…"
+                    rows={1}
+                    value={title}
+                    disabled={!canEdit || isReadOnly}
+                    onChange={(e) => { setTitle(e.target.value); setTitleErr(false); }}
+                  />
+                  {titleErr && <span className="im-field-err">Title is required.</span>}
+                </div>
               </div>
 
               {/* Description */}
@@ -420,14 +422,15 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                       {aiLoading ? (
                         <>
                           <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ animation: 'spin 1s linear infinite' }}>
-                            <circle cx="8" cy="8" r="6" stroke="#6366F1" strokeWidth="2" strokeDasharray="20 18"/>
+                            <circle cx="8" cy="8" r="6" stroke="#A32E0E" strokeWidth="2" strokeDasharray="20 18"/>
                           </svg>
                           Analyzing…
                         </>
                       ) : (
                         <>
-                          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                            <path d="M8 1l1.8 3.6L14 5.6l-3 2.9.7 4.1L8 10.5l-3.7 2.1.7-4.1L2 5.6l4.2-.9L8 1z" fill="#6366F1" strokeLinejoin="round"/>
+                          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                            <circle cx="6.5" cy="6.5" r="5.5" stroke="#A32E0E" strokeWidth="1.3"/>
+                            <path d="M4 7l2 2 3-3" stroke="#A32E0E" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                           Analyze with AI
                         </>
@@ -497,7 +500,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                   <div className="im-field-heading">
                     <IcoStatus /> Status
                   </div>
-                  <div className="im-status-pills">
+                  <div className="im-status-grid">
                     {KANBAN_COLUMNS.map((col) => {
                       const cfg = STATUS_CONFIG[col.id] ?? STATUS_CONFIG['todo'];
                       const active = status === col.id;
@@ -507,19 +510,9 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                           type="button"
                           disabled={!canEdit || isReadOnly}
                           onClick={() => setStatus(col.id as IssueStatus)}
-                          className="im-status-pill"
-                          style={{
-                            background: active ? cfg.bg : 'transparent',
-                            color:      active ? cfg.text : 'var(--kb-field-label)',
-                            border:     active ? `1.5px solid ${cfg.border}` : '1.5px solid transparent',
-                            fontWeight: active ? 600 : 400,
-                            opacity: (!canEdit || isReadOnly) ? 0.55 : 1,
-                            cursor: (!canEdit || isReadOnly) ? 'default' : 'pointer',
-                          }}
+                          className={`im-status-grid-chip${active ? ' im-active' : ''}`}
                         >
-                          {active && (
-                            <span className="im-status-dot" style={{ background: cfg.border }} />
-                          )}
+                          <span className="im-status-dot" style={{ background: cfg.dot }} />
                           {col.label}
                         </button>
                       );
@@ -533,17 +526,15 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                 <div className="im-field-heading">
                   <IcoType /> Issue Type
                 </div>
-                <div className="im-pill-group">
+                <div className="im-type-list">
                   {ISSUE_TYPES.map((t) => {
-                    const tc = TYPE_COLOR[t];
                     const active = issueType === t;
                     const disabled = !canEdit || isReadOnly;
                     return (
                       <button
                         key={t} type="button"
                         disabled={disabled}
-                        className={`im-option-pill${active ? ' im-option-pill-active' : ''}`}
-                        style={active ? { background: tc.bg, color: tc.text, borderColor: tc.text } : {}}
+                        className={`im-type-item${active ? ' im-active' : ''}`}
                         onClick={() => {
                           if (disabled) return;
                           setIssueType(t);
@@ -552,28 +543,27 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                         }}
                       >
                         {t === 'task' && (
-                          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-                            <rect x="1.5" y="1.5" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
-                            <path d="M3.5 6l2 2 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                            <rect x="1" y="1" width="12" height="12" rx="2" stroke={active ? '#A32E0E' : '#6B778C'} strokeWidth="1.3"/>
+                            <path d="M4 7l2 2 3-3" stroke={active ? '#A32E0E' : '#6B778C'} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         )}
                         {t === 'subtask' && (
-                          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-                            <rect x="1.5" y="1.5" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.4" strokeDasharray="2.5 1.5"/>
-                            <path d="M4 6h4M6 4v4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                            <circle cx="7" cy="7" r="5.5" stroke={active ? '#A32E0E' : '#6B778C'} strokeWidth="1.3"/>
+                            <circle cx="7" cy="7" r="2" stroke={active ? '#A32E0E' : '#6B778C'} strokeWidth="1.3"/>
                           </svg>
                         )}
                         {t === 'bug' && (
-                          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-                            <circle cx="6" cy="6.5" r="3.5" stroke="currentColor" strokeWidth="1.4"/>
-                            <path d="M4.5 3.5C4.5 2.67 5.17 2 6 2s1.5.67 1.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                            <path d="M2.5 5.5h1M8.5 5.5h1M2.5 8h1M8.5 8h1M6 10v1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                            <path d="M7 1.5L13 12.5H1L7 1.5Z" stroke={active ? '#A32E0E' : '#DE350B'} strokeWidth="1.3" strokeLinejoin="round"/>
+                            <path d="M7 5.5v3M7 10v.5" stroke={active ? '#A32E0E' : '#DE350B'} strokeWidth="1.3" strokeLinecap="round"/>
                           </svg>
                         )}
-                        <span>{TYPE_LABELS[t]}</span>
-                        {t === 'subtask' && <span className="im-pill-hint">child issue</span>}
-                        {t === 'bug' && <span className="im-pill-hint">defect</span>}
-                        {t === 'task' && <span className="im-pill-hint">work item</span>}
+                        <span className="im-type-item-name">{TYPE_LABELS[t]}</span>
+                        <span className="im-type-item-desc">
+                          {t === 'task' ? 'work item' : t === 'subtask' ? 'child issue' : 'defect'}
+                        </span>
                       </button>
                     );
                   })}
@@ -585,7 +575,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                 <div className="im-field-heading">
                   <IcoPriority /> Priority
                 </div>
-                <div className="im-pill-group">
+                <div className="im-priority-grid">
                   {PRIORITIES.map((p) => {
                     const pc = PRIORITY_COLOR[p];
                     const active = priority === p;
@@ -594,8 +584,8 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                       <button
                         key={p} type="button"
                         disabled={disabled}
-                        className={`im-option-pill${active ? ' im-option-pill-active' : ''}`}
-                        style={active ? { background: pc.bg, color: pc.text, borderColor: pc.dot } : {}}
+                        className={`im-priority-chip${active ? ' im-active' : ''}`}
+                        style={{ color: pc.text }}
                         onClick={() => { if (!disabled) setPriority(p); }}
                       >
                         <span className="im-prio-dot" style={{ background: pc.dot }} />
@@ -753,11 +743,8 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                               selected ? prev.filter((id) => id !== lbl.id) : [...prev, lbl.id]
                             );
                           }}
-                          className="im-label-chip"
+                          className={`im-label-chip${selected ? ' im-label-chip-active' : ''}`}
                           style={{
-                            border: `1.5px solid ${lbl.color}`,
-                            background: selected ? lbl.color : 'transparent',
-                            color: selected ? '#fff' : lbl.color,
                             opacity: isReadOnly || !canEdit ? 0.55 : 1,
                             cursor: isReadOnly || !canEdit ? 'default' : 'pointer',
                           }}
