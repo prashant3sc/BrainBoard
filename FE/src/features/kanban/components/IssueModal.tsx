@@ -124,7 +124,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
   const canEdit = can('editIssue');
   const canDel  = can('deleteIssue');
   const canAI   = can('analyzeIssue');
-  const { analysis: aiResult, isLoading: aiLoading, error: aiError, analyze, clear: clearAI } = useAIAnalysis();
+  const { analysis: aiResult, isLoading: aiLoading, error: aiError, analyze, analyzeDraft, clear: clearAI } = useAIAnalysis();
   const { data: members = [] } = useProjectMembers(projectId);
   const { data: activeSprintData } = useActiveSprint(projectId);
   const activeSprintId = activeSprintData?.sprint?.id ?? null;
@@ -409,15 +409,29 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                 />
               </div>
 
-              {/* AI analyze */}
-              {isEdit && canAI && !isReadOnly && (
+              {/* AI analyze — available in both create and edit mode */}
+              {canAI && !isReadOnly && (
                 <div className="im-section">
                   {!aiResult && (
                     <button
                       type="button"
-                      disabled={aiLoading}
+                      disabled={aiLoading || (!isEdit && (!title.trim() || !desc.trim()))}
                       className="im-ai-btn"
-                    onClick={() => analyze(issue!.id)}
+                      onClick={() => {
+                        if (isEdit) {
+                          analyze(issue!.id);
+                        } else {
+                          const labelNames = projectLabels
+                            .filter((l) => labelIds.includes(l.id))
+                            .map((l) => l.name);
+                          analyzeDraft({
+                            title,
+                            description: desc,
+                            labels: labelNames,
+                            project_id: projectId,
+                          });
+                        }
+                      }}
                     >
                       {aiLoading ? (
                         <>
@@ -437,6 +451,13 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                       )}
                     </button>
                   )}
+                  {!isEdit && (!title.trim() || !desc.trim()) && !aiResult && (
+                    <p style={{ fontSize: 11, color: 'var(--bb-text-muted)', marginTop: 4 }}>
+                      {!title.trim()
+                        ? 'Add a title and description to enable AI analysis'
+                        : 'Add a description for better AI results'}
+                    </p>
+                  )}
                   {aiError && (
                     <div className="im-ai-error">
                       <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
@@ -444,7 +465,16 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                         <path d="M7 4.5v3M7 9.5v.5" stroke="#DC2626" strokeWidth="1.3" strokeLinecap="round"/>
                       </svg>
                       {aiError}
-                      <button type="button" className="im-ai-retry" onClick={() => analyze(issue!.id)}>Retry</button>
+                      <button type="button" className="im-ai-retry" onClick={() => {
+                        if (isEdit) {
+                          analyze(issue!.id);
+                        } else {
+                          const labelNames = projectLabels
+                            .filter((l) => labelIds.includes(l.id))
+                            .map((l) => l.name);
+                          analyzeDraft({ title, description: desc, labels: labelNames, project_id: projectId });
+                        }
+                      }}>Retry</button>
                     </div>
                   )}
                   {aiResult && (

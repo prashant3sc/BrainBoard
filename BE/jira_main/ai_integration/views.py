@@ -315,6 +315,84 @@ class AnalyzeIssueView(APIView):
         })
 
 
+class AnalyzeDraftView(APIView):
+    """
+    POST /ai/analyze-draft
+
+    Analyzes an unsaved (draft) issue using title, description and labels
+    supplied directly in the request body — no issue_id required.
+
+    Body: { "title", "description", "labels": [], "project_id" }
+    Returns the same shape as AnalyzeIssueView so the FE can reuse AIAnalysisPanel.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        title       = request.data.get("title", "").strip()
+        description = request.data.get("description", "").strip()
+        labels      = request.data.get("labels", [])
+        project_id  = request.data.get("project_id", "").strip()
+
+        if not title:
+            return Response({"detail": "title is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        description = description or f"Issue titled: {title}"
+
+        try:
+            analysis = ai_client.analyze_task(
+                heading=title,
+                description=description,
+                labels=labels,
+            )
+        except requests.RequestException as exc:
+            return Response(
+                {"detail": f"AI layer unreachable: {exc}"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        # Match recommended name against project members if project_id provided
+        matched_user = None
+        recommended_name = (analysis.get("recommended_team") or {}).get("Assigned To", "")
+
+        if recommended_name and recommended_name != "Unassigned" and project_id:
+            try:
+                project = Project.objects.get(pk=project_id)
+                project_members = (
+                    ProjectMember.objects
+                    .filter(project=project)
+                    .select_related("user")
+                )
+                recommended_lower = recommended_name.lower()
+                for pm in project_members:
+                    full_name = pm.user.get_full_name().strip().lower()
+                    if recommended_lower == full_name or recommended_lower in full_name or full_name in recommended_lower:
+                        matched_user = {
+                            "id": str(pm.user.id),
+                            "name": pm.user.get_full_name().strip() or pm.user.email,
+                            "email": pm.user.email,
+                            "role": pm.user.role,
+                        }
+                        break
+                    if recommended_lower.split()[0] == full_name.split()[0]:
+                        matched_user = {
+                            "id": str(pm.user.id),
+                            "name": pm.user.get_full_name().strip() or pm.user.email,
+                            "email": pm.user.email,
+                            "role": pm.user.role,
+                        }
+            except Project.DoesNotExist:
+                pass
+
+        return Response({
+            "issue_id": None,
+            "issue_title": title,
+            "labels": labels,
+            "analysis": analysis,
+            "recommended_user": matched_user,
+        })
+
+
 class ChatView(APIView):
     """
     POST /ai/chat
