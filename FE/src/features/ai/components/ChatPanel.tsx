@@ -35,18 +35,17 @@ function TypingDots() {
 /* ── AI logo mark ── */
 function BrainBoardMark({ size = 18 }: { size?: number }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width={size} height={size} aria-hidden="true">
-      <rect width="64" height="64" rx="16" fill="#E75026"/>
-      <rect x="14" y="20" width="10" height="10" rx="2.5" fill="white"/>
-      <rect x="27" y="20" width="10" height="10" rx="2.5" fill="white" opacity=".55"/>
-      <rect x="40" y="20" width="10" height="10" rx="2.5" fill="white" opacity=".3"/>
-      <rect x="14" y="33" width="10" height="7"  rx="2"   fill="white" opacity=".45"/>
-      <rect x="27" y="33" width="10" height="7"  rx="2"   fill="white"/>
-      <rect x="40" y="33" width="10" height="7"  rx="2"   fill="white" opacity=".55"/>
-      <circle cx="47" cy="18" r="6"   fill="white"/>
-      <circle cx="47" cy="18" r="3.5" fill="#E75026"/>
-      <circle cx="47" cy="18" r="1.6" fill="white"/>
-      <path d="M32 44 Q32 50 26 52 Q30 50 36 52 Q30 50 32 44Z" fill="white" opacity=".5"/>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width={size} height={size} aria-hidden="true">
+      <rect x="1"  y="7"  width="8" height="8" rx="2"   fill="#E75026" />
+      <rect x="11" y="7"  width="8" height="8" rx="2"   fill="#E75026" />
+      <rect x="21" y="7"  width="5" height="8" rx="1.5" fill="#E75026" opacity="0.35" />
+      <rect x="1"  y="17" width="8" height="5" rx="1.5" fill="#E75026" opacity="0.5" />
+      <rect x="11" y="17" width="8" height="5" rx="1.5" fill="#E75026" opacity="0.35" />
+      <rect x="21" y="17" width="5" height="5" rx="1.5" fill="#E75026" opacity="0.6" />
+      <line x1="24" y1="7" x2="27" y2="4" stroke="#E75026" strokeWidth="1.2" opacity="0.5" />
+      <circle cx="28" cy="3.5" r="3.5" fill="#E75026" />
+      <circle cx="28" cy="3.5" r="2"   fill="white" />
+      <circle cx="28" cy="3.5" r="1"   fill="#E75026" />
     </svg>
   );
 }
@@ -93,11 +92,13 @@ function AssistantBubble({ msg }: { msg: ChatMessage }) {
       <div
         style={{
           width: 26, height: 26, borderRadius: 8, flexShrink: 0,
+          background: 'var(--bb-nav-active-bg)',
+          border: '1.5px solid rgba(231,80,38,0.2)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           marginTop: 1,
         }}
       >
-        <BrainBoardMark size={26} />
+        <BrainBoardMark size={14} />
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -237,16 +238,23 @@ export function ChatPanel({ projectId, projectName }: Props) {
         style={{
           position: 'fixed', bottom: 28, right: 28, zIndex: 1000,
           width: 54, height: 54, borderRadius: 16,
-          background: open ? 'var(--bb-bg-card)' : 'transparent',
-          border: open ? '2px solid #E75026' : '2px solid transparent',
+          background: open
+            ? 'var(--bb-bg-card)'
+            : btnHover
+              ? '#C73F1A'
+              : '#E75026',
+          border: open
+            ? '2px solid #E75026'
+            : '2px solid transparent',
           cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           transition: 'all 0.2s',
           boxShadow: open
             ? '0 4px 16px rgba(231,80,38,0.2)'
-            : '0 4px 14px rgba(231,80,38,0.35)',
-          animation: !open ? 'bb-fab-pulse 2.5s ease-out infinite' : 'none',
-          filter: !open && btnHover ? 'brightness(0.88)' : 'none',
+            : btnHover
+              ? '0 6px 20px rgba(231,80,38,0.5)'
+              : '0 4px 14px rgba(231,80,38,0.35)',
+          animation: !open && !btnHover ? 'bb-fab-pulse 2.5s ease-out infinite' : 'none',
         }}
       >
         {open ? (
@@ -254,7 +262,18 @@ export function ChatPanel({ projectId, projectName }: Props) {
             <path d="M3 3l10 10M13 3L3 13" stroke={open ? '#E75026' : 'white'} strokeWidth="2" strokeLinecap="round"/>
           </svg>
         ) : (
-          <BrainBoardMark size={24} />
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width={28} height={28} aria-hidden="true">
+            <rect x="14" y="20" width="10" height="10" rx="2.5" fill="white"/>
+            <rect x="27" y="20" width="10" height="10" rx="2.5" fill="white" opacity=".55"/>
+            <rect x="40" y="20" width="10" height="10" rx="2.5" fill="white" opacity=".3"/>
+            <rect x="14" y="33" width="10" height="7"  rx="2"   fill="white" opacity=".45"/>
+            <rect x="27" y="33" width="10" height="7"  rx="2"   fill="white"/>
+            <rect x="40" y="33" width="10" height="7"  rx="2"   fill="white" opacity=".55"/>
+            <circle cx="47" cy="18" r="6"   fill="white"/>
+            <circle cx="47" cy="18" r="3.5" fill="#E75026"/>
+            <circle cx="47" cy="18" r="1.6" fill="white"/>
+            <path d="M32 44 Q32 50 26 52 Q30 50 36 52 Q30 50 32 44Z" fill="white" opacity=".5"/>
+          </svg>
         )}
       </button>
 
@@ -289,11 +308,13 @@ export function ChatPanel({ projectId, projectName }: Props) {
               <div
                 style={{
                   width: 36, height: 36, borderRadius: 10,
+                  background: 'var(--bb-nav-active-bg)',
+                  border: '1.5px solid rgba(231,80,38,0.2)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   flexShrink: 0,
                 }}
               >
-                <BrainBoardMark size={36} />
+                <BrainBoardMark size={20} />
               </div>
               <div>
                 <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--bb-text-primary)', lineHeight: 1.2 }}>
@@ -370,10 +391,12 @@ export function ChatPanel({ projectId, projectName }: Props) {
                     <div
                       style={{
                         width: 48, height: 48, borderRadius: 14,
+                        background: 'var(--bb-nav-active-bg)',
+                        border: '2px solid rgba(231,80,38,0.2)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                       }}
                     >
-                      <BrainBoardMark size={48} />
+                      <BrainBoardMark size={28} />
                     </div>
                   </div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--bb-text-primary)', marginBottom: 5 }}>
