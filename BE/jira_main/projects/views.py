@@ -290,3 +290,57 @@ class SprintDetailView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         sprint = serializer.save()
         return Response(SprintSerializer(sprint).data)
+
+
+class VelocityView(APIView):
+    """
+    GET /projects/<project_id>/analytics/velocity
+
+    Returns per-sprint velocity data for the project:
+    - committed: total story points planned at sprint start
+    - completed: story points of done issues
+    - completion_rate: % of committed points completed
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, project_id):
+        try:
+            project = Project.objects.get(pk=project_id)
+        except Project.DoesNotExist:
+            return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        sprints = (
+            Sprint.objects
+            .filter(project=project, status__in=[Sprint.COMPLETED, Sprint.ACTIVE])
+            .order_by("start_date", "created_at")
+        )
+
+        data = []
+        for sprint in sprints:
+            issues = Issue.objects.filter(sprint=sprint)
+            committed = sum(i.story_points or 0 for i in issues)
+            completed = sum(i.story_points or 0 for i in issues if i.status == Issue.DONE)
+            rate = round((completed / committed * 100), 1) if committed > 0 else 0
+            data.append({
+                "sprint_id":       str(sprint.id),
+                "sprint_name":     sprint.name,
+                "status":          sprint.status,
+                "start_date":      str(sprint.start_date) if sprint.start_date else None,
+                "end_date":        str(sprint.end_date)   if sprint.end_date   else None,
+                "committed":       round(float(committed), 1),
+                "completed":       round(float(completed), 1),
+                "completion_rate": rate,
+            })
+
+        avg_velocity = (
+            round(sum(d["completed"] for d in data) / len(data), 1)
+            if data else 0
+        )
+
+        return Response({
+            "project_id":   str(project.id),
+            "project_name": project.name,
+            "sprints":      data,
+            "avg_velocity": avg_velocity,
+        })

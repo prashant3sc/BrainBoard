@@ -41,6 +41,7 @@ const KanbanPage            = React.lazy(() => import('@/pages/KanbanPage'));
 const WikiPage              = React.lazy(() => import('@/pages/WikiPage'));
 const UserManagementPage    = React.lazy(() => import('@/pages/UserManagementPage'));
 const ProjectSettingsPage   = React.lazy(() => import('@/pages/ProjectSettingsPage'));
+const AnalyticsPage         = React.lazy(() => import('@/pages/AnalyticsPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -118,6 +119,17 @@ export default function App() {
                 <ProtectedRoute permission="manageUsers">
                   <AppShell>
                     <UserManagementPage />
+                  </AppShell>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/projects/:projectId/analytics"
+              element={
+                <ProtectedRoute>
+                  <AppShell>
+                    <AnalyticsPage />
                   </AppShell>
                 </ProtectedRoute>
               }
