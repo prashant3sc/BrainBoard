@@ -1,8 +1,6 @@
 # ── Environment — never commit real credentials ───────────────────────────────
 .env
 .env.*
-!.env.example
-!.env.client.example
 
 # ── Claude Code ───────────────────────────────────────────────────────────────
 .claude/
@@ -28,6 +26,14 @@ node_modules/
 FE/node_modules/
 FE/dist/
 *.local
+
+# ── Seed data ─────────────────────────────────────────────────────────────────
+BE/jira_main/seed_data.py
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs.txt
+AI/logs.txt
 
 # ── Django ────────────────────────────────────────────────────────────────────
 *.log
