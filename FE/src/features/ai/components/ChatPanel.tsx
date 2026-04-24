@@ -238,31 +238,37 @@ export function ChatPanel({ projectId, projectName }: Props) {
         style={{
           position: 'fixed', bottom: 28, right: 28, zIndex: 1000,
           width: 54, height: 54, borderRadius: 16,
-          background: open
-            ? 'var(--bb-bg-card)'
-            : btnHover
-              ? '#C73F1A'
-              : '#E75026',
-          border: open
-            ? '2px solid #E75026'
-            : '2px solid transparent',
+          background: open ? 'var(--bb-bg-card)' : 'none',
+          border: open ? '2px solid #E75026' : 'none',
+          padding: 0,
           cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           transition: 'all 0.2s',
           boxShadow: open
             ? '0 4px 16px rgba(231,80,38,0.2)'
-            : btnHover
-              ? '0 6px 20px rgba(231,80,38,0.5)'
-              : '0 4px 14px rgba(231,80,38,0.35)',
+            : '0 4px 14px rgba(231,80,38,0.35)',
+          filter: !open && btnHover ? 'brightness(0.85)' : 'none',
           animation: !open && !btnHover ? 'bb-fab-pulse 2.5s ease-out infinite' : 'none',
         }}
       >
         {open ? (
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M3 3l10 10M13 3L3 13" stroke={open ? '#E75026' : 'white'} strokeWidth="2" strokeLinecap="round"/>
+            <path d="M3 3l10 10M13 3L3 13" stroke="#E75026" strokeWidth="2" strokeLinecap="round"/>
           </svg>
         ) : (
-          <BrainBoardMark size={24} />
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width={54} height={54} aria-hidden="true" style={{ display: 'block', borderRadius: 16 }}>
+            <rect width="64" height="64" rx="16" fill="#E75026"/>
+            <rect x="14" y="20" width="10" height="10" rx="2.5" fill="white"/>
+            <rect x="27" y="20" width="10" height="10" rx="2.5" fill="white" opacity=".55"/>
+            <rect x="40" y="20" width="10" height="10" rx="2.5" fill="white" opacity=".3"/>
+            <rect x="14" y="33" width="10" height="7"  rx="2"   fill="white" opacity=".45"/>
+            <rect x="27" y="33" width="10" height="7"  rx="2"   fill="white"/>
+            <rect x="40" y="33" width="10" height="7"  rx="2"   fill="white" opacity=".55"/>
+            <circle cx="47" cy="18" r="6"   fill="white"/>
+            <circle cx="47" cy="18" r="3.5" fill="#E75026"/>
+            <circle cx="47" cy="18" r="1.6" fill="white"/>
+            <path d="M32 44 Q32 50 26 52 Q30 50 36 52 Q30 50 32 44Z" fill="white" opacity=".5"/>
+          </svg>
         )}
       </button>
 
