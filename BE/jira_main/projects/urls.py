@@ -11,6 +11,7 @@ from projects.views import (
     SprintDetailView,
     SprintListView,
     VelocityView,
+    WorkloadView,
 )
 
 urlpatterns = [
@@ -28,4 +29,5 @@ urlpatterns = [
     path("sprints/<uuid:pk>", SprintDetailView.as_view(), name="sprint-detail"),
     # Analytics
     path("projects/<uuid:project_id>/analytics/velocity", VelocityView.as_view(), name="analytics-velocity"),
+    path("projects/<uuid:project_id>/analytics/workload", WorkloadView.as_view(), name="analytics-workload"),
 ]

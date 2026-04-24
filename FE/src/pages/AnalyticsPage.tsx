@@ -1,5 +1,6 @@
 import { useParams } from 'react-router-dom';
 import { VelocityChart } from '@/features/analytics/components/VelocityChart';
+import { WorkloadChart } from '@/features/analytics/components/WorkloadChart';
 
 export default function AnalyticsPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -13,11 +14,11 @@ export default function AnalyticsPage() {
           Analytics
         </h1>
         <p style={{ fontSize: 13, color: 'var(--bb-text-muted)', marginTop: 4 }}>
-          Sprint velocity and team performance insights
+          Sprint velocity, team performance, and workload insights
         </p>
       </div>
 
-      <section>
+      <section style={{ marginBottom: 36 }}>
         <div style={{
           fontSize: 13, fontWeight: 700, color: 'var(--bb-text-primary)',
           marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8,
@@ -30,6 +31,20 @@ export default function AnalyticsPage() {
           Velocity Chart
         </div>
         <VelocityChart projectId={projectId} />
+      </section>
+
+      <section>
+        <div style={{
+          fontSize: 13, fontWeight: 700, color: 'var(--bb-text-primary)',
+          marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          <svg viewBox="0 0 16 16" fill="none" width="14" height="14" aria-hidden="true">
+            <circle cx="8" cy="6" r="3.5" fill="#E75026" />
+            <path d="M2 14c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke="#E75026" strokeWidth="1.5" strokeLinecap="round" opacity="0.6" />
+          </svg>
+          Workload Distribution
+        </div>
+        <WorkloadChart projectId={projectId} />
       </section>
     </div>
   );

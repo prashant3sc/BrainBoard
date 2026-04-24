@@ -344,3 +344,88 @@ class VelocityView(APIView):
             "sprints":      data,
             "avg_velocity": avg_velocity,
         })
+
+
+class WorkloadView(APIView):
+    """
+    GET /projects/<project_id>/analytics/workload
+
+    Returns per-member workload for all active/open issues in the project:
+    - issue counts by status (todo, in_progress, review, done)
+    - total story points assigned
+    - issue count by priority
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, project_id):
+        try:
+            project = Project.objects.get(pk=project_id)
+        except Project.DoesNotExist:
+            return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        members = ProjectMember.objects.filter(project=project).select_related("user")
+        issues  = Issue.objects.filter(project=project).select_related("assignee")
+
+        member_map = {}
+        for m in members:
+            u = m.user
+            member_map[str(u.id)] = {
+                "user_id":   str(u.id),
+                "name":      u.get_full_name() or u.username or u.email,
+                "email":     u.email,
+                "role":      u.role,
+                "todo":      0,
+                "in_progress": 0,
+                "review":    0,
+                "done":      0,
+                "total":     0,
+                "story_points": 0,
+                "critical":  0,
+                "high":      0,
+                "medium":    0,
+                "low":       0,
+            }
+
+        unassigned = {
+            "user_id":   None,
+            "name":      "Unassigned",
+            "email":     "",
+            "role":      "",
+            "todo":      0,
+            "in_progress": 0,
+            "review":    0,
+            "done":      0,
+            "total":     0,
+            "story_points": 0,
+            "critical":  0,
+            "high":      0,
+            "medium":    0,
+            "low":       0,
+        }
+
+        for issue in issues:
+            if issue.assignee and str(issue.assignee.id) in member_map:
+                bucket = member_map[str(issue.assignee.id)]
+            else:
+                bucket = unassigned
+
+            bucket[issue.status] = bucket.get(issue.status, 0) + 1
+            bucket["total"] += 1
+            bucket["story_points"] += issue.story_points or 0
+            bucket[issue.priority] = bucket.get(issue.priority, 0) + 1
+
+        members_data = list(member_map.values())
+        if unassigned["total"] > 0:
+            members_data.append(unassigned)
+
+        members_data.sort(key=lambda x: x["total"], reverse=True)
+
+        total_issues = sum(m["total"] for m in members_data)
+
+        return Response({
+            "project_id":   str(project.id),
+            "project_name": project.name,
+            "total_issues": total_issues,
+            "members":      members_data,
+        })

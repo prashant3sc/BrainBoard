@@ -18,9 +18,38 @@ export interface VelocityData {
   avg_velocity: number;
 }
 
+export interface WorkloadMember {
+  user_id: string | null;
+  name: string;
+  email: string;
+  role: string;
+  todo: number;
+  in_progress: number;
+  review: number;
+  done: number;
+  total: number;
+  story_points: number;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+}
+
+export interface WorkloadData {
+  project_id: string;
+  project_name: string;
+  total_issues: number;
+  members: WorkloadMember[];
+}
+
 export const analyticsApi = {
   getVelocity: (projectId: string): Promise<VelocityData> =>
     apiClient
       .get(`/projects/${projectId}/analytics/velocity`)
       .then((r: { data: VelocityData }) => r.data),
+
+  getWorkload: (projectId: string): Promise<WorkloadData> =>
+    apiClient
+      .get(`/projects/${projectId}/analytics/workload`)
+      .then((r: { data: WorkloadData }) => r.data),
 };
