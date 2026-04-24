@@ -29,9 +29,19 @@ export interface ChatResponse {
   out_of_scope: boolean;
 }
 
+export interface AnalyzeDraftPayload {
+  title: string;
+  description: string;
+  labels: string[];
+  project_id: string;
+}
+
 export const aiApi = {
   analyzeIssue: (issueId: string): Promise<AnalyzeIssueResponse> =>
     apiClient.post(`/ai/analyze-issue/${issueId}`, undefined, { timeout: 60_000 }).then((r: { data: AnalyzeIssueResponse }) => r.data),
+
+  analyzeDraft: (payload: AnalyzeDraftPayload): Promise<AnalyzeIssueResponse> =>
+    apiClient.post('/ai/analyze-draft', payload, { timeout: 60_000 }).then((r: { data: AnalyzeIssueResponse }) => r.data),
 
   chat: (message: string, projectId?: string): Promise<ChatResponse> =>
     apiClient.post('/ai/chat', { message, project_id: projectId }, { timeout: 60_000 })
