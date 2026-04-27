@@ -1,4 +1,5 @@
 import json
+import re
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
@@ -6,7 +7,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.language_models import BaseChatModel
 
 from app.schemas import IssueDocument, WikiDocument, UserDocument, ProjectDocument, SprintDocument
-from app.prompts.task_prompts import SYSTEM_PROMPT_TEMPLATE
+from app.prompts.task_prompts import SYSTEM_PROMPT_TEMPLATE, ANALYZE_TICKET_PROMPT
 from app.config import get_settings
 from app.core.logging import get_logger
 
@@ -285,6 +286,16 @@ def semantic_search(query: str, k: int = 10) -> list[dict]:
     return results
 
 
+def _extract_json(raw: str) -> dict:
+    """Parse JSON from LLM output, stripping markdown fences if present."""
+    raw = raw.strip()
+    # Strip ```json ... ``` or ``` ... ``` fences
+    fenced = re.search(r"```(?:json)?\s*([\s\S]*?)```", raw)
+    if fenced:
+        raw = fenced.group(1).strip()
+    return json.loads(raw)
+
+
 def analyze_task_with_rag(heading: str, description: str, labels: list[str]) -> dict:
     """
     Label-aware RAG analysis:
@@ -324,3 +335,95 @@ def analyze_task_with_rag(heading: str, description: str, labels: list[str]) -> 
     })
 
     return json.loads(response_msg.content)
+
+
+def analyze_ticket_with_rag(
+    title: str,
+    description: str,
+    sprint_id: str | None,
+    frequent_labels: list[dict],
+    team_bandwidth: list[dict],
+) -> dict:
+    """
+    Full-ticket AI analysis for an existing or draft issue.
+
+    Retrieves similar tickets from ChromaDB (sprint-filtered when possible,
+    unfiltered fallback since sprint_id is not yet stored in ChromaDB metadata).
+    Formats caller-supplied label frequency and team bandwidth, then calls Claude
+    for title / description / label / assignee suggestions.
+    """
+    settings = get_settings()
+    vector_store = get_vector_store()
+
+    query = f"{title}. {description[:600]}"
+
+    # Attempt sprint-filtered retrieval; fall back to unfiltered.
+    # Sprint_id is not currently indexed in ChromaDB metadata, so the filtered
+    # path will return 0 results and we fall through to the unfiltered query.
+    retrieved_docs: list = []
+    if sprint_id:
+        try:
+            retrieved_docs = vector_store.similarity_search(
+                query,
+                k=settings.chroma_retrieval_k,
+                filter={"doc_type": "issue", "sprint_id": sprint_id},
+            )
+        except Exception:
+            pass  # ChromaDB filter error — continue with unfiltered
+
+    if not retrieved_docs:
+        try:
+            retrieved_docs = vector_store.similarity_search(
+                query,
+                k=settings.chroma_retrieval_k,
+                filter={"doc_type": "issue"},
+            )
+        except Exception:
+            retrieved_docs = []  # ChromaDB unreachable — continue with empty context
+
+    similar_tickets_text = (
+        "\n\n---\n".join(doc.page_content for doc in retrieved_docs)
+        if retrieved_docs
+        else "No similar tickets found."
+    )
+
+    frequent_labels_text = (
+        "\n".join(
+            f"  - {item['label']}: used {item['usage_count']} times"
+            for item in frequent_labels
+        )
+        if frequent_labels
+        else "  No label frequency data available."
+    )
+
+    team_bandwidth_text = (
+        "\n".join(
+            f"  - id={member['id']} | {member['name']}: "
+            f"{member['open_tickets']} open, {member['high_priority_count']} high/critical"
+            for member in team_bandwidth
+        )
+        if team_bandwidth
+        else "  No team bandwidth data available."
+    )
+
+    logger.info(
+        f"analyze_ticket_with_rag: '{title[:60]}' | "
+        f"similar={len(retrieved_docs)} labels={len(frequent_labels)} bandwidth={len(team_bandwidth)}"
+    )
+
+    llm = get_llm(model_key="rag")
+    prompt = PromptTemplate(
+        template=ANALYZE_TICKET_PROMPT,
+        input_variables=["title", "description", "similar_tickets", "frequent_labels", "team_bandwidth"],
+    )
+
+    chain = prompt | llm
+    response_msg = chain.invoke({
+        "title": title,
+        "description": description,
+        "similar_tickets": similar_tickets_text,
+        "frequent_labels": frequent_labels_text,
+        "team_bandwidth": team_bandwidth_text,
+    })
+
+    return _extract_json(response_msg.content)

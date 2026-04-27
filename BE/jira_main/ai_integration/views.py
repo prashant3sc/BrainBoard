@@ -1,12 +1,16 @@
 import requests
+from concurrent.futures import ThreadPoolExecutor
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from django.contrib.auth import get_user_model
+from django.db.models import Count, Q
+from django.utils import timezone
+from datetime import timedelta
 
-from issues.models import Issue
+from issues.models import Issue, Label
 from projects.models import Project, ProjectMember, Sprint
 from wiki.models import WikiPage
 
@@ -518,6 +522,122 @@ class SprintPulseView(APIView):
             "highlights": ai_result.get("highlights", []),
             "team":       list(team_map.values()),
         })
+
+
+class AnalyzeTicketView(APIView):
+    """
+    POST /api/ai/analyze-ticket/
+
+    Accepts: { "title", "description", "project_id", "sprint_id" (optional) }
+
+    Runs label frequency and team bandwidth queries in parallel via
+    ThreadPoolExecutor (WSGI), then calls the AI layer with all context.
+    Returns the AI JSON directly — title suggestion, description expansion,
+    label changes, suggested assignee, not-recommended assignee.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        title       = request.data.get("title", "").strip()
+        description = request.data.get("description", "").strip()
+        project_id  = request.data.get("project_id", "").strip()
+        sprint_id   = request.data.get("sprint_id", "").strip() or None
+
+        if not title:
+            return Response({"detail": "title is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not description:
+            return Response({"detail": "description is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not project_id:
+            return Response({"detail": "project_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # ── Parallel DB queries ───────────────────────────────────────────────
+        def _fetch_label_frequency():
+            ninety_days_ago = timezone.now() - timedelta(days=90)
+            rows = (
+                Label.objects
+                .filter(
+                    labels_issues__project_id=project_id,
+                    labels_issues__created_at__gte=ninety_days_ago,
+                )
+                .annotate(usage_count=Count("labels_issues", distinct=True))
+                .order_by("-usage_count")
+                .values("name", "usage_count")[:10]
+            )
+            return [{"label": r["name"], "usage_count": r["usage_count"]} for r in rows]
+
+        def _fetch_team_bandwidth():
+            open_statuses    = [Issue.TODO, Issue.IN_PROGRESS, Issue.REVIEW]
+            high_priorities  = [Issue.HIGH, Issue.CRITICAL]
+            rows = (
+                User.objects
+                .filter(project_memberships__project_id=project_id)
+                .annotate(
+                    open_tickets=Count(
+                        "assigned_issues",
+                        filter=Q(assigned_issues__status__in=open_statuses),
+                        distinct=True,
+                    ),
+                    high_priority_count=Count(
+                        "assigned_issues",
+                        filter=Q(
+                            assigned_issues__status__in=open_statuses,
+                            assigned_issues__priority__in=high_priorities,
+                        ),
+                        distinct=True,
+                    ),
+                )
+                .order_by("-high_priority_count", "-open_tickets")
+                .values("id", "first_name", "last_name", "email", "open_tickets", "high_priority_count")
+            )
+            return [
+                {
+                    "id": str(r["id"]),
+                    "name": f"{r['first_name']} {r['last_name']}".strip() or r["email"],
+                    "open_tickets": r["open_tickets"],
+                    "high_priority_count": r["high_priority_count"],
+                }
+                for r in rows
+            ]
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            label_future     = pool.submit(_fetch_label_frequency)
+            bandwidth_future = pool.submit(_fetch_team_bandwidth)
+            frequent_labels  = label_future.result()
+            team_bandwidth   = bandwidth_future.result()
+
+        # ── Call AI layer ─────────────────────────────────────────────────────
+        try:
+            result = ai_client.analyze_ticket(
+                title=title,
+                description=description,
+                sprint_id=sprint_id,
+                frequent_labels=frequent_labels,
+                team_bandwidth=team_bandwidth,
+            )
+        except requests.exceptions.ConnectionError as exc:
+            return Response(
+                {"detail": f"AI layer unreachable: {exc}"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        except requests.exceptions.HTTPError as exc:
+            # AI service responded but returned an error — surface its detail
+            detail = "AI service error"
+            try:
+                detail = exc.response.json().get("error", {}).get("message", detail)
+            except Exception:
+                pass
+            return Response(
+                {"detail": detail},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        except requests.RequestException as exc:
+            return Response(
+                {"detail": f"AI request failed: {exc}"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        return Response(result)
 
 
 class AIHealthView(APIView):

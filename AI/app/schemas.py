@@ -132,3 +132,44 @@ class SemanticSearchResult(BaseModel):
     type: str
     title: str
     excerpt: str
+
+
+# ── Analyze Ticket ────────────────────────────────────────────────────────────
+
+class TeamMemberBandwidth(BaseModel):
+    id: str
+    name: str
+    open_tickets: int
+    high_priority_count: int
+
+
+class FrequentLabel(BaseModel):
+    label: str
+    usage_count: int
+
+
+class AnalyzeTicketRequest(BaseModel):
+    title: str
+    description: str
+    sprint_id: Optional[str] = None
+    frequent_labels: List[FrequentLabel] = []
+    team_bandwidth: List[TeamMemberBandwidth] = []
+
+
+class AssigneeInfo(BaseModel):
+    id: Optional[str] = None
+    name: str
+    reason: str
+
+
+class LabelChanges(BaseModel):
+    add: List[str] = []
+    remove: List[str] = []
+
+
+class AnalyzeTicketResponse(BaseModel):
+    title_suggestion: str
+    description_expansion: str
+    label_changes: LabelChanges
+    suggested_assignee: AssigneeInfo
+    not_recommended: Optional[AssigneeInfo] = None

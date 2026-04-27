@@ -36,6 +36,27 @@ export interface AnalyzeDraftPayload {
   project_id: string;
 }
 
+export interface AnalyzeTicketPayload {
+  title: string;
+  description: string;
+  project_id: string;
+  sprint_id?: string | null;
+}
+
+export interface AssigneeInfo {
+  id: string | null;
+  name: string;
+  reason: string;
+}
+
+export interface AnalyzeTicketResult {
+  title_suggestion: string;
+  description_expansion: string;
+  label_changes: { add: string[]; remove: string[] };
+  suggested_assignee: AssigneeInfo;
+  not_recommended: AssigneeInfo | null;
+}
+
 export const aiApi = {
   analyzeIssue: (issueId: string): Promise<AnalyzeIssueResponse> =>
     apiClient.post(`/ai/analyze-issue/${issueId}`, undefined, { timeout: 60_000 }).then((r: { data: AnalyzeIssueResponse }) => r.data),
@@ -52,4 +73,9 @@ export const aiApi = {
 
   syncStatus: () =>
     apiClient.get('/ai/sync/status').then((r: { data: unknown }) => r.data),
+
+  analyzeTicket: (payload: AnalyzeTicketPayload): Promise<AnalyzeTicketResult> =>
+    apiClient
+      .post('/ai/analyze-ticket', payload, { timeout: 120_000 })
+      .then((r: { data: AnalyzeTicketResult }) => r.data),
 };

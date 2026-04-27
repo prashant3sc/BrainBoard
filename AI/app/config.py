@@ -22,10 +22,10 @@ class Settings(BaseSettings):
 
     # --- OpenAI ---
     openai_api_key: str
-    openai_model_rag: str = "gpt-4o-mini"   # Faster for structured JSON output
-    openai_model_chat: str = "gpt-4o-mini"     # Smarter for chatbot responses
-    openai_max_tokens_rag: int = 250
-    openai_max_tokens_chat: int = 250
+    openai_model_rag: str = "gpt-4o-mini"  # Faster for structured JSON output
+    openai_model_chat: str = "gpt-4o-mini"  # Smarter for chatbot responses
+    openai_max_tokens_rag: int = 3000
+    openai_max_tokens_chat: int = 3000
 
     # --- Groq (Optional: Ultra-fast alternative LLM provider) ---
     # Sign up free at https://console.groq.com and set GROQ_API_KEY in .env
@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     groq_model_rag: str = "llama3-8b-8192"
     groq_model_chat: str = "llama3-8b-8192"
-    use_groq: bool = False   # Set USE_GROQ=true in .env to switch to Groq
+    use_groq: bool = False  # Set USE_GROQ=true in .env to switch to Groq
 
     # --- ChromaDB ---
     chroma_db_dir: str = "./chroma_db"

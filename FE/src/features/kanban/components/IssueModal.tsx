@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { issuesApi } from '@/api/issues';
+import { aiApi } from '@/api/ai';
+import type { AnalyzeTicketResult } from '@/api/ai';
 import { useRBAC } from '@/hooks/useRBAC';
 import { useProjectMembers } from '@/features/projects/useProjects';
 import { useActiveSprint, useSprints } from '@/features/projects/useSprints';
@@ -50,25 +52,6 @@ const STATUS_CONFIG: Record<string, { label: string; dot: string }> = {
   cancelled:   { label: 'Cancelled',   dot: '#888780' },
 };
 
-/* ── Mock AI data (replace with real API response later) ── */
-const MOCK_TITLE_SUGGESTION =
-  'Bulk-sync PostgreSQL user capacity to ChromaDB via AI ingestion layer';
-
-const MOCK_DESC_SUGGESTION = `BE endpoint to read all users and workloads from DB, compute capacity, and bulk-upload to ChromaDB via AI layer.
-
-Acceptance criteria:
-- Fetch all active users from PostgreSQL
-- Compute capacity as (workload / max_capacity) × 100
-- Upsert vectors with user_id as namespace key
-- Idempotent: re-runs must not duplicate records
-
-Edge cases:
-- Handle zero-workload users gracefully
-- Rate-limit ChromaDB calls to avoid 429s
-- Log individual failures without halting the batch`;
-
-const MOCK_LABELS_ADD    = ['ai engineer', 'devops'];
-const MOCK_LABELS_REMOVE = ['tester'];
 
 /* ── Icon helpers ─────────────────────────────── */
 function StatusDot({ status }: { status: string }) {
@@ -187,9 +170,11 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
   const assigneeRef = useRef<HTMLDivElement>(null);
   const { data: projectLabels = [] } = useLabels(projectId);
 
-  /* ── Mock AI state ── */
+  /* ── AI analysis state ── */
   const [mockAiLoading,  setMockAiLoading]  = useState(false);
   const [mockAiShown,    setMockAiShown]    = useState(false);
+  const [aiResult,       setAiResult]       = useState<AnalyzeTicketResult | null>(null);
+  const [aiError,        setAiError]        = useState<string | null>(null);
   const [expandedCards,  setExpandedCards]  = useState<Set<number>>(new Set());
   const [appliedCards,   setAppliedCards]   = useState<Set<number>>(new Set());
   const [dismissedCards, setDismissedCards] = useState<Set<number>>(new Set());
@@ -199,21 +184,35 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
   function resetMockAI() {
     setMockAiShown(false);
     setMockAiLoading(false);
+    setAiResult(null);
+    setAiError(null);
     setExpandedCards(new Set());
     setAppliedCards(new Set());
     setDismissedCards(new Set());
   }
 
-  function handleMockAnalyze() {
+  async function handleMockAnalyze() {
     setMockAiLoading(true);
     setMockAiShown(false);
+    setAiResult(null);
+    setAiError(null);
     setExpandedCards(new Set());
     setAppliedCards(new Set());
     setDismissedCards(new Set());
-    setTimeout(() => {
-      setMockAiLoading(false);
+    try {
+      const result = await aiApi.analyzeTicket({
+        title,
+        description: desc,
+        project_id: projectId,
+        sprint_id: activeSprintId ?? undefined,
+      });
+      setAiResult(result);
       setMockAiShown(true);
-    }, 2000);
+    } catch {
+      setAiError('Analysis failed. Please try again.');
+    } finally {
+      setMockAiLoading(false);
+    }
   }
 
   function toggleCard(idx: number) {
@@ -226,16 +225,18 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
   }
 
   function applyMockCard(idx: number) {
-    if (idx === 0) setTitle(MOCK_TITLE_SUGGESTION);
-    if (idx === 1) setDesc(MOCK_DESC_SUGGESTION);
+    if (!aiResult) return;
+    if (idx === 0) setTitle(aiResult.title_suggestion);
+    if (idx === 1) setDesc(aiResult.description_expansion);
     if (idx === 2) {
-      const toAdd    = projectLabels.filter(l => MOCK_LABELS_ADD.some(n => l.name.toLowerCase() === n)).map(l => l.id);
-      const toRemove = projectLabels.filter(l => MOCK_LABELS_REMOVE.some(n => l.name.toLowerCase() === n)).map(l => l.id);
+      const labelsAdd    = aiResult.label_changes.add.map(n => n.toLowerCase());
+      const labelsRemove = aiResult.label_changes.remove.map(n => n.toLowerCase());
+      const toAdd    = projectLabels.filter(l => labelsAdd.includes(l.name.toLowerCase())).map(l => l.id);
+      const toRemove = projectLabels.filter(l => labelsRemove.includes(l.name.toLowerCase())).map(l => l.id);
       setLabelIds(prev => [...new Set([...prev.filter(id => !toRemove.includes(id)), ...toAdd])]);
     }
-    if (idx === 3) {
-      const harsh = members.find(m => m.user.name.toLowerCase().includes('harsh'));
-      if (harsh) setAssigneeId(harsh.user.id);
+    if (idx === 3 && aiResult.suggested_assignee?.id) {
+      setAssigneeId(aiResult.suggested_assignee.id);
     }
     setAppliedCards(prev => new Set([...prev, idx]));
     setExpandedCards(prev => { const n = new Set(prev); n.delete(idx); return n; });
@@ -247,17 +248,19 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
   }
 
   function applyAllMockCards() {
+    if (!aiResult) return;
     const remaining = [0, 1, 2, 3].filter(i => !appliedCards.has(i) && !dismissedCards.has(i));
-    if (remaining.includes(0)) setTitle(MOCK_TITLE_SUGGESTION);
-    if (remaining.includes(1)) setDesc(MOCK_DESC_SUGGESTION);
+    if (remaining.includes(0)) setTitle(aiResult.title_suggestion);
+    if (remaining.includes(1)) setDesc(aiResult.description_expansion);
     if (remaining.includes(2)) {
-      const toAdd    = projectLabels.filter(l => MOCK_LABELS_ADD.some(n => l.name.toLowerCase() === n)).map(l => l.id);
-      const toRemove = projectLabels.filter(l => MOCK_LABELS_REMOVE.some(n => l.name.toLowerCase() === n)).map(l => l.id);
+      const labelsAdd    = aiResult.label_changes.add.map(n => n.toLowerCase());
+      const labelsRemove = aiResult.label_changes.remove.map(n => n.toLowerCase());
+      const toAdd    = projectLabels.filter(l => labelsAdd.includes(l.name.toLowerCase())).map(l => l.id);
+      const toRemove = projectLabels.filter(l => labelsRemove.includes(l.name.toLowerCase())).map(l => l.id);
       setLabelIds(prev => [...new Set([...prev.filter(id => !toRemove.includes(id)), ...toAdd])]);
     }
-    if (remaining.includes(3)) {
-      const harsh = members.find(m => m.user.name.toLowerCase().includes('harsh'));
-      if (harsh) setAssigneeId(harsh.user.id);
+    if (remaining.includes(3) && aiResult.suggested_assignee?.id) {
+      setAssigneeId(aiResult.suggested_assignee.id);
     }
     setAppliedCards(new Set([0, 1, 2, 3].filter(i => !dismissedCards.has(i))));
     setExpandedCards(new Set());
@@ -567,12 +570,12 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                     <div className="im-sugg-cards">
 
                       {/* Card 0 — Title */}
-                      {!dismissedCards.has(0) && (
+                      {!dismissedCards.has(0) && aiResult && (
                         <SuggCard
                           idx={0}
                           iconBg="#FAECE7"
                           cardTitle="Sharpen the title"
-                          preview={MOCK_TITLE_SUGGESTION}
+                          preview={aiResult.title_suggestion}
                           applyLabel="Apply →"
                           dismissLabel="Dismiss"
                           icon={
@@ -589,7 +592,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                               </div>
                               <div className="im-diff-row im-diff-now">
                                 <span className="im-diff-pill im-diff-pill-now">Now</span>
-                                <span className="im-diff-now-text">{MOCK_TITLE_SUGGESTION}</span>
+                                <span className="im-diff-now-text">{aiResult.title_suggestion}</span>
                               </div>
                             </div>
                           }
@@ -597,7 +600,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                       )}
 
                       {/* Card 1 — Description */}
-                      {!dismissedCards.has(1) && (
+                      {!dismissedCards.has(1) && aiResult && (
                         <SuggCard
                           idx={1}
                           iconBg="#E6F1FB"
@@ -619,7 +622,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                               </div>
                               <div className="im-diff-pane im-diff-pane-now">
                                 <span className="im-diff-pane-label">AI expanded</span>
-                                <p className="im-diff-pane-text" style={{ whiteSpace: 'pre-line' }}>{MOCK_DESC_SUGGESTION}</p>
+                                <p className="im-diff-pane-text" style={{ whiteSpace: 'pre-line' }}>{aiResult.description_expansion}</p>
                               </div>
                             </div>
                           }
@@ -627,12 +630,15 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                       )}
 
                       {/* Card 2 — Labels */}
-                      {!dismissedCards.has(2) && (
+                      {!dismissedCards.has(2) && aiResult && (
                         <SuggCard
                           idx={2}
                           iconBg="#FAEEDA"
                           cardTitle="Label suggestions"
-                          preview={`Add ${MOCK_LABELS_ADD.join(', ')} · Remove ${MOCK_LABELS_REMOVE.join(', ')}`}
+                          preview={[
+                            aiResult.label_changes.add.length ? `+ ${aiResult.label_changes.add.join(', ')}` : '',
+                            aiResult.label_changes.remove.length ? `− ${aiResult.label_changes.remove.join(', ')}` : '',
+                          ].filter(Boolean).join(' · ') || 'No label changes suggested'}
                           applyLabel="Apply labels"
                           dismissLabel="Dismiss"
                           icon={
@@ -657,14 +663,14 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                                   <span className="im-diff-label-key">After AI</span>
                                   <div className="im-diff-chips">
                                     {currentLabelNames
-                                      .filter(n => !MOCK_LABELS_REMOVE.includes(n.toLowerCase()))
+                                      .filter(n => !aiResult.label_changes.remove.map(r => r.toLowerCase()).includes(n.toLowerCase()))
                                       .map(n => <span key={n} className="im-diff-chip">{n}</span>)
                                     }
-                                    {MOCK_LABELS_ADD.map(n => (
+                                    {aiResult.label_changes.add.map(n => (
                                       <span key={n} className="im-diff-chip im-diff-chip-add">+ {n}</span>
                                     ))}
                                     {currentLabelNames
-                                      .filter(n => MOCK_LABELS_REMOVE.includes(n.toLowerCase()))
+                                      .filter(n => aiResult.label_changes.remove.map(r => r.toLowerCase()).includes(n.toLowerCase()))
                                       .map(n => <span key={n} className="im-diff-chip im-diff-chip-remove">− {n}</span>)
                                     }
                                   </div>
@@ -676,13 +682,13 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                       )}
 
                       {/* Card 3 — Assignee */}
-                      {!dismissedCards.has(3) && (
+                      {!dismissedCards.has(3) && aiResult?.suggested_assignee && (
                         <SuggCard
                           idx={3}
                           iconBg="#E1F5EE"
                           cardTitle="Assignee suggestion"
-                          preview="Suggest Harsh Malik — 1 open ticket, available"
-                          applyLabel="Assign to Harsh"
+                          preview={`Suggest ${aiResult.suggested_assignee.name} — ${aiResult.suggested_assignee.reason}`}
+                          applyLabel={`Assign to ${aiResult.suggested_assignee.name.split(' ')[0]}`}
                           dismissLabel="Dismiss"
                           icon={
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
@@ -693,26 +699,32 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                           body={
                             <div className="im-sugg-diff">
                               <div className="im-diff-assignee-table">
-                                {/* Not recommended — current assignee */}
-                                <div className="im-diff-assignee-row">
-                                  <span className="im-diff-person-av" style={{ background: '#D85A30' }}>PP</span>
-                                  <div className="im-diff-person-info">
-                                    <div className="im-diff-person-top">
-                                      <span className="im-diff-person-name">Prashant Poonia</span>
-                                      <span className="im-diff-badge im-diff-badge-warn">2 high priority open</span>
+                                {/* Not recommended */}
+                                {aiResult.not_recommended && (
+                                  <div className="im-diff-assignee-row">
+                                    <span className="im-diff-person-av" style={{ background: '#D85A30' }}>
+                                      {aiResult.not_recommended.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                                    </span>
+                                    <div className="im-diff-person-info">
+                                      <div className="im-diff-person-top">
+                                        <span className="im-diff-person-name">{aiResult.not_recommended.name}</span>
+                                        <span className="im-diff-badge im-diff-badge-warn">overloaded</span>
+                                      </div>
+                                      <span className="im-diff-person-reason">{aiResult.not_recommended.reason}</span>
                                     </div>
-                                    <span className="im-diff-person-reason">Not recommended — already at capacity this sprint</span>
                                   </div>
-                                </div>
+                                )}
                                 {/* Recommended */}
                                 <div className="im-diff-assignee-row im-diff-assignee-rec">
-                                  <span className="im-diff-person-av" style={{ background: '#378ADD' }}>HM</span>
+                                  <span className="im-diff-person-av" style={{ background: '#378ADD' }}>
+                                    {aiResult.suggested_assignee.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                                  </span>
                                   <div className="im-diff-person-info">
                                     <div className="im-diff-person-top">
-                                      <span className="im-diff-person-name">Harsh Malik</span>
-                                      <span className="im-diff-badge im-diff-badge-ok">1 open, available</span>
+                                      <span className="im-diff-person-name">{aiResult.suggested_assignee.name}</span>
+                                      <span className="im-diff-badge im-diff-badge-ok">recommended</span>
                                     </div>
-                                    <span className="im-diff-person-reason">✓ Recommended — has bandwidth, familiar with this module</span>
+                                    <span className="im-diff-person-reason">✓ {aiResult.suggested_assignee.reason}</span>
                                   </div>
                                 </div>
                               </div>
@@ -760,6 +772,9 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                       </>
                     )}
                   </button>
+                  {aiError && (
+                    <p style={{ fontSize: 11, color: '#DC2626', marginTop: 4 }}>{aiError}</p>
+                  )}
                   {!isEdit && (!title.trim() || !desc.trim()) && !mockAiShown && !mockAiLoading && (
                     <p style={{ fontSize: 11, color: 'var(--kb-field-label)', marginTop: 2 }}>
                       {!title.trim() ? 'Add a title and description to enable AI analysis' : 'Add a description for better AI results'}

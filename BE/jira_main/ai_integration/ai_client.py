@@ -63,6 +63,23 @@ def sprint_pulse(sprint: dict, issues: list[dict]) -> dict:
     return _post("/sprint-pulse", {"sprint": sprint, "issues": issues}, timeout=_TIMEOUT_LONG)
 
 
+def analyze_ticket(
+    title: str,
+    description: str,
+    sprint_id: str | None,
+    frequent_labels: list[dict],
+    team_bandwidth: list[dict],
+) -> dict:
+    """Full-ticket analysis: title, description, labels, and assignee suggestions."""
+    return _post("/analyze-ticket", {
+        "title": title,
+        "description": description,
+        "sprint_id": sprint_id,
+        "frequent_labels": frequent_labels,
+        "team_bandwidth": team_bandwidth,
+    })
+
+
 def semantic_search(query: str, k: int = 10) -> list[dict]:
     """Semantic similarity search: returns id, type, title, excerpt (no projectId yet)."""
     return _post("/search/semantic", {"query": query, "k": k}, timeout=_TIMEOUT_LONG)
