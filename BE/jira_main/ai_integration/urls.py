@@ -9,4 +9,5 @@ urlpatterns = [
     path("ai/analyze-draft",                               views.AnalyzeDraftView.as_view()),
     path("ai/chat",                                         views.ChatView.as_view()),
     path("projects/<uuid:project_id>/ai-pulse",             views.SprintPulseView.as_view()),
+    path("ai/chatbot/query",                                views.ChatbotQueryView.as_view()),
 ]

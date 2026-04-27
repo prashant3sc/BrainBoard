@@ -108,3 +108,27 @@ class Issue(models.Model):
 
     def __str__(self):
         return f"[{self.project.name}] {self.title}"
+
+
+class Comment(models.Model):
+    """A comment left on a ticket (issue)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    # Named `ticket` so signal handlers can reference `instance.ticket_id`
+    ticket = models.ForeignKey(Issue, on_delete=models.CASCADE, related_name="comments")
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="comments",
+    )
+    body = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "issue_comments"
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return f"Comment on [{self.ticket.project.name}] {self.ticket.title}"

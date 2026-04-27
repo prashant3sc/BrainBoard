@@ -1,10 +1,16 @@
+import logging
+import re
 import requests
+from concurrent.futures import ThreadPoolExecutor
+
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from django.contrib.auth import get_user_model
+
+logger = logging.getLogger(__name__)
 
 from issues.models import Issue
 from projects.models import Project, ProjectMember, Sprint
@@ -93,6 +99,45 @@ def _build_sprint_payload(sprint: Sprint) -> dict:
         "total_issues": issues.count(),
         "done_issues": done_count,
     }
+
+
+def _build_sources_from_chromadb(results: list[dict], answer_text: str) -> list[dict]:
+    """
+    Build a deduplicated list of source references from ChromaDB result dicts.
+
+    Prioritisation:
+      1. Documents whose title appears verbatim in the answer text (most relevant).
+      2. All other retrieved documents, in retrieval order.
+
+    Cap: at most 3 sources.
+
+    Each source has shape: {"type": str, "id": str, "title": str}
+    """
+    answer_lower = answer_text.lower()
+    seen: set[tuple] = set()
+    primary:   list[dict] = []
+    secondary: list[dict] = []
+
+    for r in results:
+        doc_type = (r.get("type") or "").strip()
+        doc_id   = (r.get("id")   or "").strip()
+        title    = (r.get("title") or "").strip()
+
+        if not doc_type or not doc_id:
+            continue  # skip malformed entries
+
+        key = (doc_type, doc_id)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        source = {"type": doc_type, "id": doc_id, "title": title}
+        if title and title.lower() in answer_lower:
+            primary.append(source)
+        else:
+            secondary.append(source)
+
+    return (primary + secondary)[:3]
 
 
 class SyncView(APIView):
@@ -518,6 +563,175 @@ class SprintPulseView(APIView):
             "highlights": ai_result.get("highlights", []),
             "team":       list(team_map.values()),
         })
+
+
+class ChatbotQueryView(APIView):
+    """
+    POST /api/chatbot/query/
+
+    Project/sprint-scoped RAG chatbot.  Full pipeline:
+
+      1. Validate — query required, history capped at 4 turns.
+      2. Resolve project_id / sprint_id → names for ChromaDB filtering.
+      3. Build live page context from Postgres (get_page_context).
+      4. Classify the query to decide what to fetch (classify_query).
+      5. Run ChromaDB search + optional bandwidth SQL in parallel
+         (ThreadPoolExecutor — Django runs under WSGI, not ASGI).
+      6. Build a plain-text system prompt combining page context,
+         ChromaDB results, and bandwidth data.
+      7. Build the messages array: system + history + current query.
+      8. Call the LLM via FastAPI /llm/generate (plain text, json_mode=False).
+      9. Assemble sources from ChromaDB metadata and return
+         {answer, sources}.
+
+    Body:
+      {
+        "query":      string,                            required
+        "project_id": uuid | null,
+        "sprint_id":  uuid | null,
+        "page":       "kanban"|"backlog"|"wiki"|"analytics"|"dashboard",
+        "history":    [{"role": string, "content": string}]  // max 4
+      }
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from .page_context import get_page_context, to_prompt_text, get_team_bandwidth
+        from .classifier import classify_query
+        from .prompts import CHATBOT_SYSTEM_PROMPT
+        from .serializers import ChatbotQuerySerializer
+
+        # ── 1. Validate ───────────────────────────────────────────────────
+        serializer = ChatbotQuerySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        query      = data["query"].strip()
+        history    = data["history"]          # already capped at 4 by validate_history
+        project_id = data.get("project_id")   # UUID instance or None
+        sprint_id  = data.get("sprint_id")    # UUID instance or None
+        page       = data.get("page") or ""
+
+        # ── 2. Resolve IDs → display names (used as ChromaDB filter values) ─
+        project_name: str | None = None
+        if project_id:
+            try:
+                project_obj  = Project.objects.get(pk=project_id)
+                project_name = project_obj.name
+            except Project.DoesNotExist:
+                project_id = None  # treat as missing so filters are not wrong
+
+        sprint_name: str | None = None
+        if sprint_id:
+            try:
+                sprint_obj  = Sprint.objects.get(pk=sprint_id)
+                sprint_name = sprint_obj.name
+            except Sprint.DoesNotExist:
+                sprint_id = None
+
+        # ── 3. Live page context from Postgres ────────────────────────────
+        ctx = get_page_context(
+            page,
+            str(project_id) if project_id else None,
+            str(sprint_id)  if sprint_id  else None,
+        )
+        page_context_text = to_prompt_text(ctx)
+
+        # ── 4. Classify query ─────────────────────────────────────────────
+        classification   = classify_query(query, page)
+        needs_chromadb   = classification["needs_chromadb"]
+        doc_types        = classification["doc_types"]
+        sql_queries      = classification["sql_queries"]
+
+        logger.info(
+            "ChatbotQuery classify: needs_chromadb=%s doc_types=%s sql_queries=%s "
+            "project_id=%s sprint_id=%s page=%s",
+            needs_chromadb, doc_types, sql_queries, project_id, sprint_id, page,
+        )
+
+        # ── 5. Parallel fetch: ChromaDB + bandwidth SQL ───────────────────
+        chromadb_results: list[dict] = []
+        bandwidth_text:   str        = ""
+
+        def _fetch_chromadb() -> list[dict]:
+            if not needs_chromadb:
+                return []
+            try:
+                return ai_client.chromadb_query(
+                    query=query,
+                    project_id=str(project_id) if project_id else None,
+                    doc_types=doc_types,
+                    sprint_id=str(sprint_id) if sprint_id else None,
+                )
+            except requests.RequestException as exc:
+                logger.warning("ChatbotQuery: ChromaDB fetch failed: %s", exc)
+                return []
+
+        def _fetch_bandwidth() -> str:
+            if "bandwidth" not in sql_queries or not project_id:
+                return ""
+            try:
+                return get_team_bandwidth(str(project_id))
+            except Exception as exc:
+                logger.warning("ChatbotQuery: bandwidth fetch failed: %s", exc)
+                return ""
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            future_chroma = executor.submit(_fetch_chromadb)
+            future_bw     = executor.submit(_fetch_bandwidth)
+            chromadb_results = future_chroma.result()
+            bandwidth_text   = future_bw.result()
+
+        logger.info(
+            "ChatbotQuery parallel fetch done: %d chromadb docs, bandwidth=%s",
+            len(chromadb_results), bool(bandwidth_text),
+        )
+
+        # ── 6. Build system prompt ────────────────────────────────────────
+        chromadb_context = (
+            "\n\n---\n\n".join(r["text"] for r in chromadb_results)
+            if chromadb_results
+            else "No relevant workspace data found."
+        )
+
+        bandwidth_section = (
+            f"\nTEAM BANDWIDTH:\n{bandwidth_text}\n"
+            if bandwidth_text
+            else ""
+        )
+
+        system_content = CHATBOT_SYSTEM_PROMPT.format(
+            page             = page or "unknown",
+            page_context     = page_context_text or "No live page data available.",
+            chromadb_context = chromadb_context,
+            bandwidth_section= bandwidth_section,
+        )
+
+        # ── 7. Build messages array ───────────────────────────────────────
+        messages: list[dict] = [{"role": "system", "content": system_content}]
+
+        for h in history:
+            role    = (h.get("role") or "user").lower()
+            content = (h.get("content") or "").strip()
+            if role in ("user", "assistant") and content:
+                messages.append({"role": role, "content": content})
+
+        messages.append({"role": "user", "content": query})
+
+        # ── 8. Call LLM (plain text — json_mode=False) ────────────────────
+        try:
+            answer_text: str = ai_client.llm_generate(messages, json_mode=False)
+        except requests.RequestException as exc:
+            logger.error("ChatbotQuery: LLM call failed: %s", exc)
+            return Response(
+                {"detail": f"AI layer unreachable: {exc}"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        # ── 9. Build sources + return ─────────────────────────────────────
+        sources = _build_sources_from_chromadb(chromadb_results, answer_text)
+        return Response({"answer": answer_text, "sources": sources})
 
 
 class AIHealthView(APIView):
