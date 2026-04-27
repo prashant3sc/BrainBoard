@@ -13,7 +13,19 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 
 
-def get_llm(model_key: str = "rag") -> BaseChatModel:
+def get_llm(model_key: str = "rag", json_mode: bool = True) -> BaseChatModel:
+    """
+    Return a configured LLM instance.
+
+    Args:
+        model_key:  "rag" (lower temperature, used for structured analysis) or
+                    "chat" (higher temperature, used for conversational responses).
+        json_mode:  When True (default) the OpenAI model is instructed to return
+                    a valid JSON object.  Set to False for free-text responses
+                    such as the chatbot answer in ChatbotQueryView.
+                    Groq is unaffected — it does not support the response_format
+                    parameter in the same way and already returns plain text.
+    """
     settings = get_settings()
 
     if settings.use_groq and settings.groq_api_key:
@@ -31,13 +43,18 @@ def get_llm(model_key: str = "rag") -> BaseChatModel:
 
     model = settings.openai_model_rag if model_key == "rag" else settings.openai_model_chat
     max_tokens = settings.openai_max_tokens_rag if model_key == "rag" else settings.openai_max_tokens_chat
-    logger.info(f"Using OpenAI LLM: {model}")
+    logger.info(f"Using OpenAI LLM: {model} (json_mode={json_mode})")
+
+    extra_kwargs: dict = {}
+    if json_mode:
+        extra_kwargs["model_kwargs"] = {"response_format": {"type": "json_object"}}
+
     return ChatOpenAI(
         model=model,
         temperature=0.2 if model_key == "rag" else 0.7,
         max_tokens=max_tokens,
         openai_api_key=settings.openai_api_key,
-        model_kwargs={"response_format": {"type": "json_object"}},
+        **extra_kwargs,
     )
 
 
@@ -282,6 +299,199 @@ def semantic_search(query: str, k: int = 10) -> list[dict]:
                 "excerpt": excerpt,
             })
 
+    return results
+
+
+def upsert_document(doc_id: str, text: str, metadata: dict) -> None:
+    """
+    Idempotent single-document upsert into ChromaDB.
+
+    Deletes any pre-existing document with the same `doc_id`, then re-embeds
+    and inserts it.  Called by the Django Celery embedding tasks whenever a
+    ticket, wiki page, sprint, or analytics snapshot changes.
+
+    Args:
+        doc_id:   Stable, deterministic ID (e.g. "ticket_<uuid>").
+        text:     Pre-built plain-text representation of the document.
+        metadata: Dict of filter-friendly fields stored alongside the vector.
+    """
+    vector_store = get_vector_store()
+
+    # Delete stale version if it exists
+    try:
+        existing = vector_store._collection.get(ids=[doc_id])
+        if existing.get("ids"):
+            vector_store._collection.delete(ids=[doc_id])
+    except Exception as exc:
+        logger.warning(f"upsert_document: delete check failed for {doc_id}: {exc}")
+
+    # Re-embed and store with the deterministic ID
+    vector_store.add_texts(texts=[text], metadatas=[metadata], ids=[doc_id])
+    logger.info(f"upsert_document: upserted {doc_id} (type={metadata.get('type')})")
+
+
+def _extract_title_from_doc(text: str, metadata: dict, doc_type: str) -> str:
+    """
+    Extract a human-readable title from a document's page_content.
+
+    Handles both metadata formats that coexist in the collection:
+
+    New format (Celery tasks, Step 2):
+      ticket   → "Title: My Issue"
+      wiki     → "Page: My Wiki Page"
+      sprint   → "Sprint: My Sprint | 2025-04-01 to ..."
+      analytics→ "Week of 2025-04-14. Project: Alpha"
+
+    Old format (full_sync):
+      issue    → "[ISSUE] Project: X\nTitle: My Issue"
+      wiki     → "[WIKI] ...\nTitle: My Page"
+      sprint   → "[SPRINT] Name: My Sprint"
+      project  → "[PROJECT] Name: My Project"
+      user     → "[USER] Name: Alice"
+    """
+    lines = text.split("\n") if text else []
+    first_line = lines[0] if lines else ""
+
+    for line in lines:
+        # Both formats use "Title: " for ticket/issue
+        if line.startswith("Title: "):
+            return line[7:].strip()
+        # Celery wiki format
+        if line.startswith("Page: "):
+            return line[6:].strip()
+        # Old format sprint / project / user — "[TYPE] Name: …"
+        if " Name: " in line and line.startswith("["):
+            return line.split(" Name: ", 1)[1].strip()
+
+    # Celery sprint first line: "Sprint: My Sprint | 2025-04-01 to 2025-04-14"
+    if first_line.startswith("Sprint: "):
+        segment = first_line[8:]                     # strip "Sprint: "
+        return segment.split(" | ")[0].strip()       # keep just the name
+
+    # Celery analytics first line: "Week of 2025-04-14. Project: Alpha"
+    if first_line.startswith("Week of "):
+        return first_line.strip()
+
+    # Metadata fallbacks
+    return metadata.get("title", metadata.get("name", ""))
+
+
+def query_chromadb(
+    query: str,
+    project_id: str | None,
+    doc_types: list[str],
+    sprint_id: str | None = None,
+    top_k: int = 6,
+) -> list[dict]:
+    """
+    Targeted ChromaDB vector search with metadata pre-filtering.
+
+    Uses the same Chroma client and ``text-embedding-3-small`` embedding model
+    that the rest of the pipeline uses — no separate embedding call needed,
+    ``similarity_search`` embeds the query automatically.
+
+    Metadata filter logic
+    ─────────────────────
+    The filter targets the **Celery-task metadata format** written by Step 2's
+    ``upsert_document`` calls:
+
+        type       → "ticket" | "wiki" | "sprint" | "analytics"
+        project_id → UUID string of the owning project
+        sprint_id  → UUID string of the sprint (tickets and sprints only)
+
+    Old ``full_sync`` documents (``doc_type`` key, ``project`` = name) are
+    stored in the same collection but will not match a ``project_id`` filter
+    because they lack that field — ChromaDB silently excludes them.
+
+    Filter build rules (exactly as specified):
+        * ``type in doc_types``                            — always applied
+        * ``project_id == project_id``                     — when project_id given
+        * ``sprint_id == sprint_id`` (tickets only)        — when sprint_id given
+                                                             AND "ticket" in doc_types
+
+    ChromaDB constraint: ``$and`` requires ≥ 2 operands; with a single
+    condition the dict is used directly.
+
+    Args:
+        query:      Natural-language query string; embedded automatically.
+        project_id: UUID string — restrict to this project.  None = org-wide.
+        doc_types:  Document type values to include, e.g. ["ticket", "wiki"].
+                    Must use Celery-format names (ticket/wiki/sprint/analytics).
+        sprint_id:  UUID string — scope ticket results to a specific sprint.
+                    Ignored when "ticket" is not in doc_types.
+        top_k:      Maximum number of results (default 6).
+
+    Returns:
+        List of dicts: [{"type": str, "id": str, "title": str, "text": str}, …]
+        Returns [] on any error — never raises.
+    """
+    if not doc_types:
+        return []
+
+    try:
+        vector_store = get_vector_store()
+
+        # ── Build ChromaDB WHERE filter ──────────────────────────────────────
+        conditions: list[dict] = []
+
+        # Type filter — always present; $in works with single-element lists too
+        conditions.append({"type": {"$in": list(doc_types)}})
+
+        # Project scope
+        if project_id:
+            conditions.append({"project_id": {"$eq": str(project_id)}})
+
+        # Sprint scope — only meaningful for ticket documents
+        if sprint_id and "ticket" in doc_types:
+            conditions.append({"sprint_id": {"$eq": str(sprint_id)}})
+
+        # $and requires >= 2 items; use bare dict for a single condition
+        where = {"$and": conditions} if len(conditions) > 1 else conditions[0]
+
+        logger.info(
+            f"query_chromadb: query={query[:60]!r} types={doc_types} "
+            f"project_id={project_id} sprint_id={sprint_id} k={top_k}"
+        )
+
+        docs = vector_store.similarity_search(query, k=top_k, filter=where)
+
+    except Exception as exc:
+        logger.error(
+            f"query_chromadb failed for query={query[:60]!r} "
+            f"project_id={project_id}: {exc}"
+        )
+        return []
+
+    # ── Extract {type, id, title, text} from each result ────────────────────
+    results: list[dict] = []
+    for doc in docs:
+        meta = doc.metadata
+
+        # Normalise type — handle both new (type) and old (doc_type) formats
+        doc_type = meta.get("type") or meta.get("doc_type", "")
+
+        # Resolve the entity ID per type (Celery-format keys first, then old format)
+        id_lookup: dict[str, str | None] = {
+            "ticket":    meta.get("ticket_id"),
+            "issue":     meta.get("issue_id"),           # old full_sync name
+            "wiki":      meta.get("page_id") or meta.get("wiki_id"),
+            "sprint":    meta.get("sprint_id"),
+            "analytics": meta.get("project_id"),         # analytics keyed by project + week
+            "project":   meta.get("project_id"),
+            "user":      meta.get("user_id"),
+        }
+        doc_id = id_lookup.get(doc_type) or ""
+
+        title = _extract_title_from_doc(doc.page_content, meta, doc_type)
+
+        results.append({
+            "type":  doc_type,
+            "id":    doc_id,
+            "title": title,
+            "text":  doc.page_content,
+        })
+
+    logger.info(f"query_chromadb: returned {len(results)} results")
     return results
 
 

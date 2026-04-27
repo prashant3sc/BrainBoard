@@ -40,6 +40,8 @@ INSTALLED_APPS = [
     "wiki",
     "search",
     "ai_integration",
+    # Celery beat — persists periodic-task state in Postgres
+    "django_celery_beat",
 ]
 
 MIDDLEWARE = [
@@ -167,3 +169,34 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ---------------------------------------------------------------------------
 
 AI_SERVICE_URL = os.environ.get("AI_SERVICE_URL", "http://localhost:8001")
+
+# ---------------------------------------------------------------------------
+# Celery
+# ---------------------------------------------------------------------------
+
+CELERY_BROKER_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = "UTC"
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+
+# ---------------------------------------------------------------------------
+# Celery Beat — weekly Monday 09:00 UTC embedding jobs
+# ---------------------------------------------------------------------------
+
+from celery.schedules import crontab  # noqa: E402
+
+CELERY_BEAT_SCHEDULE = {
+    # Re-embed all active sprints every Monday at 09:00 UTC
+    "weekly-embed-active-sprints": {
+        "task": "ai_integration.tasks.embed_all_active_sprints",
+        "schedule": crontab(day_of_week=1, hour=9, minute=0),
+    },
+    # Re-embed analytics snapshot for all active projects every Monday at 09:00 UTC
+    "weekly-embed-project-analytics": {
+        "task": "ai_integration.tasks.embed_all_active_project_analytics",
+        "schedule": crontab(day_of_week=1, hour=9, minute=0),
+    },
+}

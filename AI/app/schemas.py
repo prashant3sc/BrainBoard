@@ -132,3 +132,85 @@ class SemanticSearchResult(BaseModel):
     type: str
     title: str
     excerpt: str
+
+
+class UpsertDocumentRequest(BaseModel):
+    """Single-document upsert into ChromaDB from a Celery embedding task."""
+    doc_id: str
+    text: str
+    metadata: Dict[str, str]  # ChromaDB requires str values
+
+
+class UpsertDocumentResponse(BaseModel):
+    doc_id: str
+    status: str = "upserted"
+
+
+class ChatHistoryItem(BaseModel):
+    role: str
+    content: str
+
+
+class ChatbotQueryRequest(BaseModel):
+    query: str
+    project_id: Optional[str] = None
+    sprint_id: Optional[str] = None
+    page: Optional[str] = None
+    history: List[ChatHistoryItem] = []
+    # Pre-rendered live data from Postgres (built by Django's get_page_context).
+    # Empty string when not applicable (e.g. wiki page).
+    page_context: str = ""
+
+
+class ChatbotQuerySource(BaseModel):
+    type: str
+    id: str
+    title: str
+
+
+class ChatbotQueryResponse(BaseModel):
+    answer: str
+    sources: List[ChatbotQuerySource] = []
+
+
+# ---------------------------------------------------------------------------
+# ChromaDB query (POST /chromadb/query)
+# ---------------------------------------------------------------------------
+
+class ChromadbQueryRequest(BaseModel):
+    """Direct ChromaDB vector search with optional metadata pre-filtering."""
+    query: str
+    project_id: Optional[str] = None
+    doc_types: List[str] = []
+    sprint_id: Optional[str] = None
+    top_k: int = 6
+
+
+class ChromadbQueryResult(BaseModel):
+    """Single document result returned by /chromadb/query."""
+    type: str
+    id: str
+    title: str
+    text: str
+
+
+# ---------------------------------------------------------------------------
+# Plain-text LLM generation (POST /llm/generate)
+# ---------------------------------------------------------------------------
+
+class LlmMessageItem(BaseModel):
+    """Single message in an OpenAI-style conversation turn."""
+    role: str     # "system" | "user" | "assistant"
+    content: str
+
+
+class LlmGenerateRequest(BaseModel):
+    """Full messages array for a direct LLM call."""
+    messages: List[LlmMessageItem]
+    model_key: str = "chat"   # "rag" | "chat"
+    json_mode: bool = False   # True → enforce JSON object output
+
+
+class LlmGenerateResponse(BaseModel):
+    """Plain-text response from the LLM."""
+    text: str
