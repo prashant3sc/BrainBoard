@@ -31,8 +31,16 @@ def chat_with_rag(message: str, project_name: str | None = None) -> dict:
     # If scoped to a project, prefer docs from that project but keep others as fallback
     if project_name:
         project_lower = project_name.lower()
-        project_docs = [d for d in raw_docs if d.metadata.get("project", "").lower() == project_lower]
-        other_docs = [d for d in raw_docs if d.metadata.get("project", "").lower() != project_lower]
+        project_docs = [
+            d
+            for d in raw_docs
+            if d.metadata.get("project", "").lower() == project_lower
+        ]
+        other_docs = [
+            d
+            for d in raw_docs
+            if d.metadata.get("project", "").lower() != project_lower
+        ]
         docs = (project_docs + other_docs)[:k]
     else:
         docs = raw_docs
@@ -43,7 +51,11 @@ def chat_with_rag(message: str, project_name: str | None = None) -> dict:
     context_parts = []
     for doc in docs:
         context_parts.append(doc.page_content)
-    context = "\n\n---\n\n".join(context_parts) if context_parts else "No relevant data found in the workspace."
+    context = (
+        "\n\n---\n\n".join(context_parts)
+        if context_parts
+        else "No relevant data found in the workspace."
+    )
 
     # Extract source titles for citation
     source_titles = []

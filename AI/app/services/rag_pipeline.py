@@ -23,7 +23,7 @@ def get_llm(model_key: str = "rag") -> BaseChatModel:
             logger.info(f"Using Groq LLM: {model}")
             return ChatGroq(
                 model=model,
-                temperature=0 if model_key == "rag" else 0.7,
+                temperature=0.2 if model_key == "rag" else 0.7,
                 groq_api_key=settings.groq_api_key,
             )
         except ImportError:
@@ -34,7 +34,7 @@ def get_llm(model_key: str = "rag") -> BaseChatModel:
     logger.info(f"Using OpenAI LLM: {model}")
     return ChatOpenAI(
         model=model,
-        temperature=0 if model_key == "rag" else 0.7,
+        temperature=0.2 if model_key == "rag" else 0.7,
         max_tokens=max_tokens,
         openai_api_key=settings.openai_api_key,
         model_kwargs={"response_format": {"type": "json_object"}},
@@ -296,8 +296,8 @@ def analyze_task_with_rag(heading: str, description: str, labels: list[str]) -> 
     vector_store = get_vector_store()
 
     labels_str = ", ".join(labels) if labels else "general"
-    # Query emphasises labels so retrieval is label-aware, then falls back to title similarity
-    query = f"Labels: {labels_str}. Issue: {heading}. {description[:200]}"
+    # Use more of the description so retrieval matches on actual work content, not just labels
+    query = f"Labels: {labels_str}. Issue: {heading}. {description[:600]}"
 
     # Filter to only issue documents (not wiki)
     retrieved_docs = vector_store.similarity_search(
