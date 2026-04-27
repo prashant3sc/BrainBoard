@@ -8,9 +8,6 @@ import { useLabels } from '@/features/projects/useLabels';
 import useAuthStore from '@/store/useAuthStore';
 import type { Issue, IssueStatus, Priority, IssueType } from '@/types';
 import { KANBAN_COLUMNS } from './KanbanBoard';
-import { useAIAnalysis } from '@/features/ai/useAIAnalysis';
-import { AIAnalysisPanel } from '@/features/ai/components/AIAnalysisPanel';
-import type { RecommendedUser } from '@/api/ai';
 
 type Destination = 'backlog' | 'sprint';
 
@@ -38,84 +35,106 @@ const PRIORITY_LABELS: Record<Priority, string> = {
   low:      'Low',
 };
 
-const PRIORITY_COLOR: Record<Priority, { bg: string; text: string; dot: string }> = {
-  critical: { bg: '#FFEBE6', text: '#DE350B', dot: '#DE350B' },
-  high:     { bg: '#FFF0E6', text: '#FF5630', dot: '#FF5630' },
-  medium:   { bg: '#FFFAE6', text: '#FF8B00', dot: '#FF8B00' },
-  low:      { bg: '#E3FCEF', text: '#00875A', dot: '#00875A' },
-};
-
 const TYPE_COLOR: Record<IssueType, { bg: string; text: string }> = {
   task:    { bg: '#DEEBFF', text: '#0052CC' },
   subtask: { bg: '#EAE6FF', text: '#6554C0' },
   bug:     { bg: '#FFEBE6', text: '#DE350B' },
 };
 
+/* key fixed to 'review' to match KANBAN_COLUMNS */
 const STATUS_CONFIG: Record<string, { label: string; dot: string }> = {
-  todo:        { label: 'To Do',       dot: '#B3BAC5' },
-  in_progress: { label: 'In Progress', dot: '#E75026' },
-  in_review:   { label: 'In Review',   dot: '#0052CC' },
-  done:        { label: 'Done',        dot: '#006644' },
-  cancelled:   { label: 'Cancelled',   dot: '#BF2600' },
+  todo:        { label: 'To Do',       dot: '#888780' },
+  in_progress: { label: 'In Progress', dot: '#D85A30' },
+  review:      { label: 'In Review',   dot: '#378ADD' },
+  done:        { label: 'Done',        dot: '#1D9E75' },
+  cancelled:   { label: 'Cancelled',   dot: '#888780' },
 };
 
-/* ── tiny SVG icons ─────────────────────────────── */
-const IcoStatus = () => (
-  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-    <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.4"/>
-    <path d="M4.5 7l2 2 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-);
-const IcoType = () => (
-  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-    <rect x="2" y="2" width="4" height="4" rx="1" fill="currentColor"/>
-    <rect x="8" y="2" width="4" height="4" rx="1" fill="currentColor"/>
-    <rect x="2" y="8" width="4" height="4" rx="1" fill="currentColor"/>
-    <rect x="8" y="8" width="4" height="4" rx="1" fill="currentColor"/>
-  </svg>
-);
-const IcoPriority = () => (
-  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-    <path d="M7 2v6M7 10v2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-    <path d="M4 4.5l3-2.5 3 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-);
-const IcoAssignee = () => (
-  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-    <circle cx="7" cy="4.5" r="2.5" stroke="currentColor" strokeWidth="1.4"/>
-    <path d="M2 12c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-  </svg>
-);
-const IcoReporter = () => (
-  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-    <circle cx="7" cy="4.5" r="2.5" stroke="currentColor" strokeWidth="1.4"/>
-    <path d="M2 12c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-    <circle cx="10.5" cy="10.5" r="2" fill="#00875A"/>
-    <path d="M9.5 10.5l.7.7 1.3-1.2" stroke="white" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-);
-const IcoPoints = () => (
-  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-    <path d="M7 2l1.5 3 3.5.5-2.5 2.5.5 3.5L7 10l-3 1.5.5-3.5L2 5.5l3.5-.5L7 2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
-  </svg>
-);
-const IcoDue = () => (
-  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-    <rect x="2" y="3" width="10" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
-    <path d="M5 2v2M9 2v2M2 6h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-  </svg>
-);
-const IcoLabel = () => (
-  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-    <path d="M2 2h5l5 5-5 5-5-5V2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
-    <circle cx="5" cy="5" r="1" fill="currentColor"/>
-  </svg>
-);
-const IcoParent = () => (
-  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-    <path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-);
+/* ── Mock AI data (replace with real API response later) ── */
+const MOCK_TITLE_SUGGESTION =
+  'Bulk-sync PostgreSQL user capacity to ChromaDB via AI ingestion layer';
+
+const MOCK_DESC_SUGGESTION = `BE endpoint to read all users and workloads from DB, compute capacity, and bulk-upload to ChromaDB via AI layer.
+
+Acceptance criteria:
+- Fetch all active users from PostgreSQL
+- Compute capacity as (workload / max_capacity) × 100
+- Upsert vectors with user_id as namespace key
+- Idempotent: re-runs must not duplicate records
+
+Edge cases:
+- Handle zero-workload users gracefully
+- Rate-limit ChromaDB calls to avoid 429s
+- Log individual failures without halting the batch`;
+
+const MOCK_LABELS_ADD    = ['ai engineer', 'devops'];
+const MOCK_LABELS_REMOVE = ['tester'];
+
+/* ── Icon helpers ─────────────────────────────── */
+function StatusDot({ status }: { status: string }) {
+  const c = STATUS_CONFIG[status]?.dot ?? '#888780';
+  return <span className="im-sdot" style={{ background: c }} />;
+}
+
+function TypeIcon({ type, active = false }: { type: IssueType; active?: boolean }) {
+  const col = active ? '#993C1D' : '#5F5E5A';
+  if (type === 'task') return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+      <rect x="4" y="4" width="16" height="16" rx="3" stroke={col} strokeWidth="1.5"/>
+      <polyline points="8,12 11,15 16,9" stroke={col} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+  if (type === 'subtask') return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+      <rect x="4" y="4" width="16" height="16" rx="3" stroke={col} strokeWidth="1.5"/>
+      <rect x="8" y="8" width="8" height="8" rx="1.5" stroke={col} strokeWidth="1.5"/>
+    </svg>
+  );
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+      <polygon points="12,3 22,21 2,21" stroke="#E24B4A" strokeWidth="1.5" strokeLinejoin="round"/>
+      <line x1="12" y1="10" x2="12" y2="15" stroke="#E24B4A" strokeWidth="1.5" strokeLinecap="round"/>
+      <circle cx="12" cy="18.5" r="0.8" fill="#E24B4A"/>
+    </svg>
+  );
+}
+
+function PriorityIcon({ priority }: { priority: Priority }) {
+  if (priority === 'critical') return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+      <line x1="12" y1="19" x2="12" y2="6" stroke="#E24B4A" strokeWidth="1.5" strokeLinecap="round"/>
+      <polyline points="8,10 12,6 16,10" stroke="#E24B4A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <line x1="8" y1="19" x2="16" y2="19" stroke="#E24B4A" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  );
+  if (priority === 'high') return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+      <line x1="5" y1="8" x2="19" y2="8" stroke="#D85A30" strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="5" y1="13" x2="19" y2="13" stroke="#D85A30" strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="5" y1="18" x2="13" y2="18" stroke="#D85A30" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  );
+  if (priority === 'medium') return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+      <line x1="5" y1="10" x2="19" y2="10" stroke="#EF9F27" strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="5" y1="16" x2="19" y2="16" stroke="#EF9F27" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  );
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+      <line x1="5" y1="13" x2="19" y2="13" stroke="#1D9E75" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
+      style={{ transition: 'transform 0.18s', transform: open ? 'rotate(180deg)' : '', flexShrink: 0, color: 'var(--kb-field-label)' }}>
+      <polyline points="6,9 12,15 18,9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
 
 export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Props) {
   const isEdit  = issue !== null;
@@ -124,7 +143,6 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
   const canEdit = can('editIssue');
   const canDel  = can('deleteIssue');
   const canAI   = can('analyzeIssue');
-  const { analysis: aiResult, isLoading: aiLoading, error: aiError, analyze, analyzeDraft, clear: clearAI } = useAIAnalysis();
   const { data: members = [] } = useProjectMembers(projectId);
   const { data: activeSprintData } = useActiveSprint(projectId);
   const activeSprintId = activeSprintData?.sprint?.id ?? null;
@@ -148,6 +166,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
     ? allIssues.filter((i) => i.parentId === issue?.id)
     : [];
 
+  /* ── Form state ── */
   const [title,       setTitle]       = useState('');
   const [desc,        setDesc]        = useState('');
   const [status,      setStatus]      = useState<IssueStatus>('todo');
@@ -158,16 +177,98 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
   const [parentId,    setParentId]    = useState('');
   const [due,         setDue]         = useState('');
   const [points,      setPoints]      = useState(3);
-  const [labelIds,      setLabelIds]      = useState<string[]>([]);
-  const [titleErr,      setTitleErr]      = useState(false);
-  const [parentErr,     setParentErr]     = useState(false);
-  const [destination,   setDestination]   = useState<Destination>('backlog');
-  const [assigneeOpen,  setAssigneeOpen]  = useState(false);
-  const [parentSearch,  setParentSearch]  = useState('');
-  const assigneeRef    = useRef<HTMLDivElement>(null);
-  const { data: projectLabels = [] }  = useLabels(projectId);
+  const [labelIds,    setLabelIds]    = useState<string[]>([]);
+  const [titleErr,    setTitleErr]    = useState(false);
+  const [parentErr,   setParentErr]   = useState(false);
+  const [destination, setDestination] = useState<Destination>('backlog');
+  const [assigneeOpen, setAssigneeOpen] = useState(false);
+  const [parentSearch, setParentSearch] = useState('');
+  const [openDD,       setOpenDD]       = useState<string | null>(null);
+  const assigneeRef = useRef<HTMLDivElement>(null);
+  const { data: projectLabels = [] } = useLabels(projectId);
 
-  /* Close dropdowns on outside click */
+  /* ── Mock AI state ── */
+  const [mockAiLoading,  setMockAiLoading]  = useState(false);
+  const [mockAiShown,    setMockAiShown]    = useState(false);
+  const [expandedCards,  setExpandedCards]  = useState<Set<number>>(new Set());
+  const [appliedCards,   setAppliedCards]   = useState<Set<number>>(new Set());
+  const [dismissedCards, setDismissedCards] = useState<Set<number>>(new Set());
+
+  const mockActiveCount = 4 - appliedCards.size - dismissedCards.size;
+
+  function resetMockAI() {
+    setMockAiShown(false);
+    setMockAiLoading(false);
+    setExpandedCards(new Set());
+    setAppliedCards(new Set());
+    setDismissedCards(new Set());
+  }
+
+  function handleMockAnalyze() {
+    setMockAiLoading(true);
+    setMockAiShown(false);
+    setExpandedCards(new Set());
+    setAppliedCards(new Set());
+    setDismissedCards(new Set());
+    setTimeout(() => {
+      setMockAiLoading(false);
+      setMockAiShown(true);
+    }, 2000);
+  }
+
+  function toggleCard(idx: number) {
+    if (appliedCards.has(idx)) return;
+    setExpandedCards(prev => {
+      const n = new Set(prev);
+      n.has(idx) ? n.delete(idx) : n.add(idx);
+      return n;
+    });
+  }
+
+  function applyMockCard(idx: number) {
+    if (idx === 0) setTitle(MOCK_TITLE_SUGGESTION);
+    if (idx === 1) setDesc(MOCK_DESC_SUGGESTION);
+    if (idx === 2) {
+      const toAdd    = projectLabels.filter(l => MOCK_LABELS_ADD.some(n => l.name.toLowerCase() === n)).map(l => l.id);
+      const toRemove = projectLabels.filter(l => MOCK_LABELS_REMOVE.some(n => l.name.toLowerCase() === n)).map(l => l.id);
+      setLabelIds(prev => [...new Set([...prev.filter(id => !toRemove.includes(id)), ...toAdd])]);
+    }
+    if (idx === 3) {
+      const harsh = members.find(m => m.user.name.toLowerCase().includes('harsh'));
+      if (harsh) setAssigneeId(harsh.user.id);
+    }
+    setAppliedCards(prev => new Set([...prev, idx]));
+    setExpandedCards(prev => { const n = new Set(prev); n.delete(idx); return n; });
+  }
+
+  function dismissMockCard(idx: number) {
+    setDismissedCards(prev => new Set([...prev, idx]));
+    setExpandedCards(prev => { const n = new Set(prev); n.delete(idx); return n; });
+  }
+
+  function applyAllMockCards() {
+    const remaining = [0, 1, 2, 3].filter(i => !appliedCards.has(i) && !dismissedCards.has(i));
+    if (remaining.includes(0)) setTitle(MOCK_TITLE_SUGGESTION);
+    if (remaining.includes(1)) setDesc(MOCK_DESC_SUGGESTION);
+    if (remaining.includes(2)) {
+      const toAdd    = projectLabels.filter(l => MOCK_LABELS_ADD.some(n => l.name.toLowerCase() === n)).map(l => l.id);
+      const toRemove = projectLabels.filter(l => MOCK_LABELS_REMOVE.some(n => l.name.toLowerCase() === n)).map(l => l.id);
+      setLabelIds(prev => [...new Set([...prev.filter(id => !toRemove.includes(id)), ...toAdd])]);
+    }
+    if (remaining.includes(3)) {
+      const harsh = members.find(m => m.user.name.toLowerCase().includes('harsh'));
+      if (harsh) setAssigneeId(harsh.user.id);
+    }
+    setAppliedCards(new Set([0, 1, 2, 3].filter(i => !dismissedCards.has(i))));
+    setExpandedCards(new Set());
+  }
+
+  function toggleDD(id: string) {
+    setOpenDD(prev => prev === id ? null : id);
+    if (assigneeOpen) setAssigneeOpen(false);
+  }
+
+  /* Close assignee dropdown on outside click */
   useEffect(() => {
     if (!assigneeOpen) return;
     function handleClick(e: MouseEvent) {
@@ -177,8 +278,17 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
     return () => document.removeEventListener('mousedown', handleClick);
   }, [assigneeOpen]);
 
+  /* Close right-column dropdowns on outside click */
+  useEffect(() => {
+    if (!openDD) return;
+    function handleClick(e: MouseEvent) {
+      if (!(e.target as Element).closest('.im-dd-wrap')) setOpenDD(null);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [openDD]);
 
-  useEffect(() => { clearAI(); }, [issue?.id, isOpen]);
+  useEffect(() => { resetMockAI(); }, [issue?.id, isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -196,6 +306,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
     setTitleErr(false);
     setParentErr(false);
     setParentSearch('');
+    setOpenDD(null);
     if (issue?.sprintId) setDestination('sprint');
     else setDestination('backlog');
   }, [issue, isOpen]);
@@ -203,9 +314,8 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
   function close() { onClose(); }
 
   function invalidateAndClose() {
-    // Refresh every query that could show stale data after an issue change
     qc.invalidateQueries({ queryKey: ['issues',  projectId] });
-    qc.invalidateQueries({ queryKey: ['sprints', projectId] }); // covers active-sprint + sprint list
+    qc.invalidateQueries({ queryKey: ['sprints', projectId] });
     close();
   }
 
@@ -255,26 +365,25 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
 
   const isPending = createMut.isPending || updateMut.isPending;
 
-  /* Dirty check — compare every field against the original issue */
   const isDirty = isEdit ? (() => {
     if (!issue) return false;
     const origDestination = issue.sprintId ? 'sprint' : 'backlog';
     const origLabels = [...(issue.labelIds ?? [])].sort().join(',');
     const currLabels  = [...labelIds].sort().join(',');
     return (
-      title       !== (issue.title        ?? '')        ||
-      desc        !== (issue.description  ?? '')        ||
-      status      !== (issue.status       ?? 'todo')    ||
-      priority    !== (issue.priority     ?? 'medium')  ||
-      issueType   !== (issue.issueType    ?? 'task')    ||
-      assigneeId  !== (issue.assigneeId   ?? '')        ||
-      parentId    !== (issue.parentId     ?? '')        ||
-      due         !== (issue.due          ?? '')        ||
-      points      !== (issue.storyPoints  ?? 3)         ||
-      destination !== origDestination                   ||
+      title       !== (issue.title        ?? '')       ||
+      desc        !== (issue.description  ?? '')       ||
+      status      !== (issue.status       ?? 'todo')   ||
+      priority    !== (issue.priority     ?? 'medium') ||
+      issueType   !== (issue.issueType    ?? 'task')   ||
+      assigneeId  !== (issue.assigneeId   ?? '')       ||
+      parentId    !== (issue.parentId     ?? '')       ||
+      due         !== (issue.due          ?? '')       ||
+      points      !== (issue.storyPoints  ?? 3)        ||
+      destination !== origDestination                  ||
       currLabels  !== origLabels
     );
-  })() : true; // create mode is always "dirty"
+  })() : true;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -304,8 +413,6 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
     ? issue!.id.slice(0, 8).toUpperCase()
     : null;
 
-
-  /* helper: initials avatar */
   function Initials({ name }: { name: string }) {
     const parts = name.trim().split(' ');
     const ini = (parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '');
@@ -316,6 +423,53 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
     );
   }
 
+  /* ── Suggestion card helper ── */
+  function SuggCard({
+    idx, iconBg, icon, cardTitle, preview, body, applyLabel, dismissLabel,
+  }: {
+    idx: number;
+    iconBg: string;
+    icon: React.ReactNode;
+    cardTitle: string;
+    preview: string;
+    body: React.ReactNode;
+    applyLabel: string;
+    dismissLabel: string;
+  }) {
+    const applied   = appliedCards.has(idx);
+    const expanded  = expandedCards.has(idx);
+    return (
+      <div className="im-sugg-card">
+        <div
+          className={`im-sugg-card-hdr${applied ? ' im-sugg-card-applied' : ''}`}
+          onClick={() => toggleCard(idx)}
+        >
+          <div className="im-sugg-icon" style={{ background: iconBg }}>{icon}</div>
+          <div className="im-sugg-info">
+            <div className="im-sugg-title">{cardTitle}</div>
+            <div className="im-sugg-preview">{preview}</div>
+          </div>
+          {applied
+            ? <span className="im-sugg-applied-badge">✓ Applied</span>
+            : <ChevronIcon open={expanded} />
+          }
+        </div>
+        {expanded && !applied && (
+          <div className="im-sugg-body">
+            {body}
+            <div className="im-sugg-footer">
+              <button className="im-sugg-dismiss-btn" onClick={() => dismissMockCard(idx)}>{dismissLabel}</button>
+              <button className="im-sugg-apply-btn"   onClick={() => applyMockCard(idx)}>{applyLabel}</button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  /* ── Current labels for display ── */
+  const currentLabelNames = projectLabels.filter(l => labelIds.includes(l.id)).map(l => l.name);
+
   return (
     <div className="kb-modal-overlay" onClick={handleOverlay}>
       <div className="kb-modal-wide bb-modal-animate im-modal">
@@ -323,26 +477,8 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
         {/* ── Header ── */}
         <div className="im-header">
           <div className="im-header-left">
-            {/* Type badge */}
             <span className="im-type-badge">
-              {issueType === 'task' && (
-                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                  <rect x="1" y="1" width="11" height="11" rx="2" stroke="#A32E0E" strokeWidth="1.3"/>
-                  <path d="M4 6.5l2 2 3-3" stroke="#A32E0E" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              )}
-              {issueType === 'subtask' && (
-                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                  <circle cx="6.5" cy="6.5" r="5.5" stroke="#A32E0E" strokeWidth="1.3"/>
-                  <circle cx="6.5" cy="6.5" r="2" stroke="#A32E0E" strokeWidth="1.3"/>
-                </svg>
-              )}
-              {issueType === 'bug' && (
-                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                  <path d="M6.5 1.5L12.5 12.5H.5L6.5 1.5Z" stroke="#A32E0E" strokeWidth="1.3" strokeLinejoin="round"/>
-                  <path d="M6.5 5.5v3M6.5 10v.5" stroke="#A32E0E" strokeWidth="1.3" strokeLinecap="round"/>
-                </svg>
-              )}
+              <TypeIcon type={issueType} active />
               {TYPE_LABELS[issueType]}
             </span>
             {issueKey && <span className="im-issue-key">{issueKey}</span>}
@@ -383,7 +519,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
 
               {/* Title */}
               <div className="im-section">
-                <div className="im-section-label">Title <span style={{ color: '#DE350B' }}>*</span></div>
+                <span className="im-fl">Title <span style={{ color: '#DE350B' }}>*</span></span>
                 <div className="im-title-wrap">
                   <textarea
                     className={`im-title-input${titleErr ? ' kb-input-error' : ''}`}
@@ -397,9 +533,9 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                 </div>
               </div>
 
-              {/* Description */}
+              {/* Description + AI suggestions panel */}
               <div className="im-section">
-                <div className="im-section-label">Description</div>
+                <span className="im-fl">Description</span>
                 <textarea
                   className="kb-input im-desc"
                   placeholder="Add details, steps to reproduce, acceptance criteria…"
@@ -407,83 +543,227 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                   disabled={!canEdit || isReadOnly}
                   onChange={(e) => setDesc(e.target.value)}
                 />
+
+                {/* ── AI Suggestions Panel ── */}
+                {mockAiShown && (
+                  <div className="im-sugg-container">
+                    {/* Header */}
+                    <div className="im-sugg-hdr">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                        <span className="im-sugg-hdr-title">AI suggestions</span>
+                        <span className="im-sugg-count-badge">{mockActiveCount} suggestion{mockActiveCount !== 1 ? 's' : ''}</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="im-sugg-apply-all-btn"
+                        disabled={mockActiveCount === 0}
+                        onClick={applyAllMockCards}
+                      >
+                        Apply all →
+                      </button>
+                    </div>
+
+                    {/* Cards */}
+                    <div className="im-sugg-cards">
+
+                      {/* Card 0 — Title */}
+                      {!dismissedCards.has(0) && (
+                        <SuggCard
+                          idx={0}
+                          iconBg="#FAECE7"
+                          cardTitle="Sharpen the title"
+                          preview={MOCK_TITLE_SUGGESTION}
+                          applyLabel="Apply →"
+                          dismissLabel="Dismiss"
+                          icon={
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="#D85A30" strokeWidth="2" strokeLinecap="round"/>
+                              <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="#D85A30" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          }
+                          body={
+                            <div className="im-sugg-diff">
+                              <div className="im-diff-row im-diff-was">
+                                <span className="im-diff-pill im-diff-pill-was">Was</span>
+                                <span className="im-diff-was-text">{title || '(empty)'}</span>
+                              </div>
+                              <div className="im-diff-row im-diff-now">
+                                <span className="im-diff-pill im-diff-pill-now">Now</span>
+                                <span className="im-diff-now-text">{MOCK_TITLE_SUGGESTION}</span>
+                              </div>
+                            </div>
+                          }
+                        />
+                      )}
+
+                      {/* Card 1 — Description */}
+                      {!dismissedCards.has(1) && (
+                        <SuggCard
+                          idx={1}
+                          iconBg="#E6F1FB"
+                          cardTitle="Expand description"
+                          preview="Add acceptance criteria, edge cases and expected behaviour"
+                          applyLabel="Apply →"
+                          dismissLabel="Keep mine"
+                          icon={
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                              <path d="M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7.5L14.5 2z" stroke="#185FA5" strokeWidth="2" strokeLinejoin="round"/>
+                              <polyline points="14,2 14,8 20,8" stroke="#185FA5" strokeWidth="2" strokeLinejoin="round"/>
+                            </svg>
+                          }
+                          body={
+                            <div className="im-sugg-diff">
+                              <div className="im-diff-pane im-diff-pane-was">
+                                <span className="im-diff-pane-label">Your version</span>
+                                <p className="im-diff-pane-text im-diff-was-text">{desc || '(empty)'}</p>
+                              </div>
+                              <div className="im-diff-pane im-diff-pane-now">
+                                <span className="im-diff-pane-label">AI expanded</span>
+                                <p className="im-diff-pane-text" style={{ whiteSpace: 'pre-line' }}>{MOCK_DESC_SUGGESTION}</p>
+                              </div>
+                            </div>
+                          }
+                        />
+                      )}
+
+                      {/* Card 2 — Labels */}
+                      {!dismissedCards.has(2) && (
+                        <SuggCard
+                          idx={2}
+                          iconBg="#FAEEDA"
+                          cardTitle="Label suggestions"
+                          preview={`Add ${MOCK_LABELS_ADD.join(', ')} · Remove ${MOCK_LABELS_REMOVE.join(', ')}`}
+                          applyLabel="Apply labels"
+                          dismissLabel="Dismiss"
+                          icon={
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                              <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" stroke="#854F0B" strokeWidth="2" strokeLinejoin="round"/>
+                              <line x1="7" y1="7" x2="7.01" y2="7" stroke="#854F0B" strokeWidth="2.5" strokeLinecap="round"/>
+                            </svg>
+                          }
+                          body={
+                            <div className="im-sugg-diff">
+                              <div className="im-diff-label-table">
+                                <div className="im-diff-label-row">
+                                  <span className="im-diff-label-key">Currently</span>
+                                  <div className="im-diff-chips">
+                                    {currentLabelNames.length > 0
+                                      ? currentLabelNames.map(n => <span key={n} className="im-diff-chip">{n}</span>)
+                                      : <span style={{ fontSize: 11, color: 'var(--kb-field-label)' }}>No labels</span>
+                                    }
+                                  </div>
+                                </div>
+                                <div className="im-diff-label-row">
+                                  <span className="im-diff-label-key">After AI</span>
+                                  <div className="im-diff-chips">
+                                    {currentLabelNames
+                                      .filter(n => !MOCK_LABELS_REMOVE.includes(n.toLowerCase()))
+                                      .map(n => <span key={n} className="im-diff-chip">{n}</span>)
+                                    }
+                                    {MOCK_LABELS_ADD.map(n => (
+                                      <span key={n} className="im-diff-chip im-diff-chip-add">+ {n}</span>
+                                    ))}
+                                    {currentLabelNames
+                                      .filter(n => MOCK_LABELS_REMOVE.includes(n.toLowerCase()))
+                                      .map(n => <span key={n} className="im-diff-chip im-diff-chip-remove">− {n}</span>)
+                                    }
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          }
+                        />
+                      )}
+
+                      {/* Card 3 — Assignee */}
+                      {!dismissedCards.has(3) && (
+                        <SuggCard
+                          idx={3}
+                          iconBg="#E1F5EE"
+                          cardTitle="Assignee suggestion"
+                          preview="Suggest Harsh Malik — 1 open ticket, available"
+                          applyLabel="Assign to Harsh"
+                          dismissLabel="Dismiss"
+                          icon={
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="#0F6E56" strokeWidth="2" strokeLinecap="round"/>
+                              <circle cx="9" cy="7" r="4" stroke="#0F6E56" strokeWidth="2"/>
+                            </svg>
+                          }
+                          body={
+                            <div className="im-sugg-diff">
+                              <div className="im-diff-assignee-table">
+                                {/* Not recommended — current assignee */}
+                                <div className="im-diff-assignee-row">
+                                  <span className="im-diff-person-av" style={{ background: '#D85A30' }}>PP</span>
+                                  <div className="im-diff-person-info">
+                                    <div className="im-diff-person-top">
+                                      <span className="im-diff-person-name">Prashant Poonia</span>
+                                      <span className="im-diff-badge im-diff-badge-warn">2 high priority open</span>
+                                    </div>
+                                    <span className="im-diff-person-reason">Not recommended — already at capacity this sprint</span>
+                                  </div>
+                                </div>
+                                {/* Recommended */}
+                                <div className="im-diff-assignee-row im-diff-assignee-rec">
+                                  <span className="im-diff-person-av" style={{ background: '#378ADD' }}>HM</span>
+                                  <div className="im-diff-person-info">
+                                    <div className="im-diff-person-top">
+                                      <span className="im-diff-person-name">Harsh Malik</span>
+                                      <span className="im-diff-badge im-diff-badge-ok">1 open, available</span>
+                                    </div>
+                                    <span className="im-diff-person-reason">✓ Recommended — has bandwidth, familiar with this module</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          }
+                        />
+                      )}
+
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* AI analyze — available in both create and edit mode */}
+              {/* Analyze with AI button */}
               {canAI && !isReadOnly && (
                 <div className="im-section">
-                  {!aiResult && (
-                    <button
-                      type="button"
-                      disabled={aiLoading || (!isEdit && (!title.trim() || !desc.trim()))}
-                      className="im-ai-btn"
-                      onClick={() => {
-                        if (isEdit) {
-                          analyze(issue!.id);
-                        } else {
-                          const labelNames = projectLabels
-                            .filter((l) => labelIds.includes(l.id))
-                            .map((l) => l.name);
-                          analyzeDraft({
-                            title,
-                            description: desc,
-                            labels: labelNames,
-                            project_id: projectId,
-                          });
-                        }
-                      }}
-                    >
-                      {aiLoading ? (
-                        <>
-                          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ animation: 'spin 1s linear infinite' }}>
-                            <circle cx="8" cy="8" r="6" stroke="#A32E0E" strokeWidth="2" strokeDasharray="20 18"/>
-                          </svg>
-                          Analyzing…
-                        </>
-                      ) : (
-                        <>
-                          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                            <circle cx="6.5" cy="6.5" r="5.5" stroke="#A32E0E" strokeWidth="1.3"/>
-                            <path d="M4 7l2 2 3-3" stroke="#A32E0E" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                          Analyze with AI
-                        </>
-                      )}
-                    </button>
-                  )}
-                  {!isEdit && (!title.trim() || !desc.trim()) && !aiResult && (
-                    <p style={{ fontSize: 11, color: 'var(--bb-text-muted)', marginTop: 4 }}>
-                      {!title.trim()
-                        ? 'Add a title and description to enable AI analysis'
-                        : 'Add a description for better AI results'}
+                  <button
+                    type="button"
+                    disabled={mockAiLoading || (!isEdit && (!title.trim() || !desc.trim()))}
+                    className="im-ai-btn"
+                    onClick={handleMockAnalyze}
+                  >
+                    {mockAiLoading ? (
+                      <>
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ animation: 'spin 1s linear infinite' }}>
+                          <circle cx="8" cy="8" r="6" stroke="#A32E0E" strokeWidth="2" strokeDasharray="20 18"/>
+                        </svg>
+                        Analyzing<span className="im-ai-dots"><span>.</span><span>.</span><span>.</span></span>
+                      </>
+                    ) : mockAiShown ? (
+                      <>
+                        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                          <circle cx="6.5" cy="6.5" r="5.5" stroke="#A32E0E" strokeWidth="1.3"/>
+                          <path d="M4 7l2 2 3-3" stroke="#A32E0E" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        Re-analyze
+                      </>
+                    ) : (
+                      <>
+                        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                          <circle cx="6.5" cy="6.5" r="5.5" stroke="#A32E0E" strokeWidth="1.3"/>
+                          <path d="M4 7l2 2 3-3" stroke="#A32E0E" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        Analyze with AI
+                      </>
+                    )}
+                  </button>
+                  {!isEdit && (!title.trim() || !desc.trim()) && !mockAiShown && !mockAiLoading && (
+                    <p style={{ fontSize: 11, color: 'var(--kb-field-label)', marginTop: 2 }}>
+                      {!title.trim() ? 'Add a title and description to enable AI analysis' : 'Add a description for better AI results'}
                     </p>
-                  )}
-                  {aiError && (
-                    <div className="im-ai-error">
-                      <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-                        <circle cx="7" cy="7" r="5.5" stroke="#DC2626" strokeWidth="1.3"/>
-                        <path d="M7 4.5v3M7 9.5v.5" stroke="#DC2626" strokeWidth="1.3" strokeLinecap="round"/>
-                      </svg>
-                      {aiError}
-                      <button type="button" className="im-ai-retry" onClick={() => {
-                        if (isEdit) {
-                          analyze(issue!.id);
-                        } else {
-                          const labelNames = projectLabels
-                            .filter((l) => labelIds.includes(l.id))
-                            .map((l) => l.name);
-                          analyzeDraft({ title, description: desc, labels: labelNames, project_id: projectId });
-                        }
-                      }}>Retry</button>
-                    </div>
-                  )}
-                  {aiResult && (
-                    <AIAnalysisPanel
-                      result={aiResult}
-                      onApplyPoints={(pts) => setPoints(pts)}
-                      onApplyAssignee={(user: RecommendedUser) => setAssigneeId(user.id)}
-                      onClose={clearAI}
-                    />
                   )}
                 </div>
               )}
@@ -491,7 +771,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
               {/* Location / Destination */}
               {(!isEdit || (isEdit && !isReadOnly)) && (
                 <div className="im-section">
-                  <div className="im-section-label">{isEdit ? 'Location' : 'Add to'}</div>
+                  <span className="im-fl">{isEdit ? 'Location' : 'Add to'}</span>
                   <div className="im-dest-row">
                     <label className={`im-dest-pill${destination === 'backlog' ? ' im-dest-active' : ''}`}>
                       <input type="radio" name="destination" value="backlog" checked={destination === 'backlog'} disabled={isReadOnly} onChange={() => setDestination('backlog')} />
@@ -518,122 +798,117 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
 
             </div>
 
-            {/* ═══ DIVIDER ═══ */}
-            <div className="im-col-divider" />
-
             {/* ═══ RIGHT — properties ═══ */}
             <div className="im-col-props">
 
-              {/* STATUS */}
+              {/* STATUS — edit only */}
               {isEdit && (
-                <div className="im-props-section">
-                  <div className="im-field-heading">
-                    <IcoStatus /> Status
-                  </div>
-                  <div className="im-status-grid">
-                    {KANBAN_COLUMNS.map((col) => {
-                      const cfg = STATUS_CONFIG[col.id] ?? STATUS_CONFIG['todo'];
-                      const active = status === col.id;
-                      return (
-                        <button
-                          key={col.id}
-                          type="button"
-                          disabled={!canEdit || isReadOnly}
-                          onClick={() => setStatus(col.id as IssueStatus)}
-                          className={`im-status-grid-chip${active ? ' im-active' : ''}`}
+                <div className="im-srow">
+                  <div className="im-sl">Status</div>
+                  <div className="im-dd-wrap">
+                    <button className="im-ddt" type="button" onClick={() => toggleDD('status')} disabled={!canEdit || isReadOnly}>
+                      <div className="im-ddl">
+                        <StatusDot status={status} />
+                        <span>{STATUS_CONFIG[status]?.label ?? 'To Do'}</span>
+                      </div>
+                      <ChevronIcon open={openDD === 'status'} />
+                    </button>
+                    {openDD === 'status' && (
+                      <div className="im-ddm">
+                        {KANBAN_COLUMNS.map(col => (
+                          <div
+                            key={col.id}
+                            className={`im-ddi${status === col.id ? ' im-ddi-sel' : ''}`}
+                            onClick={() => { setStatus(col.id as IssueStatus); setOpenDD(null); }}
+                          >
+                            <StatusDot status={col.id} />
+                            {STATUS_CONFIG[col.id]?.label ?? col.label}
+                          </div>
+                        ))}
+                        <div className="im-ddi-sep" />
+                        <div
+                          className={`im-ddi${status === 'cancelled' ? ' im-ddi-sel' : ''}`}
+                          onClick={() => { setStatus('cancelled' as IssueStatus); setOpenDD(null); }}
                         >
-                          <span className="im-status-dot" style={{ background: cfg.dot }} />
-                          {col.label}
-                        </button>
-                      );
-                    })}
+                          <StatusDot status="cancelled" />
+                          Cancelled
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
 
-              {/* TYPE */}
-              <div className="im-props-section">
-                <div className="im-field-heading">
-                  <IcoType /> Issue Type
-                </div>
-                <div className="im-type-list">
-                  {ISSUE_TYPES.map((t) => {
-                    const active = issueType === t;
-                    const disabled = !canEdit || isReadOnly;
-                    return (
-                      <button
-                        key={t} type="button"
-                        disabled={disabled}
-                        className={`im-type-item${active ? ' im-active' : ''}`}
-                        onClick={() => {
-                          if (disabled) return;
-                          setIssueType(t);
-                          setParentErr(false);
-                          if (t !== 'subtask') setParentId('');
-                        }}
-                      >
-                        {t === 'task' && (
-                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                            <rect x="1" y="1" width="12" height="12" rx="2" stroke={active ? '#A32E0E' : '#6B778C'} strokeWidth="1.3"/>
-                            <path d="M4 7l2 2 3-3" stroke={active ? '#A32E0E' : '#6B778C'} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        )}
-                        {t === 'subtask' && (
-                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                            <circle cx="7" cy="7" r="5.5" stroke={active ? '#A32E0E' : '#6B778C'} strokeWidth="1.3"/>
-                            <circle cx="7" cy="7" r="2" stroke={active ? '#A32E0E' : '#6B778C'} strokeWidth="1.3"/>
-                          </svg>
-                        )}
-                        {t === 'bug' && (
-                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                            <path d="M7 1.5L13 12.5H1L7 1.5Z" stroke={active ? '#A32E0E' : '#DE350B'} strokeWidth="1.3" strokeLinejoin="round"/>
-                            <path d="M7 5.5v3M7 10v.5" stroke={active ? '#A32E0E' : '#DE350B'} strokeWidth="1.3" strokeLinecap="round"/>
-                          </svg>
-                        )}
-                        <span className="im-type-item-name">{TYPE_LABELS[t]}</span>
-                        <span className="im-type-item-desc">
-                          {t === 'task' ? 'work item' : t === 'subtask' ? 'child issue' : 'defect'}
-                        </span>
-                      </button>
-                    );
-                  })}
+              {/* ISSUE TYPE */}
+              <div className="im-srow">
+                <div className="im-sl">Issue type</div>
+                <div className="im-dd-wrap">
+                  <button className="im-ddt" type="button" onClick={() => toggleDD('type')} disabled={!canEdit || isReadOnly}>
+                    <div className="im-ddl">
+                      <TypeIcon type={issueType} active />
+                      <span>{TYPE_LABELS[issueType]}</span>
+                    </div>
+                    <ChevronIcon open={openDD === 'type'} />
+                  </button>
+                  {openDD === 'type' && (
+                    <div className="im-ddm">
+                      {ISSUE_TYPES.map(t => (
+                        <div
+                          key={t}
+                          className={`im-ddi${issueType === t ? ' im-ddi-sel' : ''}`}
+                          onClick={() => {
+                            setIssueType(t);
+                            setParentErr(false);
+                            if (t !== 'subtask') setParentId('');
+                            setOpenDD(null);
+                          }}
+                        >
+                          <TypeIcon type={t} active={issueType === t} />
+                          {TYPE_LABELS[t]}
+                          <span className="im-ddi-sub">
+                            {t === 'task' ? 'work item' : t === 'subtask' ? 'child issue' : 'defect'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* PRIORITY */}
-              <div className="im-props-section">
-                <div className="im-field-heading">
-                  <IcoPriority /> Priority
-                </div>
-                <div className="im-priority-grid">
-                  {PRIORITIES.map((p) => {
-                    const pc = PRIORITY_COLOR[p];
-                    const active = priority === p;
-                    const disabled = !canEdit || isReadOnly;
-                    return (
-                      <button
-                        key={p} type="button"
-                        disabled={disabled}
-                        className={`im-priority-chip${active ? ' im-active' : ''}`}
-                        style={{ color: pc.text }}
-                        onClick={() => { if (!disabled) setPriority(p); }}
-                      >
-                        <span className="im-prio-dot" style={{ background: pc.dot }} />
-                        <span>{PRIORITY_LABELS[p]}</span>
-                      </button>
-                    );
-                  })}
+              <div className="im-srow">
+                <div className="im-sl">Priority</div>
+                <div className="im-dd-wrap">
+                  <button className="im-ddt" type="button" onClick={() => toggleDD('priority')} disabled={!canEdit || isReadOnly}>
+                    <div className="im-ddl">
+                      <PriorityIcon priority={priority} />
+                      <span>{PRIORITY_LABELS[priority]}</span>
+                    </div>
+                    <ChevronIcon open={openDD === 'priority'} />
+                  </button>
+                  {openDD === 'priority' && (
+                    <div className="im-ddm">
+                      {PRIORITIES.map(p => (
+                        <div
+                          key={p}
+                          className={`im-ddi${priority === p ? ' im-ddi-sel' : ''}`}
+                          onClick={() => { setPriority(p); setOpenDD(null); }}
+                        >
+                          <PriorityIcon priority={p} />
+                          {PRIORITY_LABELS[p]}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* PEOPLE */}
-              <div className="im-props-section">
-                <div className="im-field-heading"><IcoAssignee /> People</div>
-
-                {/* Assignee — custom picker */}
-                <div className="im-prop-row">
-                  <span className="im-prop-label"><IcoAssignee /> Assignee</span>
-                  <div className="im-assignee-picker" ref={assigneeRef}>
+              <div className="im-srow">
+                <div className="im-sl">People</div>
+                <div className="im-prow">
+                  <span className="im-plbl">Assignee</span>
+                  <div className="im-assignee-picker" ref={assigneeRef} style={{ flex: 1, minWidth: 0 }}>
                     <button
                       type="button"
                       className={`im-assignee-trigger${assigneeOpen ? ' im-assignee-trigger-open' : ''}`}
@@ -666,7 +941,6 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
 
                     {assigneeOpen && (
                       <div className="im-assignee-dropdown">
-                        {/* Unassign option */}
                         <button
                           type="button"
                           className={`im-assignee-option${!assigneeId ? ' im-assignee-option-active' : ''}`}
@@ -687,9 +961,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                             </svg>
                           )}
                         </button>
-
                         {members.length > 0 && <div className="im-assignee-sep" />}
-
                         {members.map((m) => {
                           const active = assigneeId === m.user.id;
                           const role = (m as any).role ?? '';
@@ -717,48 +989,19 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                     )}
                   </div>
                 </div>
-
-                {/* Reporter */}
-                <div className="im-prop-row">
-                  <span className="im-prop-label"><IcoReporter /> Reporter</span>
-                  <div className="im-reporter-val">
+                <div className="im-prow" style={{ marginTop: 5 }}>
+                  <span className="im-plbl">Reporter</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
                     <Initials name={reporterName} />
-                    <span>{reporterName}</span>
+                    <span className="im-pname">{reporterName}</span>
                   </div>
-                </div>
-              </div>
-
-              {/* STORY POINTS + DUE DATE */}
-              <div className="im-props-section">
-                <div className="im-field-heading"><IcoPoints /> Details</div>
-                <div className="im-prop-row">
-                  <span className="im-prop-label"><IcoPoints /> Story pts</span>
-                  <input
-                    type="number" min={1} max={13}
-                    className="im-prop-input"
-                    value={points}
-                    disabled={!canEdit || isReadOnly}
-                    onChange={(e) => setPoints(Number(e.target.value))}
-                  />
-                </div>
-                <div className="im-prop-row">
-                  <span className="im-prop-label"><IcoDue /> Due date</span>
-                  <input
-                    type="date"
-                    className="im-prop-input"
-                    value={due}
-                    disabled={!canEdit || isReadOnly}
-                    onChange={(e) => setDue(e.target.value)}
-                  />
                 </div>
               </div>
 
               {/* LABELS */}
               {projectLabels.length > 0 && (
-                <div className="im-props-section">
-                  <div className="im-field-heading">
-                    <IcoLabel /> Labels
-                  </div>
+                <div className="im-srow">
+                  <div className="im-sl">Labels</div>
                   <div className="im-labels-wrap">
                     {projectLabels.map((lbl) => {
                       const selected = labelIds.includes(lbl.id);
@@ -792,14 +1035,26 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                 </div>
               )}
 
+              {/* STORY POINTS */}
+              <div className="im-srow">
+                <div className="im-sl">Story points</div>
+                <input
+                  type="number" min={1} max={13}
+                  className="im-pts-inp"
+                  value={points}
+                  disabled={!canEdit || isReadOnly}
+                  onChange={(e) => setPoints(Number(e.target.value))}
+                />
+                <div className="im-pts-note">Set by team during sprint planning</div>
+              </div>
+
               {/* PARENT ISSUE — subtask only */}
               {issueType === 'subtask' && (
-                <div className="im-props-section">
-                  <div className="im-field-heading">
-                    <IcoParent /> Parent Issue <span className="kb-required" style={{ marginLeft: 2 }}>*</span>
+                <div className="im-srow">
+                  <div className="im-sl">
+                    Parent issue <span style={{ color: '#DE350B', textTransform: 'none', letterSpacing: 0 }}>*</span>
                   </div>
 
-                  {/* Selected parent display */}
                   {parentId && (() => {
                     const p = allIssues.find((i) => i.id === parentId);
                     if (!p) return null;
@@ -815,24 +1070,14 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                           {TYPE_LABELS[p.issueType as IssueType]}
                         </span>
                         {(!isReadOnly && canEdit) && (
-                          <button
-                            type="button"
-                            className="im-parent-clear"
-                            onClick={() => setParentId('')}
-                            title="Clear parent"
-                          >
+                          <button type="button" className="im-parent-clear" onClick={() => setParentId('')} title="Clear parent">
                             <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
                               <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
                             </svg>
                           </button>
                         )}
                         {isEdit && onNavigate && (
-                          <button
-                            type="button"
-                            className="im-goto-parent"
-                            onClick={() => { close(); onNavigate(p); }}
-                            title="Open parent"
-                          >
+                          <button type="button" className="im-goto-parent" onClick={() => { close(); onNavigate(p); }} title="Open parent">
                             <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
                               <path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
                             </svg>
@@ -843,10 +1088,8 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                     );
                   })()}
 
-                  {/* Inline search + list — always visible when no parent selected or editing */}
                   {(!parentId || !isReadOnly) && canEdit && !isReadOnly && (
                     <div className={`im-parent-panel${parentErr ? ' im-parent-panel-err' : ''}`}>
-                      {/* Search */}
                       <div className="im-parent-search-wrap">
                         <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
                           <circle cx="6" cy="6" r="4" stroke="currentColor" strokeWidth="1.4"/>
@@ -859,8 +1102,6 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                           onChange={(e) => setParentSearch(e.target.value)}
                         />
                       </div>
-
-                      {/* Issue list */}
                       <div className="im-parent-list">
                         {parentCandidates
                           .filter((i) =>
@@ -904,20 +1145,16 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                       </div>
                     </div>
                   )}
-
                   {parentErr && <span className="im-field-err">Parent issue is required.</span>}
                 </div>
               )}
 
               {/* SUBTASKS */}
               {subtasks.length > 0 && (
-                <div className="im-props-section">
-                  <div className="im-field-heading">
-                    <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-                      <path d="M3 3h8M3 7h6M3 11h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-                    </svg>
+                <div className="im-srow">
+                  <div className="im-sl">
                     Subtasks
-                    <span className="im-subtask-progress">
+                    <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, fontSize: 10, color: 'var(--kb-field-label)' }}>
                       {subtasks.filter((s) => s.status === 'done').length}/{subtasks.length} done
                     </span>
                   </div>
