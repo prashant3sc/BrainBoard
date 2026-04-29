@@ -149,9 +149,7 @@ export function IssueCard({ issue, index, members, onClick }: Props) {
           {/* Footer: id | subtasks + date + avatar */}
           <div className="kb-card-meta">
             <span className="kb-card-id">
-              {issue.id.startsWith('issue-')
-                ? `BB-${issue.id.replace('issue-', '')}`
-                : issue.id.slice(0, 8).toUpperCase()}
+              {issue.ticketId ?? issue.id.slice(0, 8).toUpperCase()}
             </span>
 
             <div className="kb-card-footer-right">

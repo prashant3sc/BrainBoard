@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { projectsApi } from '@/api/projects';
 import { useProjectMembers } from '@/features/projects/useProjects';
@@ -45,6 +45,20 @@ export function KanbanPage() {
     );
   }
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
+  const [searchParams, setSearchParams]   = useSearchParams();
+
+  // Deep-link: ?issue=<uuid> opens the modal for that issue
+  useEffect(() => {
+    const issueId = searchParams.get('issue');
+    if (issueId && allIssues.length > 0) {
+      const found = allIssues.find((i) => i.id === issueId);
+      if (found) {
+        setSelectedIssue(found);
+        setModalOpen(true);
+        setSearchParams({}, { replace: true });
+      }
+    }
+  }, [searchParams, allIssues]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: project } = useQuery({
     queryKey: ['project', projectId],

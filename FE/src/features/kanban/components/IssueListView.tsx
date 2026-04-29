@@ -195,9 +195,7 @@ export function IssueListView({ issues, members, isLoading, searchQuery, assigne
               const prio    = PRIORITY_STYLE[issue.priority];
               const typeS   = issue.issueType ? TYPE_STYLE[issue.issueType] : null;
               const overdue = issue.due && issue.status !== 'done' && isOverdue(issue.due);
-              const shortId = issue.id.startsWith('issue-')
-                ? `BB-${issue.id.replace('issue-', '')}`
-                : issue.id.slice(0, 8).toUpperCase();
+              const shortId = issue.ticketId ?? issue.id.slice(0, 8).toUpperCase();
 
               return (
                 <div key={issue.id} className="kbl-row" onClick={() => onIssueClick(issue)}>

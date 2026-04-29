@@ -29,8 +29,11 @@ function SleepingKanbanCanvas() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    const ctxOrNull = canvas.getContext('2d');
+    if (!ctxOrNull) return;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const _ctx = ctxOrNull!;
+    const _canvas = canvas;
 
     let t = 0;
     let rafId: number;
@@ -41,27 +44,27 @@ function SleepingKanbanCanvas() {
         const strokeAlpha = Math.min(1, breath + 0.35);
         const fillAlpha   = breath * 0.45;
 
-        ctx.strokeStyle = `rgba(99,115,140,${strokeAlpha})`;
-        ctx.lineWidth   = 1.5;
+        _ctx.strokeStyle = `rgba(99,115,140,${strokeAlpha})`;
+        _ctx.lineWidth   = 1.5;
 
         /* Rounded column outline */
-        ctx.beginPath();
-        ctx.roundRect(col.x * PS, COL_Y * PS, col.width * PS, COL_HEIGHT * PS, 3);
-        ctx.stroke();
+        _ctx.beginPath();
+        _ctx.roundRect(col.x * PS, COL_Y * PS, col.width * PS, COL_HEIGHT * PS, 3);
+        _ctx.stroke();
 
         /* Rounded card placeholders */
-        ctx.fillStyle = `rgba(99,115,140,${fillAlpha})`;
+        _ctx.fillStyle = `rgba(99,115,140,${fillAlpha})`;
         const cardW = col.width * PS - 6;
         const cardH = PS * 4;
         const cardX = col.x * PS + 3;
 
-        ctx.beginPath();
-        ctx.roundRect(cardX, 7  * PS, cardW, cardH, 2);
-        ctx.fill();
+        _ctx.beginPath();
+        _ctx.roundRect(cardX, 7  * PS, cardW, cardH, 2);
+        _ctx.fill();
 
-        ctx.beginPath();
-        ctx.roundRect(cardX, 14 * PS, cardW, cardH, 2);
-        ctx.fill();
+        _ctx.beginPath();
+        _ctx.roundRect(cardX, 14 * PS, cardW, cardH, 2);
+        _ctx.fill();
       });
     }
 
@@ -75,18 +78,18 @@ function SleepingKanbanCanvas() {
         else if (rise > 10) alpha = ((14 - rise) / 4) * 0.85;
         else                alpha = 0.85;
 
-        ctx.fillStyle = `rgba(231,80,38,${alpha})`;
+        _ctx.fillStyle = `rgba(231,80,38,${alpha})`;
 
         z.pattern.forEach((row, dy) => {
           row.forEach((px, dx) => {
-            if (px) ctx.fillRect((z.xPos + dx) * PS, (drawY + dy) * PS, PS, PS);
+            if (px) _ctx.fillRect((z.xPos + dx) * PS, (drawY + dy) * PS, PS, PS);
           });
         });
       });
     }
 
     function animate() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      _ctx.clearRect(0, 0, _canvas.width, _canvas.height);
       drawColumns();
       drawZzz();
       t++;

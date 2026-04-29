@@ -73,29 +73,38 @@ class IssueListView(APIView):
 
 class IssueDetailView(APIView):
     """
-    GET    /issues/:id
-    PATCH  /issues/:id — edit (admin, pm, developer; developer limited to own/assigned)
-    DELETE /issues/:id — admin, pm only
+    GET    /issues/:id          (uuid or BB-12)
+    PATCH  /issues/:id
+    DELETE /issues/:id
     """
 
     permission_classes = [IsAuthenticated]
 
-    def _get_issue(self, pk):
+    def _get_issue(self, pk=None, ticket_id=None):
+        if ticket_id:
+            # Parse KEY-NUMBER format e.g. "BB-12"
+            import re
+            match = re.match(r'^([A-Z0-9]{1,6})-(\d+)$', ticket_id.upper())
+            if not match:
+                return None
+            key, seq = match.group(1), int(match.group(2))
+            return annotate_issues(
+                Issue.objects.filter(project__key=key, sequence_number=seq)
+            ).first()
         return annotate_issues(Issue.objects.filter(pk=pk)).first()
 
-    def get(self, request, pk):
-        issue = self._get_issue(pk)
+    def get(self, request, pk=None, ticket_id=None):
+        issue = self._get_issue(pk=pk, ticket_id=ticket_id)
         if not issue:
             return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
         return Response(IssueSerializer(issue).data)
 
-    def patch(self, request, pk):
-        issue = self._get_issue(pk)
+    def patch(self, request, pk=None, ticket_id=None):
+        issue = self._get_issue(pk=pk, ticket_id=ticket_id)
         if not issue:
             return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        user = request.user
-        if user.role == "viewer":
+        if request.user.role == "viewer":
             return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
 
         serializer = IssueUpdateSerializer(issue, data=request.data, partial=True)
@@ -104,8 +113,8 @@ class IssueDetailView(APIView):
         issue = serializer.save()
         return Response(IssueSerializer(issue).data)
 
-    def delete(self, request, pk):
-        issue = self._get_issue(pk)
+    def delete(self, request, pk=None, ticket_id=None):
+        issue = self._get_issue(pk=pk, ticket_id=ticket_id)
         if not issue:
             return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
         if not request.user.can_manage_projects:

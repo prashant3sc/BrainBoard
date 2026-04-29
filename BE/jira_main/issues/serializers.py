@@ -18,11 +18,13 @@ class IssueSerializer(serializers.ModelSerializer):
     labelIds     = serializers.PrimaryKeyRelatedField(source="labels", many=True, read_only=True)
     subtaskCount = serializers.SerializerMethodField()
     progress     = serializers.SerializerMethodField()
+    ticketId     = serializers.SerializerMethodField()
 
     class Meta:
         model = Issue
         fields = [
             "id",
+            "ticketId",
             "title",
             "description",
             "status",
@@ -30,6 +32,7 @@ class IssueSerializer(serializers.ModelSerializer):
             "issue_type",
             "story_points",
             "due_date",
+            "sequence_number",
             "assigneeId",
             "reporterId",
             "projectId",
@@ -41,6 +44,9 @@ class IssueSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def get_ticketId(self, instance):
+        return instance.ticket_id
 
     def get_subtaskCount(self, instance):
         if hasattr(instance, "subtask_count"):
@@ -62,11 +68,12 @@ class IssueSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
-        rep["storyPoints"] = rep.pop("story_points")
-        rep["issueType"]   = rep.pop("issue_type")
-        rep["dueDate"]     = rep.pop("due_date")
-        rep["createdAt"]   = rep.pop("created_at")
-        rep["updatedAt"]   = rep.pop("updated_at")
+        rep["storyPoints"]    = rep.pop("story_points")
+        rep["issueType"]      = rep.pop("issue_type")
+        rep["dueDate"]        = rep.pop("due_date")
+        rep["sequenceNumber"] = rep.pop("sequence_number")
+        rep["createdAt"]      = rep.pop("created_at")
+        rep["updatedAt"]      = rep.pop("updated_at")
         return rep
 
 
@@ -107,6 +114,8 @@ class IssueCreateSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        from django.db import transaction
+        from django.db.models import Max
         from projects.models import Project, Sprint
         from users.models import User
 
@@ -122,7 +131,6 @@ class IssueCreateSerializer(serializers.ModelSerializer):
         except Project.DoesNotExist:
             raise serializers.ValidationError({"projectId": "Project not found"})
 
-        # Resolve sprint: use explicit sprintId if provided, otherwise no sprint (backlog)
         sprint = None
         if sprint_id is not None:
             try:
@@ -144,15 +152,27 @@ class IssueCreateSerializer(serializers.ModelSerializer):
             except Issue.DoesNotExist:
                 raise serializers.ValidationError({"parentId": "Parent issue not found."})
 
-        issue = Issue.objects.create(
-            project=project,
-            sprint=sprint,
-            status=Issue.TODO,
-            assignee=assignee,
-            reporter=request.user if request else None,
-            parent=parent,
-            **validated_data,
-        )
+        with transaction.atomic():
+            # Lock all issues for this project to prevent race conditions on sequence_number
+            max_seq = (
+                Issue.objects
+                .select_for_update()
+                .filter(project=project)
+                .aggregate(Max("sequence_number"))["sequence_number__max"]
+            ) or 0
+            sequence_number = max_seq + 1
+
+            issue = Issue.objects.create(
+                project=project,
+                sprint=sprint,
+                status=Issue.TODO,
+                assignee=assignee,
+                reporter=request.user if request else None,
+                parent=parent,
+                sequence_number=sequence_number,
+                **validated_data,
+            )
+
         if label_ids:
             issue.labels.set(Label.objects.filter(pk__in=label_ids, project=project))
         return issue

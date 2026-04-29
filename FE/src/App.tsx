@@ -42,6 +42,7 @@ const WikiPage              = React.lazy(() => import('@/pages/WikiPage'));
 const UserManagementPage    = React.lazy(() => import('@/pages/UserManagementPage'));
 const ProjectSettingsPage   = React.lazy(() => import('@/pages/ProjectSettingsPage'));
 const AnalyticsPage         = React.lazy(() => import('@/pages/AnalyticsPage'));
+const IssuePage             = React.lazy(() => import('@/pages/IssuePage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -120,6 +121,15 @@ export default function App() {
                   <AppShell>
                     <UserManagementPage />
                   </AppShell>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/projects/:projectId/issues/:ticketId"
+              element={
+                <ProtectedRoute>
+                  <IssuePage />
                 </ProtectedRoute>
               }
             />
