@@ -498,6 +498,94 @@ def query_chromadb(
     return results
 
 
+def find_duplicates(
+    title: str,
+    description: str,
+    project_id: str,
+    threshold: float = 0.80,
+    top_k: int = 5,
+    exclude_id: str | None = None,
+) -> list[dict]:
+    """
+    Semantic duplicate detection scoped to a single project.
+
+    Searches ChromaDB for tickets/issues whose embedding is above `threshold`
+    cosine-similarity to the incoming title + description.  Intended to be
+    called while the user is composing a new issue (or editing an existing one,
+    in which case pass the current issue's UUID as `exclude_id` to skip itself).
+
+    Args:
+        title:       Issue title being checked.
+        description: Issue description (first 400 chars used for the query).
+        project_id:  UUID string — restrict search to this project only.
+        threshold:   Minimum relevance score to include (0–1, default 0.80).
+        top_k:       Maximum candidates to fetch from ChromaDB before filtering.
+        exclude_id:  ticket_id / issue_id to skip (e.g. the issue being edited).
+
+    Returns:
+        List of dicts sorted by score descending:
+        [{"id": str, "ticket_key": str, "title": str, "score": float, "status": str}]
+        Returns [] on any error — never raises.
+    """
+    try:
+        vector_store = get_vector_store()
+
+        query = f"{title}. {description[:400]}"
+
+        # Scope to ticket/issue doc types within the target project
+        where = {
+            "$and": [
+                {"type": {"$in": ["ticket", "issue"]}},
+                {"project_id": {"$eq": str(project_id)}},
+            ]
+        }
+
+        logger.info(
+            f"find_duplicates: query={query[:60]!r} project_id={project_id} "
+            f"threshold={threshold} top_k={top_k} exclude_id={exclude_id}"
+        )
+
+        raw = vector_store.similarity_search_with_relevance_scores(
+            query, k=top_k, filter=where
+        )
+
+    except Exception as exc:
+        logger.error(f"find_duplicates failed for project_id={project_id}: {exc}")
+        return []
+
+    duplicates: list[dict] = []
+    for doc, score in raw:
+        if score < threshold:
+            continue
+
+        meta = doc.metadata
+
+        # Resolve the stable entity ID — handle both Celery and full_sync formats
+        doc_id = (
+            meta.get("ticket_id")
+            or meta.get("issue_id")
+            or ""
+        )
+
+        if exclude_id and doc_id == exclude_id:
+            continue
+
+        doc_type = meta.get("type") or meta.get("doc_type", "ticket")
+        duplicates.append({
+            "id":         doc_id,
+            "ticket_key": meta.get("ticket_key", meta.get("ticket_id", "")),
+            "title":      _extract_title_from_doc(doc.page_content, meta, doc_type),
+            "score":      round(score, 3),
+            "status":     meta.get("status", ""),
+        })
+
+    duplicates.sort(key=lambda x: x["score"], reverse=True)
+    logger.info(
+        f"find_duplicates: {len(duplicates)} duplicate(s) above threshold={threshold}"
+    )
+    return duplicates
+
+
 def analyze_task_with_rag(heading: str, description: str, labels: list[str]) -> dict:
     """
     Label-aware RAG analysis:
@@ -512,15 +600,26 @@ def analyze_task_with_rag(heading: str, description: str, labels: list[str]) -> 
     # Use more of the description so retrieval matches on actual work content, not just labels
     query = f"Labels: {labels_str}. Issue: {heading}. {description[:600]}"
 
-    # Filter to only issue documents (not wiki)
+    # Try full_sync format first (doc_type=issue), fall back to Celery format (type=ticket).
+    # Both formats coexist in the same collection depending on how the last sync was run.
     retrieved_docs = vector_store.similarity_search(
         query,
         k=settings.chroma_retrieval_k,
-        filter={"doc_type": "issue"},
+        filter={"doc_type": {"$eq": "issue"}},
     )
+    if not retrieved_docs:
+        retrieved_docs = vector_store.similarity_search(
+            query,
+            k=settings.chroma_retrieval_k,
+            filter={"type": {"$eq": "ticket"}},
+        )
+
     issue_history = "\n\n---\n".join([doc.page_content for doc in retrieved_docs])
 
-    logger.info(f"RAG: retrieved {len(retrieved_docs)} past issues | labels={labels_str}")
+    if not retrieved_docs:
+        logger.warning("RAG: no past issues found in ChromaDB — run POST /ai/sync to populate")
+    else:
+        logger.info(f"RAG: retrieved {len(retrieved_docs)} past issues | labels={labels_str}")
 
     llm = get_llm(model_key="rag")
     prompt = PromptTemplate(
