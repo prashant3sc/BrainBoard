@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { DragDropContext } from '@hello-pangea/dnd';
 import type { DropResult } from '@hello-pangea/dnd';
+import type { AxiosError } from 'axios';
 import { useUpdateIssue } from '../useKanban';
 import { useActiveSprint } from '@/features/projects/useSprints';
 import { KanbanColumn } from './KanbanColumn';
@@ -26,6 +27,15 @@ export function KanbanBoard({ projectId, searchQuery, assigneeFilter, onIssueCli
   const { data: activeSprintData, isLoading, isError } = useActiveSprint(projectId);
   const { mutate: updateIssue } = useUpdateIssue();
   const { data: members = [] } = useProjectMembers(projectId);
+
+  /* Toast */
+  const [toast, setToast] = useState<{ msg: string; visible: boolean }>({ msg: '', visible: false });
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function showToast(msg: string) {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ msg, visible: true });
+    toastTimer.current = setTimeout(() => setToast((t) => ({ ...t, visible: false })), 4000);
+  }
 
   /* Local state for optimistic drag updates */
   const [localIssues, setLocalIssues] = useState<Issue[]>([]);
@@ -60,7 +70,19 @@ export function KanbanBoard({ projectId, searchQuery, assigneeFilter, onIssueCli
 
     // Only persist when the column actually changed
     if (newStatus !== oldStatus) {
-      updateIssue({ id: draggableId, dto: { status: newStatus }, projectId });
+      updateIssue(
+        { id: draggableId, dto: { status: newStatus }, projectId },
+        {
+          onError: (err) => {
+            const ax = err as AxiosError<{ status?: string; detail?: string }>;
+            const msg =
+              ax?.response?.data?.status ??
+              ax?.response?.data?.detail ??
+              'Failed to update status';
+            showToast(msg);
+          },
+        },
+      );
     }
   }
 
@@ -81,6 +103,7 @@ export function KanbanBoard({ projectId, searchQuery, assigneeFilter, onIssueCli
   }
 
   return (
+    <>
     <DragDropContext onDragEnd={onDragEnd}>
       <div className="kb-board-area">
         {KANBAN_COLUMNS.map((col) => (
@@ -106,5 +129,25 @@ export function KanbanBoard({ projectId, searchQuery, assigneeFilter, onIssueCli
         </button>
       </div>
     </DragDropContext>
+
+    {/* Kanban error toast */}
+    <div style={{
+      position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)',
+      background: '#FFF0EE', border: '1px solid #FFBDAD', borderRadius: 10,
+      padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 8,
+      boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 300,
+      fontSize: 13, fontWeight: 500, color: '#DE350B',
+      transition: 'opacity 0.2s, transform 0.2s',
+      opacity: toast.visible ? 1 : 0,
+      pointerEvents: toast.visible ? 'auto' : 'none',
+      whiteSpace: 'nowrap',
+    }}>
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <circle cx="7" cy="7" r="6" stroke="#DE350B" strokeWidth="1.4"/>
+        <path d="M7 4v3M7 9.5v.5" stroke="#DE350B" strokeWidth="1.4" strokeLinecap="round"/>
+      </svg>
+      {toast.msg}
+    </div>
+    </>
   );
 }

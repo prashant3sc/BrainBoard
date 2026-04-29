@@ -159,9 +159,17 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
     queryFn:  () => issuesApi.getAll(projectId),
     enabled:  !!projectId,
   });
-  const parentCandidates = allIssues.filter(
-    (i) => i.issueType !== 'subtask' && (!isEdit || i.id !== issue?.id),
-  );
+  // Only tasks can be parents — bugs and subtasks cannot have children
+  // Only show tasks from the active sprint or backlog (not completed sprints)
+  const parentCandidates = allIssues.filter((i) => {
+    if (i.issueType !== 'task') return false;
+    if (isEdit && i.id === issue?.id) return false;
+    // exclude tasks locked in a completed sprint
+    const sprint = sprints.find((s) => s.id === i.sprintId);
+    if (sprint && sprint.status === 'completed') return false;
+    // must be in the active sprint or backlog
+    return i.sprintId === activeSprintId || i.sprintId === null;
+  });
   const subtasks = isEdit && issue?.issueType !== 'subtask'
     ? allIssues.filter((i) => i.parentId === issue?.id)
     : [];
@@ -1063,7 +1071,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                       <div className="im-parent-selected-card">
                         <span className="im-parent-type-dot" style={{ background: tc.text }} />
                         <div className="im-parent-selected-info">
-                          <span className="im-parent-key">{p.id.slice(0, 8).toUpperCase()}</span>
+                          <span className="im-parent-key">{p.ticketId ?? p.id.slice(0, 8).toUpperCase()}</span>
                           <span className="im-parent-title">{p.title}</span>
                         </div>
                         <span className="im-parent-opt-type" style={{ background: tc.bg, color: tc.text }}>
@@ -1121,7 +1129,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                               >
                                 <span className="im-parent-opt-dot" style={{ background: tc.text }} />
                                 <div className="im-parent-opt-info">
-                                  <span className="im-parent-opt-key">{i.id.slice(0, 8).toUpperCase()}</span>
+                                  <span className="im-parent-opt-key">{i.ticketId ?? i.id.slice(0, 8).toUpperCase()}</span>
                                   <span className="im-parent-opt-title">{i.title}</span>
                                 </div>
                                 <span className="im-parent-opt-type" style={{ background: tc.bg, color: tc.text }}>
@@ -1167,7 +1175,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                         onClick={() => onNavigate && (close(), onNavigate(s))}
                       >
                         <span className={`kb-subtask-dot kb-subtask-dot-${s.status}`} />
-                        <span className="kb-subtask-key">{s.id.slice(0, 8).toUpperCase()}</span>
+                        <span className="kb-subtask-key">{s.ticketId ?? s.id.slice(0, 8).toUpperCase()}</span>
                         <span className="kb-subtask-title">{s.title}</span>
                         <svg width="9" height="9" viewBox="0 0 12 12" fill="none" style={{ marginLeft: 'auto', flexShrink: 0, opacity: 0.35 }}>
                           <path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>

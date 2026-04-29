@@ -59,6 +59,10 @@ export const issuesApi = {
       .then((r) => normalise(r.data));
   },
 
+  bulkUpdate(ids: string[], dto: UpdateIssueDto): Promise<Issue[]> {
+    return Promise.all(ids.map((id) => issuesApi.update(id, dto)));
+  },
+
   remove(id: string): Promise<void> {
     if (USE_MOCK) {
       const index = mockIssues.findIndex((i) => i.id === id);

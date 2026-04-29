@@ -1,10 +1,11 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { issuesApi } from '@/api/issues';
 import { useSprints, useStartSprint, useCompleteSprint, useCreateSprint } from '@/features/projects/useSprints';
 import { useRBAC } from '@/hooks/useRBAC';
 import { IssueModal } from '@/features/kanban/components/IssueModal';
+import { SprintDatePicker } from '@/components/SprintDatePicker';
 import type { Sprint, Issue, SprintStatus } from '@/types';
 import type { AxiosError } from 'axios';
 
@@ -128,27 +129,85 @@ interface CreateSprintModalProps {
   onConfirm: (name: string, goal: string, startDate: string, endDate: string) => void;
   onClose: () => void;
   isPending: boolean;
+  serverError?: string | null;
+  onClearError?: () => void;
+  existingSprints: Sprint[];
 }
 
-function CreateSprintModal({ onConfirm, onClose, isPending }: CreateSprintModalProps) {
-  const [name,      setName]      = useState('');
-  const [goal,      setGoal]      = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate,   setEndDate]   = useState('');
-  const [dateErr,   setDateErr]   = useState('');
+function CreateSprintModal({ onConfirm, onClose, isPending, serverError, onClearError, existingSprints }: CreateSprintModalProps) {
+  const [name,        setName]        = useState('');
+  const [goal,        setGoal]        = useState('');
+  const [startDate,   setStartDate]   = useState('');
+  const [endDate,     setEndDate]     = useState('');
+  const [showCal,     setShowCal]     = useState(false);
+  const [popPos,      setPopPos]      = useState<{ top: number; left: number } | null>(null);
+  const dateRowRef    = useRef<HTMLDivElement>(null);
+  const calPopoverRef = useRef<HTMLDivElement>(null);
+
+  // Compute popover position when it opens
+  useEffect(() => {
+    if (!showCal) { setPopPos(null); return; }
+    const anchor = dateRowRef.current;
+    if (!anchor) return;
+    const rect     = anchor.getBoundingClientRect();
+    const popW     = 516;   // approx popover width (padding + two month grids)
+    const popH     = 300;   // approx popover height
+    const gap      = 8;
+    const vw       = window.innerWidth;
+    const vh       = window.innerHeight;
+
+    // Prefer below; flip above if not enough room
+    let top = rect.bottom + gap;
+    if (top + popH > vh - 8) top = rect.top - popH - gap;
+    if (top < 8) top = 8;
+
+    // Align left-edge with anchor; clamp to viewport
+    let left = rect.left;
+    if (left + popW > vw - 8) left = vw - popW - 8;
+    if (left < 8) left = 8;
+
+    setPopPos({ top, left });
+  }, [showCal]);
+
+  // Close popover on outside click
+  useEffect(() => {
+    if (!showCal) return;
+    function handleClick(e: MouseEvent) {
+      if (
+        calPopoverRef.current && !calPopoverRef.current.contains(e.target as Node) &&
+        dateRowRef.current && !dateRowRef.current.contains(e.target as Node)
+      ) {
+        setShowCal(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showCal]);
+
+  // Auto-close popover once both dates picked
+  useEffect(() => {
+    if (startDate && endDate) setShowCal(false);
+  }, [startDate, endDate]);
 
   function handleConfirm() {
-    if (startDate && endDate && endDate < startDate) {
-      setDateErr('End date must be after start date.');
-      return;
-    }
-    setDateErr('');
     onConfirm(name.trim(), goal.trim(), startDate, endDate);
   }
 
+  function handleClear() {
+    setStartDate(''); setEndDate(''); onClearError?.();
+  }
+
+  const CalIcon = () => (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+      <rect x="1" y="3" width="14" height="12" rx="2" stroke="currentColor" strokeWidth="1.4"/>
+      <path d="M1 7h14" stroke="currentColor" strokeWidth="1.4"/>
+      <path d="M5 1v4M11 1v4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+    </svg>
+  );
+
   return (
     <div className="kb-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="kb-modal-wide bb-modal-animate" style={{ maxWidth: 420 }}>
+      <div className="kb-modal-wide bb-modal-animate" style={{ maxWidth: 500, display: 'flex', flexDirection: 'column' }}>
         <div className="kb-modal-header">
           <span className="kb-modal-title">Create Sprint</span>
           <button className="kb-modal-close" onClick={onClose}>
@@ -157,6 +216,7 @@ function CreateSprintModal({ onConfirm, onClose, isPending }: CreateSprintModalP
             </svg>
           </button>
         </div>
+
         <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="kb-field">
             <label className="kb-label">Sprint name <span className="kb-required">*</span></label>
@@ -166,18 +226,91 @@ function CreateSprintModal({ onConfirm, onClose, isPending }: CreateSprintModalP
             <label className="kb-label">Goal</label>
             <input className="kb-input" placeholder="What is the sprint goal?" value={goal} onChange={(e) => setGoal(e.target.value)} />
           </div>
-          <div className="kb-row2">
-            <div className="kb-field">
-              <label className="kb-label">Start date</label>
-              <input type="date" className="kb-input" value={startDate} onChange={(e) => { setStartDate(e.target.value); setDateErr(''); }} />
-            </div>
-            <div className="kb-field">
-              <label className="kb-label">End date</label>
-              <input type="date" className="kb-input" value={endDate} min={startDate || undefined} onChange={(e) => { setEndDate(e.target.value); setDateErr(''); }} />
+
+          {/* Date trigger row */}
+          <div>
+            <label className="kb-label">Sprint dates</label>
+            <div
+              ref={dateRowRef}
+              onClick={() => setShowCal((v) => !v)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '7px 12px', borderRadius: 7, cursor: 'pointer',
+                border: `1px solid ${showCal ? '#E75026' : 'var(--bb-border)'}`,
+                background: 'var(--kb-input-bg, var(--bb-surface))',
+                fontSize: 13, color: 'var(--bb-text-primary)',
+                userSelect: 'none', transition: 'border-color .15s',
+              }}
+            >
+              <CalIcon />
+              {startDate ? (
+                <span>
+                  {startDate}
+                  {endDate
+                    ? <> &rarr; {endDate}</>
+                    : <span style={{ color: 'var(--bb-text-muted)' }}> → pick end date</span>}
+                </span>
+              ) : (
+                <span style={{ color: 'var(--bb-text-muted)' }}>Select date range…</span>
+              )}
+              {(startDate || endDate) ? (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleClear(); }}
+                  style={{ marginLeft: 'auto', fontSize: 11, color: '#E75026', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                >
+                  Clear
+                </button>
+              ) : (
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ marginLeft: 'auto', color: 'var(--bb-text-muted)' }}>
+                  <path d="M2 4l3 3 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
             </div>
           </div>
-          {dateErr && <span style={{ fontSize: 12, color: '#DE350B', marginTop: -6 }}>{dateErr}</span>}
+
+          {/* Calendar popover — rendered into a portal-like fixed layer */}
+          {showCal && popPos && (
+            <div
+              ref={calPopoverRef}
+              style={{
+                position: 'fixed',
+                top: popPos.top,
+                left: popPos.left,
+                zIndex: 10001,
+                background: 'var(--kb-modal-bg, var(--bb-surface))',
+                border: '1px solid var(--bb-border)',
+                borderRadius: 12,
+                boxShadow: '0 16px 48px rgba(23,43,77,.28)',
+                padding: '16px 20px 14px',
+              }}
+            >
+              <SprintDatePicker
+                startDate={startDate}
+                endDate={endDate}
+                onStartChange={(v) => { setStartDate(v); onClearError?.(); }}
+                onEndChange={(v) => { setEndDate(v); onClearError?.(); }}
+                existingSprints={existingSprints}
+              />
+              {startDate && endDate && (
+                <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => setShowCal(false)}
+                    style={{ fontSize: 12, fontWeight: 600, color: '#fff', background: '#E75026', border: 'none', borderRadius: 6, padding: '5px 16px', cursor: 'pointer' }}
+                  >
+                    Done
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {serverError && (
+            <span style={{ fontSize: 12, color: '#DE350B', marginTop: -6 }}>
+              {serverError}
+            </span>
+          )}
         </div>
+
         <div className="kb-modal-footer">
           <div />
           <div className="kb-modal-footer-right">
@@ -207,17 +340,141 @@ const PRIORITY_CLASS: Record<string, string> = {
   medium: 'bb-badge bb-badge-medium',    low:  'bb-badge bb-badge-low',
 };
 
-function IssueRow({ issue, onClick }: { issue: Issue; onClick?: () => void }) {
+function IssueRow({
+  issue, onClick, selectable, selected, onSelect,
+}: {
+  issue: Issue;
+  onClick?: () => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onSelect?: (id: string, checked: boolean) => void;
+}) {
+  const subtaskTotal = issue.subtaskCount ?? 0;
+  const subtaskDone  = subtaskTotal > 0 ? Math.round((issue.progress ?? 0) / 100 * subtaskTotal) : 0;
+
   return (
-    <div className="bb-issue-row" onClick={onClick} style={{ cursor: onClick ? 'pointer' : undefined }}>
-      <span className="bb-issue-key">{issue.ticketId ?? issue.id.slice(0, 8).toUpperCase()}</span>
-      <span className="bb-issue-summary">{issue.title}</span>
+    <div
+      className="bb-issue-row"
+      onClick={selectable ? undefined : onClick}
+      style={{ cursor: selectable ? 'default' : onClick ? 'pointer' : undefined, background: selected ? 'var(--bb-bg-input)' : undefined }}
+    >
+      {selectable && (
+        <input
+          type="checkbox"
+          checked={!!selected}
+          onChange={(e) => { e.stopPropagation(); onSelect?.(issue.id, e.target.checked); }}
+          style={{ marginRight: 6, cursor: 'pointer', flexShrink: 0 }}
+          onClick={(e) => e.stopPropagation()}
+        />
+      )}
+      <span
+        className="bb-issue-key"
+        onClick={selectable ? onClick : undefined}
+        style={{ cursor: selectable ? 'pointer' : undefined }}
+      >
+        {issue.ticketId ?? issue.id.slice(0, 8).toUpperCase()}
+      </span>
+      <span
+        className="bb-issue-summary"
+        onClick={selectable ? onClick : undefined}
+        style={{ cursor: selectable ? 'pointer' : undefined }}
+      >
+        {issue.title}
+      </span>
+
+      {/* Subtask progress bar */}
+      {subtaskTotal > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          <div style={{
+            width: 56, height: 4, borderRadius: 2,
+            background: 'var(--bb-border)', overflow: 'hidden',
+          }}>
+            <div style={{
+              height: '100%', borderRadius: 2,
+              width: `${issue.progress ?? 0}%`,
+              background: (issue.progress ?? 0) === 100 ? '#36B37E' : '#E75026',
+            }} />
+          </div>
+          <span style={{ fontSize: 10, color: 'var(--bb-text-muted)', whiteSpace: 'nowrap' }}>
+            {subtaskDone}/{subtaskTotal}
+          </span>
+        </div>
+      )}
+
       <div className="bb-issue-labels">
         <span className={PRIORITY_CLASS[issue.priority] ?? 'bb-badge'}>{issue.priority}</span>
         {issue.issueType && <span className="bb-badge">{issue.issueType}</span>}
       </div>
       <span className={STATUS_CLASS[issue.status] ?? 'bb-status-badge'}>{STATUS_LABEL[issue.status] ?? issue.status}</span>
       <span className="bb-story-pts">{issue.storyPoints ?? '—'}</span>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   Bulk Move Action Bar
+───────────────────────────────────────────── */
+function BulkActionBar({
+  selectedCount, sprints, onMove, onCancel, isMoving,
+}: {
+  selectedCount: number;
+  sprints: Sprint[];
+  onMove: (sprintId: string | null) => void;
+  onCancel: () => void;
+  isMoving: boolean;
+}) {
+  const [targetSprintId, setTargetSprintId] = useState<string>('__backlog__');
+  const activeSprints = sprints.filter((s) => s.status === 'active' || s.status === 'planned');
+
+  return (
+    <div style={{
+      position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+      background: 'var(--bb-bg-card)', border: '1.5px solid var(--bb-border)',
+      borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+      padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 14,
+      zIndex: 200, minWidth: 440,
+    }}>
+      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--bb-text-primary)', whiteSpace: 'nowrap' }}>
+        {selectedCount} issue{selectedCount !== 1 ? 's' : ''} selected
+      </span>
+      <span style={{ color: 'var(--bb-border)', fontSize: 18 }}>|</span>
+      <span style={{ fontSize: 12, color: 'var(--bb-text-muted)', whiteSpace: 'nowrap' }}>Move to:</span>
+      <select
+        value={targetSprintId}
+        onChange={(e) => setTargetSprintId(e.target.value)}
+        style={{
+          flex: 1, fontSize: 13, padding: '5px 8px', borderRadius: 6,
+          border: '1px solid var(--bb-border)', background: 'var(--bb-bg-input)',
+          color: 'var(--bb-text-primary)', cursor: 'pointer',
+        }}
+      >
+        <option value="__backlog__">Backlog</option>
+        {activeSprints.map((s) => (
+          <option key={s.id} value={s.id}>{s.name} ({s.status})</option>
+        ))}
+      </select>
+      <button
+        onClick={() => onMove(targetSprintId === '__backlog__' ? null : targetSprintId)}
+        disabled={isMoving || selectedCount === 0}
+        style={{
+          background: '#E75026', color: '#fff', border: 'none', borderRadius: 7,
+          padding: '7px 16px', fontSize: 13, fontWeight: 600,
+          cursor: isMoving || selectedCount === 0 ? 'not-allowed' : 'pointer',
+          opacity: isMoving || selectedCount === 0 ? 0.6 : 1, whiteSpace: 'nowrap',
+        }}
+      >
+        {isMoving ? 'Moving…' : 'Move'}
+      </button>
+      <button
+        onClick={onCancel}
+        style={{
+          background: 'none', border: '1px solid var(--bb-border)', borderRadius: 7,
+          padding: '7px 14px', fontSize: 13, fontWeight: 500,
+          color: 'var(--bb-text-secondary)', cursor: 'pointer', whiteSpace: 'nowrap',
+        }}
+      >
+        Cancel
+      </button>
     </div>
   );
 }
@@ -319,24 +576,49 @@ function SprintBlock({ sprint, issues, search, collapsed, onToggle, canManage, o
 }
 
 /* ─────────────────────────────────────────────
-   Backlog Block (issues with no sprint)
+   Backlog Block
 ───────────────────────────────────────────── */
-function BacklogBlock({ issues, search, collapsed, onToggle, canManage, onCreateSprint, onIssueClick }: {
-  issues: Issue[]; search: string; collapsed: boolean; onToggle: () => void; canManage: boolean; onCreateSprint: () => void; onIssueClick: (issue: Issue) => void;
+function BacklogBlock({
+  issues, search, collapsed, onToggle, canManage,
+  onIssueClick,
+  selectionMode, selectedIds, onToggleSelect, onSelectAll, onEnterSelection,
+}: {
+  issues: Issue[]; search: string; collapsed: boolean; onToggle: () => void;
+  canManage: boolean;
+  onIssueClick: (issue: Issue) => void;
+  selectionMode: boolean; selectedIds: Set<string>;
+  onToggleSelect: (id: string, checked: boolean) => void;
+  onSelectAll: (checked: boolean) => void;
+  onEnterSelection: () => void;
 }) {
   const q = search.toLowerCase();
   const filtered = search.trim() ? issues.filter((i) => i.title.toLowerCase().includes(q)) : issues;
+  const allSelected = filtered.length > 0 && filtered.every((i) => selectedIds.has(i.id));
 
   return (
     <div className="bb-sprint-block">
       <div className="bb-sprint-header" onClick={onToggle}>
+        {selectionMode && (
+          <input
+            type="checkbox"
+            checked={allSelected}
+            onChange={(e) => { e.stopPropagation(); onSelectAll(e.target.checked); }}
+            onClick={(e) => e.stopPropagation()}
+            style={{ marginRight: 4, cursor: 'pointer' }}
+            title="Select all"
+          />
+        )}
         <span className={`bb-sprint-chevron${collapsed ? '' : ' open'}`}>▶</span>
         <span className="bb-sprint-name">Backlog</span>
         <span className="bb-sprint-count">{issues.length} issues</span>
         <span style={{ flex: 1 }} />
-        {canManage && (
-          <button className="bb-sprint-action" onClick={(e) => { e.stopPropagation(); onCreateSprint(); }}>
-            + Create sprint
+        {canManage && !selectionMode && issues.length > 0 && (
+          <button
+            className="bb-sprint-action"
+            onClick={(e) => { e.stopPropagation(); onEnterSelection(); }}
+            style={{ marginRight: 6 }}
+          >
+            Move to Sprint
           </button>
         )}
       </div>
@@ -344,7 +626,16 @@ function BacklogBlock({ issues, search, collapsed, onToggle, canManage, onCreate
         <div className="bb-issue-list">
           {filtered.length === 0
             ? <div style={{ padding: '16px 14px', fontSize: 12, color: 'var(--bb-bl-count)', fontStyle: 'italic' }}>No backlog issues.</div>
-            : filtered.map((i) => <IssueRow key={i.id} issue={i} onClick={() => onIssueClick(i)} />)
+            : filtered.map((i) => (
+              <IssueRow
+                key={i.id}
+                issue={i}
+                onClick={() => onIssueClick(i)}
+                selectable={selectionMode}
+                selected={selectedIds.has(i.id)}
+                onSelect={onToggleSelect}
+              />
+            ))
           }
         </div>
       )}
@@ -358,7 +649,8 @@ function BacklogBlock({ issues, search, collapsed, onToggle, canManage, onCreate
 export default function BacklogPage() {
   const { projectId = '' } = useParams<{ projectId: string }>();
   const { can } = useRBAC();
-  const canManage = can('createProject'); // admin + pm
+  const canManage = can('createProject');
+  const qc = useQueryClient();
 
   const { data: sprints = [], isLoading: sprintsLoading } = useSprints(projectId);
   const { data: allIssues = [], isLoading: issuesLoading } = useQuery({
@@ -373,14 +665,19 @@ export default function BacklogPage() {
 
   const { toastMsg, toastVisible, toastIsError, showToast } = useToast();
 
-  const [collapsed,          setCollapsed]          = useState<Record<string, boolean>>({});
-  const [search,             setSearch]             = useState('');
-  const [completeModal,      setCompleteModal]      = useState<{ sprint: Sprint; unfinished: Issue[] } | null>(null);
+  const [collapsed,       setCollapsed]       = useState<Record<string, boolean>>({});
+  const [search,          setSearch]          = useState('');
+  const [completeModal,   setCompleteModal]   = useState<{ sprint: Sprint; unfinished: Issue[] } | null>(null);
   const [showCreateModal,    setShowCreateModal]    = useState(false);
-  const [issueModalOpen,     setIssueModalOpen]     = useState(false);
-  const [selectedIssue,      setSelectedIssue]      = useState<Issue | null>(null);
+  const [createSprintError,  setCreateSprintError]  = useState<string | null>(null);
+  const [issueModalOpen,  setIssueModalOpen]  = useState(false);
+  const [selectedIssue,   setSelectedIssue]   = useState<Issue | null>(null);
 
-  // Group issues by sprintId
+  // Bulk move state
+  const [selectionMode,   setSelectionMode]   = useState(false);
+  const [selectedIds,     setSelectedIds]     = useState<Set<string>>(new Set());
+  const [isMoving,        setIsMoving]        = useState(false);
+
   const issuesBySprint = useMemo(() => {
     const map: Record<string, Issue[]> = {};
     for (const issue of allIssues) {
@@ -391,16 +688,11 @@ export default function BacklogPage() {
     return map;
   }, [allIssues]);
 
-  const backlogIssues = issuesBySprint['__backlog__'] ?? [];
-
-  // Planned sprints for the complete modal dropdown
+  const backlogIssues  = issuesBySprint['__backlog__'] ?? [];
   const plannedSprints = sprints.filter((s) => s.status === 'planned');
-
-  // Sort: active first, then planned, then completed
   const statusOrder: Record<SprintStatus, number> = { active: 0, planned: 1, completed: 2 };
   const visibleSprints = [...sprints].sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
-
-  const totalIssues = allIssues.length;
+  const totalIssues    = allIssues.length;
 
   function handleStartSprint(sprint: Sprint) {
     startSprint.mutate(
@@ -428,13 +720,57 @@ export default function BacklogPage() {
   }
 
   function handleCreateSprint(name: string, goal: string, startDate: string, endDate: string) {
+    setCreateSprintError(null);
     createSprint.mutate(
       { projectId, name, goal, startDate: startDate || undefined, endDate: endDate || undefined },
       {
-        onSuccess: () => { setShowCreateModal(false); showToast(`${name} created`); },
-        onError:   (err) => showToast(beError(err), true),
+        onSuccess: () => { setShowCreateModal(false); setCreateSprintError(null); showToast(`${name} created`); },
+        onError: (err) => {
+          const ax = err as import('axios').AxiosError<Record<string, string[]>>;
+          const data = ax?.response?.data;
+          // Extract first field error (startDate / endDate / non_field_errors)
+          const msg = data
+            ? Object.values(data).flat()[0]
+            : 'Failed to create sprint';
+          setCreateSprintError(msg ?? 'Failed to create sprint');
+        },
       },
     );
+  }
+
+  // Bulk move
+  function handleToggleSelect(id: string, checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      checked ? next.add(id) : next.delete(id);
+      return next;
+    });
+  }
+
+  function handleSelectAll(checked: boolean) {
+    const q = search.toLowerCase();
+    const visible = search.trim() ? backlogIssues.filter((i) => i.title.toLowerCase().includes(q)) : backlogIssues;
+    setSelectedIds(checked ? new Set(visible.map((i) => i.id)) : new Set());
+  }
+
+  function exitSelectionMode() {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  }
+
+  async function handleBulkMove(sprintId: string | null) {
+    if (selectedIds.size === 0) return;
+    setIsMoving(true);
+    try {
+      await issuesApi.bulkUpdate(Array.from(selectedIds), { sprintId } as any);
+      qc.invalidateQueries({ queryKey: ['issues', projectId] });
+      showToast(`${selectedIds.size} issue${selectedIds.size !== 1 ? 's' : ''} moved`);
+      exitSelectionMode();
+    } catch {
+      showToast('Failed to move some issues', true);
+    } finally {
+      setIsMoving(false);
+    }
   }
 
   if (sprintsLoading || issuesLoading) {
@@ -460,11 +796,24 @@ export default function BacklogPage() {
           </div>
         </div>
         <div style={{ flex: 1 }} />
-        <button className="bb-bl-tb-btn bb-bl-tb-btn-primary" onClick={() => { setSelectedIssue(null); setIssueModalOpen(true); }}>+ Create issue</button>
+        {canManage && (
+          <button
+            className="bb-bl-tb-btn bb-bl-tb-btn-primary"
+            onClick={() => setShowCreateModal(true)}
+          >
+            + New sprint
+          </button>
+        )}
+        <button
+          className="bb-bl-tb-btn bb-bl-tb-btn-primary"
+          onClick={() => { setSelectedIssue(null); setIssueModalOpen(true); }}
+        >
+          + Create issue
+        </button>
       </div>
 
       {/* Scrollable content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px 40px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px 80px' }}>
 
         {/* Toolbar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -506,10 +855,25 @@ export default function BacklogPage() {
           collapsed={!!collapsed['__backlog__']}
           onToggle={() => setCollapsed((p) => ({ ...p, __backlog__: !p.__backlog__ }))}
           canManage={canManage}
-          onCreateSprint={() => setShowCreateModal(true)}
           onIssueClick={(issue) => { setSelectedIssue(issue); setIssueModalOpen(true); }}
+          selectionMode={selectionMode}
+          selectedIds={selectedIds}
+          onToggleSelect={handleToggleSelect}
+          onSelectAll={handleSelectAll}
+          onEnterSelection={() => setSelectionMode(true)}
         />
       </div>
+
+      {/* Bulk action bar */}
+      {selectionMode && (
+        <BulkActionBar
+          selectedCount={selectedIds.size}
+          sprints={sprints}
+          onMove={handleBulkMove}
+          onCancel={exitSelectionMode}
+          isMoving={isMoving}
+        />
+      )}
 
       {/* Create / Edit Issue Modal */}
       <IssueModal
@@ -536,8 +900,11 @@ export default function BacklogPage() {
       {showCreateModal && (
         <CreateSprintModal
           onConfirm={handleCreateSprint}
-          onClose={() => setShowCreateModal(false)}
+          onClose={() => { setShowCreateModal(false); setCreateSprintError(null); }}
           isPending={createSprint.isPending}
+          serverError={createSprintError}
+          onClearError={() => setCreateSprintError(null)}
+          existingSprints={sprints}
         />
       )}
 

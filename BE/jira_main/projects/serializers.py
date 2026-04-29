@@ -136,6 +136,47 @@ class SprintSerializer(serializers.ModelSerializer):
             "created_at",
         ]
 
+    def validate(self, attrs):
+        start = attrs.get("start_date")
+        end   = attrs.get("end_date")
+
+        # Basic date order check
+        if start and end and end < start:
+            raise serializers.ValidationError(
+                {"endDate": "End date must be on or after start date."}
+            )
+
+        # Overlap check — only when both dates are provided
+        if start and end:
+            project = attrs.get("project") or (self.instance.project if self.instance else None)
+            if project:
+                # Exclude the current sprint when updating
+                qs = Sprint.objects.filter(
+                    project=project,
+                    start_date__isnull=False,
+                    end_date__isnull=False,
+                ).exclude(status=Sprint.COMPLETED)
+
+                if self.instance:
+                    qs = qs.exclude(pk=self.instance.pk)
+
+                # Two ranges overlap when: existing.start <= new.end AND existing.end >= new.start
+                overlapping = qs.filter(
+                    start_date__lte=end,
+                    end_date__gte=start,
+                ).first()
+
+                if overlapping:
+                    raise serializers.ValidationError({
+                        "startDate": (
+                            f"Date range overlaps with '{overlapping.name}' "
+                            f"({overlapping.start_date} – {overlapping.end_date}). "
+                            f"Choose dates outside that range."
+                        )
+                    })
+
+        return attrs
+
     def to_representation(self, instance):
         rep = super().to_representation(instance)
         rep["createdAt"] = rep.pop("created_at")

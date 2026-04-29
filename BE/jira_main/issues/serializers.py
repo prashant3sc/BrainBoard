@@ -151,6 +151,8 @@ class IssueCreateSerializer(serializers.ModelSerializer):
                 parent = Issue.objects.get(pk=parent_id)
             except Issue.DoesNotExist:
                 raise serializers.ValidationError({"parentId": "Parent issue not found."})
+            if parent.issue_type != Issue.TASK:
+                raise serializers.ValidationError({"parentId": "Only tasks can be parent issues. Bugs and subtasks cannot have children."})
 
         with transaction.atomic():
             # Lock all issues for this project to prevent race conditions on sequence_number
@@ -199,6 +201,15 @@ class IssueUpdateSerializer(serializers.ModelSerializer):
         from projects.models import Sprint
         from users.models import User
 
+        # Block moving to done if any subtasks are still incomplete
+        new_status = validated_data.get("status")
+        if new_status == Issue.DONE and instance.issue_type != Issue.SUBTASK:
+            incomplete = instance.subtasks.exclude(status=Issue.DONE).count()
+            if incomplete:
+                raise serializers.ValidationError({
+                    "status": f"Cannot mark as Done — {incomplete} subtask{'s' if incomplete > 1 else ''} still open."
+                })
+
         # Handle assignee change — distinguish "not sent" from "sent as null"
         if "assigneeId" in validated_data:
             assignee_id = validated_data.pop("assigneeId")
@@ -228,7 +239,10 @@ class IssueUpdateSerializer(serializers.ModelSerializer):
                 instance.parent = None
             else:
                 try:
-                    instance.parent = Issue.objects.get(pk=parent_id)
+                    parent = Issue.objects.get(pk=parent_id)
+                    if parent.issue_type != Issue.TASK:
+                        raise serializers.ValidationError({"parentId": "Only tasks can be parent issues."})
+                    instance.parent = parent
                 except Issue.DoesNotExist:
                     pass
 
