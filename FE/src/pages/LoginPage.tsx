@@ -215,6 +215,7 @@ export function LoginPage() {
   const [passwordErr, setPasswordErr] = useState('');
   const [submitErr,   setSubmitErr]   = useState('');
   const [loading, setLoading] = useState(false);
+  const [exiting, setExiting] = useState(false);
 
   if (isLoggedIn()) return <Navigate to="/dashboard" replace />;
 
@@ -246,10 +247,12 @@ export function LoginPage() {
         const data = await authApi.login(email, password);
         login(data.user, data.token);
       }
+      // Play exit animation before navigating
+      setExiting(true);
+      await new Promise((r) => setTimeout(r, 300));
       navigate('/dashboard', { replace: true });
     } catch {
       setSubmitErr('Invalid email or password. Please try again.');
-    } finally {
       setLoading(false);
     }
   }
@@ -266,17 +269,22 @@ export function LoginPage() {
     }}>
       <ThemeToggle />
 
-      <div style={{
-        width: '100%', maxWidth: 400,
-        background: 'var(--bb-bg-card)',
-        border: '1px solid var(--bb-border)',
-        borderRadius: 12,
-        padding: '40px 40px 36px',
-        boxShadow: 'var(--bb-shadow-card)',
-      }}>
+      <div
+        className={exiting ? 'bb-login-exiting' : ''}
+        style={{
+          width: '100%', maxWidth: 400,
+          background: 'var(--bb-bg-card)',
+          border: '1px solid var(--bb-border)',
+          borderRadius: 12,
+          padding: '40px 40px 36px',
+          boxShadow: 'var(--bb-shadow-card)',
+        }}
+      >
         {/* Header */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginBottom: 32 }}>
-          <BrainBoardIcon />
+          <div className="bb-login-logo" style={{ display: 'inline-flex' }}>
+            <BrainBoardIcon />
+          </div>
           <h1 style={{ fontSize: 22, fontWeight: 600, color: 'var(--bb-text-primary)', margin: 0, letterSpacing: '-0.3px' }}>
             BrainBoard
           </h1>

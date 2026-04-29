@@ -148,7 +148,7 @@ export function DashboardPage() {
       </div>
 
       {/* ── Content ── */}
-      <div style={{ padding: '28px 32px', flex: 1, background: 'var(--bb-content-bg)', minHeight: 'calc(100vh - 57px)' }}>
+      <div className="bb-dash-enter" style={{ padding: '28px 32px', flex: 1, background: 'var(--bb-content-bg)', minHeight: 'calc(100vh - 57px)' }}>
 
         {/* Page header */}
         <div style={{ marginBottom: 20 }}>
@@ -197,18 +197,23 @@ export function DashboardPage() {
         {!isLoading && !isError && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
             {displayed.map((project, i) => (
-              <ProjectCard
+              <div
                 key={project.id}
-                project={project}
-                onClick={handleProjectClick}
-                onPulse={handlePulse}
-                onEdit={openEdit}
-                onDelete={setDeleteTarget}
-                onArchive={handleArchive}
-                canManage={canManage}
-                index={i}
-                isPulseActive={pulseState?.project.id === project.id}
-              />
+                className="bb-dash-card-enter"
+                style={{ '--card-i': i } as React.CSSProperties}
+              >
+                <ProjectCard
+                  project={project}
+                  onClick={handleProjectClick}
+                  onPulse={handlePulse}
+                  onEdit={openEdit}
+                  onDelete={setDeleteTarget}
+                  onArchive={handleArchive}
+                  canManage={canManage}
+                  index={i}
+                  isPulseActive={pulseState?.project.id === project.id}
+                />
+              </div>
             ))}
 
             {/* Create card — only on active tab */}
