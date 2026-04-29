@@ -83,6 +83,7 @@ export function IssueCard({ issue, index, members, onClick }: Props) {
   const overdueDate = issue.due && issue.status !== 'done' && isOverdue(issue.due);
   const progress = issue.progress ?? 0;
   const isDone   = issue.status === 'done';
+  const hasOpenSubtasks = (issue.subtaskCount ?? 0) > 0 && progress < 100 && !isDone;
 
   return (
     <Draggable draggableId={issue.id} index={index}>
@@ -148,8 +149,16 @@ export function IssueCard({ issue, index, members, onClick }: Props) {
 
           {/* Footer: id | subtasks + date + avatar */}
           <div className="kb-card-meta">
-            <span className="kb-card-id">
+            <span className="kb-card-id" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               {issue.ticketId ?? issue.id.slice(0, 8).toUpperCase()}
+              {hasOpenSubtasks && (
+                <span title="Cannot move to Done — subtasks still open" style={{ color: '#DE350B', display: 'inline-flex' }}>
+                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                    <rect x="2" y="5" width="8" height="6" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+                    <path d="M4 5V3.5a2 2 0 1 1 4 0V5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                  </svg>
+                </span>
+              )}
             </span>
 
             <div className="kb-card-footer-right">

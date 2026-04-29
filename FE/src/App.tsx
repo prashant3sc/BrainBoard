@@ -48,7 +48,8 @@ const AiSyncPage            = React.lazy(() => import('@/pages/AiSyncPage'));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 2,   // data stays fresh for 2 minutes
+      staleTime: 0,               // always consider data stale → refetch on every mount
+      refetchOnMount: true,       // re-fetch whenever a component mounts (page navigation)
       refetchOnWindowFocus: false, // don't refetch on tab switch
       retry: 1,                    // only retry failed requests once
     },

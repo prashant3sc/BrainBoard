@@ -30,7 +30,6 @@ export function useUpdateIssue() {
       if (context?.previous) {
         queryClient.setQueryData(['issues', projectId], context.previous);
       }
-      // TODO: toast({ title: 'Failed to update issue', variant: 'destructive' })
     },
 
     onSettled: (_data, _err, { projectId }) => {
