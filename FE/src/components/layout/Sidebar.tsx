@@ -80,11 +80,20 @@ function UsersIcon() {
 function SettingsIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" width="16" height="16" aria-hidden="true">
-      <circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.4" opacity="0.7" />
       <path
-        d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M3.4 12.6l.7-.7M11.9 4.1l.7-.7"
-        stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" opacity="0.6"
+        d="M6.5 1.5h3l.5 1.5a4.5 4.5 0 0 1 1.1.65l1.5-.5 1.5 2.6-1.2 1.1a4.6 4.6 0 0 1 0 1.3l1.2 1.1-1.5 2.6-1.5-.5A4.5 4.5 0 0 1 10 12l-.5 1.5h-3L6 12a4.5 4.5 0 0 1-1.1-.65l-1.5.5L2 9.25l1.2-1.1a4.6 4.6 0 0 1 0-1.3L2 5.75l1.5-2.6 1.5.5A4.5 4.5 0 0 1 6 3.5l.5-2z"
+        stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"
       />
+      <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
+  );
+}
+
+function SyncIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" width="16" height="16" aria-hidden="true">
+      <path d="M13 8A5 5 0 1 1 8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <path d="M8 1v3l2-1.5L8 1z" fill="currentColor"/>
     </svg>
   );
 }
@@ -432,6 +441,18 @@ export default function Sidebar() {
             </span>
             {!collapsed && <span className="bb-tooltip">Open a project first</span>}
           </div>
+        )}
+
+        {can('manageUsers') && (
+          <NavLink
+            to="/ai-sync"
+            title={collapsed ? 'AI Sync' : undefined}
+            className={({ isActive }) => isActive ? 'bb-nav-item bb-nav-active' : 'bb-nav-item'}
+            style={navItemStyle}
+          >
+            <span className="bb-nav-icon"><SyncIcon /></span>
+            <span style={hideText}>AI Sync</span>
+          </NavLink>
         )}
       </nav>
 

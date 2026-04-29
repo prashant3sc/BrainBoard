@@ -210,7 +210,7 @@ const PRIORITY_CLASS: Record<string, string> = {
 function IssueRow({ issue, onClick }: { issue: Issue; onClick?: () => void }) {
   return (
     <div className="bb-issue-row" onClick={onClick} style={{ cursor: onClick ? 'pointer' : undefined }}>
-      <span className="bb-issue-key">{issue.id.slice(0, 8).toUpperCase()}</span>
+      <span className="bb-issue-key">{issue.ticketId ?? issue.id.slice(0, 8).toUpperCase()}</span>
       <span className="bb-issue-summary">{issue.title}</span>
       <div className="bb-issue-labels">
         <span className={PRIORITY_CLASS[issue.priority] ?? 'bb-badge'}>{issue.priority}</span>
