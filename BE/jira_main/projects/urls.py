@@ -2,6 +2,7 @@ from django.urls import path
 
 from projects.views import (
     ActiveSprintView,
+    BurndownView,
     ProjectCreateView,
     ProjectDetailView,
     ProjectListView,
@@ -30,4 +31,5 @@ urlpatterns = [
     # Analytics
     path("projects/<uuid:project_id>/analytics/velocity", VelocityView.as_view(), name="analytics-velocity"),
     path("projects/<uuid:project_id>/analytics/workload", WorkloadView.as_view(), name="analytics-workload"),
+    path("projects/<uuid:project_id>/analytics/burndown", BurndownView.as_view(), name="analytics-burndown"),
 ]
