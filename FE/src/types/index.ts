@@ -20,6 +20,7 @@ export interface Project {
   id: string;
   name: string;
   description: string;
+  key: string;           // short uppercase prefix e.g. "BB", "SHOP"
   ownerId: string;
   memberIds: string[];   // workspace user-ids assigned to this project
   createdAt: string;
@@ -29,6 +30,8 @@ export interface Project {
 /** A single trackable unit of work within a project. */
 export interface Issue {
   id: string;
+  ticketId?: string | null;    // e.g. "BB-12"
+  sequenceNumber?: number | null;
   title: string;
   description: string;
   status: IssueStatus;

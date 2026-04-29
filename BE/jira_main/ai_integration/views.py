@@ -28,6 +28,7 @@ def _build_issue_payload(issue: Issue) -> dict:
         assignee_name = issue.assignee.get_full_name().strip() or issue.assignee.email
     return {
         "issue_id": str(issue.id),
+        "ticket_id": issue.ticket_id,
         "title": issue.title,
         "description": issue.description or "",
         "labels": label_names,

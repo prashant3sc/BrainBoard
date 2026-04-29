@@ -82,9 +82,11 @@ def _clear_collection(vector_store: Chroma) -> int:
 def _issue_to_document(issue: IssueDocument) -> Document:
     labels_str = ", ".join(issue.labels) if issue.labels else "none"
     pts_str = str(issue.story_points) if issue.story_points else "unestimated"
+    ticket_prefix = f"[{issue.ticket_id}] " if issue.ticket_id else ""
     return Document(
         page_content=(
-            f"[ISSUE] Project: {issue.project}\n"
+            f"[ISSUE] {ticket_prefix}Project: {issue.project}\n"
+            f"Ticket: {issue.ticket_id or 'N/A'}\n"
             f"Title: {issue.title}\n"
             f"Labels: {labels_str}\n"
             f"Type: {issue.issue_type} | Priority: {issue.priority} | Status: {issue.status}\n"
@@ -95,6 +97,7 @@ def _issue_to_document(issue: IssueDocument) -> Document:
         metadata={
             "doc_type": "issue",
             "issue_id": issue.issue_id,
+            "ticket_id": issue.ticket_id or "",
             "project": issue.project,
             "labels": labels_str,
             "assignee": issue.assignee,

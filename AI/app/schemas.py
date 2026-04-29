@@ -10,6 +10,7 @@ class JiraTaskRequest(BaseModel):
 
 class IssueDocument(BaseModel):
     issue_id: str
+    ticket_id: Optional[str] = None
     title: str
     description: str
     labels: List[str]

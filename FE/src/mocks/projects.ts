@@ -9,6 +9,7 @@ export const mockProjects: Project[] = [
     ownerId: 'user-1',
     memberIds: ['user-1', 'user-2', 'user-3', 'user-4'],
     createdAt: '2026-01-10T09:00:00.000Z',
+    key: 'CP',
     isArchived: false,
   },
   {
@@ -19,6 +20,7 @@ export const mockProjects: Project[] = [
     ownerId: 'user-1',
     memberIds: ['user-1', 'user-4', 'user-7'],
     createdAt: '2026-02-03T11:30:00.000Z',
+    key: 'IT',
     isArchived: false,
   },
 ];

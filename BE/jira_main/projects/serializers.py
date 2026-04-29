@@ -10,7 +10,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ["id", "name", "description", "ownerId", "memberIds", "is_archived", "created_at"]
+        fields = ["id", "name", "description", "key", "ownerId", "memberIds", "is_archived", "created_at"]
 
     def get_memberIds(self, instance):
         return list(
@@ -21,17 +21,29 @@ class ProjectSerializer(serializers.ModelSerializer):
         rep = super().to_representation(instance)
         rep["isArchived"] = rep.pop("is_archived")
         rep["createdAt"]  = rep.pop("created_at")
-        # Cast UUIDs to strings so FE receives plain string[]
         rep["memberIds"]  = [str(uid) for uid in rep["memberIds"]]
         return rep
 
 
 class ProjectCreateSerializer(serializers.ModelSerializer):
     ownerId = serializers.UUIDField(write_only=True, required=False)
+    key = serializers.RegexField(
+        r'^[A-Z0-9]{1,6}$',
+        required=True,
+        error_messages={
+            "invalid": "Key must be 1–6 uppercase letters or digits (e.g. BB, SHOP).",
+        },
+    )
 
     class Meta:
         model = Project
-        fields = ["name", "description", "ownerId"]
+        fields = ["name", "description", "key", "ownerId"]
+
+    def validate_key(self, value):
+        value = value.upper()
+        if Project.objects.filter(key=value).exists():
+            raise serializers.ValidationError(f"'{value}' is already taken. Choose a different key.")
+        return value
 
     def create(self, validated_data):
         from users.models import User

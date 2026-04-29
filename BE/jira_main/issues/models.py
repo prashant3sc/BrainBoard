@@ -99,15 +99,24 @@ class Issue(models.Model):
     )
     labels = models.ManyToManyField(Label, blank=True, related_name="labels_issues")
 
+    sequence_number = models.PositiveIntegerField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "issues"
         ordering = ["-created_at"]
+        unique_together = [("project", "sequence_number")]
+
+    @property
+    def ticket_id(self):
+        if self.project.key and self.sequence_number:
+            return f"{self.project.key}-{self.sequence_number}"
+        return None
 
     def __str__(self):
-        return f"[{self.project.name}] {self.title}"
+        return f"[{self.project.key or self.project.name}] {self.ticket_id or self.title}"
 
 
 class Comment(models.Model):

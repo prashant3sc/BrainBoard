@@ -410,7 +410,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
     : (currentUser?.name ?? '—');
 
   const issueKey = isEdit
-    ? issue!.id.slice(0, 8).toUpperCase()
+    ? (issue!.ticketId ?? issue!.id.slice(0, 8).toUpperCase())
     : null;
 
   function Initials({ name }: { name: string }) {
@@ -827,7 +827,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                         ))}
                         <div className="im-ddi-sep" />
                         <div
-                          className={`im-ddi${status === 'cancelled' ? ' im-ddi-sel' : ''}`}
+                          className={`im-ddi${(status as string) === 'cancelled' ? ' im-ddi-sel' : ''}`}
                           onClick={() => { setStatus('cancelled' as IssueStatus); setOpenDD(null); }}
                         >
                           <StatusDot status="cancelled" />
