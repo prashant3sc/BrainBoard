@@ -1,0 +1,246 @@
+/* ═══════════════════════════════════════════════════════════════
+   Comments Section — full redesign
+   ════════════════════════════════════════════════════════════════ */
+
+.cm-section {
+  padding: 16px 16px 24px;
+  border-top: 1px solid var(--kb-modal-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ── Heading ─────────────────────────────────────────────────── */
+.cm-heading {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--bb-text-muted);
+  margin: 0 0 18px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.cm-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: rgba(231,80,38,.12);
+  color: #E75026;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.cm-empty {
+  font-size: 13px;
+  color: var(--bb-text-muted);
+  margin: 0 0 20px;
+  font-style: italic;
+}
+
+/* ── Thread list ─────────────────────────────────────────────── */
+.cm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.cm-thread {
+  display: flex;
+  flex-direction: column;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--kb-modal-border);
+}
+.cm-thread:last-child { border-bottom: none; }
+
+/* ── Single bubble ───────────────────────────────────────────── */
+.cm-bubble {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.cm-bubble-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.cm-bubble-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+  flex-wrap: wrap;
+}
+
+.cm-author {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--kb-modal-title);
+}
+
+.cm-time {
+  font-size: 11px;
+  color: var(--bb-text-muted);
+}
+
+.cm-edited {
+  font-size: 11px;
+  color: var(--bb-text-muted);
+  font-style: italic;
+}
+
+.cm-body {
+  font-size: 13.5px;
+  color: var(--kb-modal-title);
+  line-height: 1.65;
+  margin: 0 0 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Inline action buttons ───────────────────────────────────── */
+.cm-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.cm-action-btn {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--bb-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: color .15s;
+  line-height: 1;
+}
+.cm-action-btn:hover { color: var(--kb-modal-title); }
+.cm-action-delete { color: var(--bb-text-muted); }
+.cm-action-delete:hover { color: #DE350B !important; }
+.cm-action-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.cm-delete-err {
+  font-size: 11.5px;
+  color: #DE350B;
+  margin: 5px 0 0;
+  background: rgba(222,53,11,.06);
+  padding: 5px 9px;
+  border-radius: 5px;
+  border-left: 2px solid #DE350B;
+}
+
+/* ── Replies block ───────────────────────────────────────────── */
+.cm-replies {
+  margin: 12px 0 0 36px;
+  padding-left: 14px;
+  border-left: 2px solid var(--kb-modal-border);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cm-bubble-reply .cm-author { font-size: 12.5px; }
+.cm-bubble-reply .cm-body   { font-size: 13px; }
+
+/* ── Reply composer ──────────────────────────────────────────── */
+.cm-reply-composer {
+  margin: 12px 0 0 36px;
+}
+
+/* ── Textarea ────────────────────────────────────────────────── */
+.cm-textarea {
+  width: 100%;
+  padding: 10px 13px;
+  border-radius: 8px;
+  border: 1px solid var(--kb-input-border, var(--bb-border));
+  background: var(--kb-input-bg, var(--bb-surface));
+  color: var(--kb-input-text, var(--bb-text-primary));
+  font-size: 13px;
+  line-height: 1.6;
+  resize: none;
+  font-family: inherit;
+  box-sizing: border-box;
+  transition: border-color .15s, box-shadow .15s;
+  min-height: 72px;
+}
+.cm-textarea:focus {
+  outline: none;
+  border-color: #E75026;
+  box-shadow: 0 0 0 3px rgba(231,80,38,.09);
+}
+.cm-textarea::placeholder { color: var(--kb-input-ph, var(--bb-text-muted)); }
+
+/* ── Editor wrap ─────────────────────────────────────────────── */
+.cm-editor-wrap { display: flex; flex-direction: column; gap: 8px; }
+
+.cm-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  align-items: center;
+}
+
+.cm-hint {
+  font-size: 11px;
+  color: var(--bb-text-muted);
+  margin-right: auto;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+.cm-btn-cancel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bb-text-secondary);
+  background: none;
+  border: 1px solid var(--bb-border);
+  border-radius: 6px;
+  padding: 5px 14px;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+  line-height: 1.4;
+}
+.cm-btn-cancel:hover { border-color: var(--bb-text-muted); color: var(--kb-modal-title); }
+
+.cm-btn-save {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: #E75026;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 16px;
+  cursor: pointer;
+  transition: opacity .15s;
+  line-height: 1.4;
+}
+.cm-btn-save:disabled { opacity: .45; cursor: not-allowed; }
+.cm-btn-save:not(:disabled):hover { opacity: .88; }
+
+/* ── New comment row (bottom composer) ───────────────────────── */
+.cm-new-comment {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--kb-modal-border);
+}
+
+/* ── Standalone composer ─────────────────────────────────────── */
+.cm-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}

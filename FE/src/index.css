@@ -2572,11 +2572,11 @@
 
 /* Wide two-column modal */
 .kb-modal-wide {
-  background: var(--kb-modal-bg); border-radius: 14px; width: 100%; max-width: 860px;
+  background: var(--kb-modal-bg); border-radius: 14px; width: 100%; max-width: 1080px;
   box-shadow: 0 24px 56px rgba(23,43,77,.2);
   animation: bb-modal-in .18s ease;
   display: flex; flex-direction: column;
-  max-height: calc(100vh - 48px);
+  max-height: calc(100vh - 40px);
   overflow: hidden;
 }
 .dark .kb-modal-wide { box-shadow: 0 24px 56px rgba(0,0,0,.55); }
@@ -2822,7 +2822,7 @@
 .im-col-main {
   flex: 1; min-width: 0; padding: 0;
   display: flex; flex-direction: column;
-  overflow-y: auto; max-height: 560px;
+  overflow-y: auto; max-height: calc(100vh - 160px);
 }
 
 /* Divider */
@@ -2831,7 +2831,8 @@
 /* Right column */
 .im-col-props {
   width: 300px; flex-shrink: 0; overflow-y: auto; padding: 0;
-  display: flex; flex-direction: column; max-height: 560px;
+  display: flex; flex-direction: column; max-height: calc(100vh - 160px);
+  border-left: 1px solid var(--kb-modal-border);
 }
 
 /* Title input */

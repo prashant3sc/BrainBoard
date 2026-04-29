@@ -144,3 +144,33 @@ export type CreateIssueDto = Omit<Issue, 'id' | 'createdAt'>;
 
 /** Partial update payload for an existing issue. */
 export type UpdateIssueDto = Partial<CreateIssueDto>;
+
+// ─── Comments ────────────────────────────────────────────────────────────────
+
+export interface CommentAuthor {
+  id: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  avatar: string;   // first letter fallback
+}
+
+export interface CommentReply {
+  id: string;
+  parentId: string;
+  author: CommentAuthor;
+  body: string;
+  isEdited: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Comment {
+  id: string;
+  author: CommentAuthor;
+  body: string;
+  isEdited: boolean;
+  replies: CommentReply[];
+  createdAt: string;
+  updatedAt: string;
+}

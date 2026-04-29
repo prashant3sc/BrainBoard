@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from issues.models import Issue, Label
+from issues.models import Comment, Issue, Label
 
 
 class LabelSerializer(serializers.ModelSerializer):
@@ -255,3 +255,88 @@ class IssueUpdateSerializer(serializers.ModelSerializer):
             setattr(instance, attr, val)
         instance.save()
         return instance
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Comments
+# ─────────────────────────────────────────────────────────────────────────────
+
+class CommentAuthorSerializer(serializers.Serializer):
+    """Lightweight author embed — id, full name, avatar initial."""
+    id        = serializers.UUIDField()
+    firstName = serializers.SerializerMethodField()
+    lastName  = serializers.SerializerMethodField()
+    fullName  = serializers.SerializerMethodField()
+    avatar    = serializers.SerializerMethodField()
+
+    def get_firstName(self, obj):
+        return obj.first_name
+
+    def get_lastName(self, obj):
+        return obj.last_name
+
+    def get_fullName(self, obj):
+        return f"{obj.first_name} {obj.last_name}".strip() or obj.email
+
+    def get_avatar(self, obj):
+        # Returns first letter of name for avatar fallback
+        name = f"{obj.first_name} {obj.last_name}".strip() or obj.email
+        return name[0].upper() if name else "?"
+
+
+class ReplySerializer(serializers.ModelSerializer):
+    author   = CommentAuthorSerializer(read_only=True)
+    isEdited = serializers.SerializerMethodField()
+    parentId = serializers.UUIDField(source="parent_id", read_only=True)
+
+    class Meta:
+        model  = Comment
+        fields = ["id", "parentId", "author", "body", "isEdited", "created_at", "updated_at"]
+
+    def get_isEdited(self, obj):
+        return obj.is_edited
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        rep["createdAt"] = rep.pop("created_at")
+        rep["updatedAt"] = rep.pop("updated_at")
+        return rep
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    author   = CommentAuthorSerializer(read_only=True)
+    replies  = ReplySerializer(many=True, read_only=True)
+    isEdited = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = Comment
+        fields = ["id", "author", "body", "isEdited", "replies", "created_at", "updated_at"]
+
+    def get_isEdited(self, obj):
+        return obj.is_edited
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        rep["createdAt"] = rep.pop("created_at")
+        rep["updatedAt"] = rep.pop("updated_at")
+        return rep
+
+
+class CommentCreateSerializer(serializers.Serializer):
+    body     = serializers.CharField(min_length=1)
+    parentId = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate_parentId(self, value):
+        if value is None:
+            return value
+        try:
+            parent = Comment.objects.get(pk=value)
+        except Comment.DoesNotExist:
+            raise serializers.ValidationError("Parent comment not found.")
+        if parent.parent_id is not None:
+            raise serializers.ValidationError("Cannot reply to a reply — only one level of nesting allowed.")
+        return value
+
+
+class CommentEditSerializer(serializers.Serializer):
+    body = serializers.CharField(min_length=1)
