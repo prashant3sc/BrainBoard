@@ -3379,3 +3379,49 @@
 .im-diff-badge-warn { background: #FEF3C7; color: #92400E; }
 .im-diff-badge-ok   { background: #D1FAE5; color: #065F46; }
 
+/* ══════════════════════════════════════════════════
+   LOGIN → DASHBOARD TRANSITION
+   ══════════════════════════════════════════════════ */
+
+/* Step 1 – login card fades, blurs, and shrinks on successful auth */
+@keyframes bb-login-card-exit {
+  0%   { opacity: 1;    transform: scale(1);     filter: blur(0px); }
+  35%  { opacity: 0.9;  transform: scale(0.988); filter: blur(3px); }
+  100% { opacity: 0;    transform: scale(0.97);  filter: blur(7px); }
+}
+
+/* Step 2 – logo inside the card pops up slightly before vanishing with the card */
+@keyframes bb-login-logo-lift {
+  0%   { transform: scale(1)    translateY(0);   }
+  45%  { transform: scale(1.14) translateY(-4px); }
+  100% { transform: scale(0.72) translateY(-2px); opacity: 0; }
+}
+
+/* Step 3 – dashboard content fades in from a slight downward offset */
+@keyframes bb-dash-enter {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+/* Step 4 – each project card staggers in; set --card-i on the element */
+@keyframes bb-dash-card-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+.bb-login-exiting {
+  animation: bb-login-card-exit 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  pointer-events: none;
+}
+.bb-login-exiting .bb-login-logo {
+  animation: bb-login-logo-lift 0.26s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.bb-dash-enter {
+  animation: bb-dash-enter 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.bb-dash-card-enter {
+  animation: bb-dash-card-enter 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--card-i, 0) * 80ms);
+}
+
