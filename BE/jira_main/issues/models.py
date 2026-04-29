@@ -120,16 +120,26 @@ class Issue(models.Model):
 
 
 class Comment(models.Model):
-    """A comment left on a ticket (issue)."""
+    """A comment (or reply) left on a ticket (issue).
+
+    top-level: parent is None
+    reply:     parent points to a top-level Comment (one level deep only)
+    """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    # Named `ticket` so signal handlers can reference `instance.ticket_id`
     ticket = models.ForeignKey(Issue, on_delete=models.CASCADE, related_name="comments")
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         related_name="comments",
+    )
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="replies",
     )
     body = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
@@ -138,6 +148,16 @@ class Comment(models.Model):
     class Meta:
         db_table = "issue_comments"
         ordering = ["created_at"]
+
+    @property
+    def is_edited(self):
+        delta = self.updated_at - self.created_at
+        return delta.total_seconds() > 5
+
+    @property
+    def has_others_replies(self):
+        """True if this top-level comment has replies from users other than the author."""
+        return self.replies.exclude(author=self.author).exists()
 
     def __str__(self):
         return f"Comment on [{self.ticket.project.name}] {self.ticket.title}"

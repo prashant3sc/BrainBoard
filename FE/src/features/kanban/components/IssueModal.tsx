@@ -6,6 +6,7 @@ import { useProjectMembers } from '@/features/projects/useProjects';
 import { useActiveSprint, useSprints } from '@/features/projects/useSprints';
 import { useLabels } from '@/features/projects/useLabels';
 import useAuthStore from '@/store/useAuthStore';
+import { CommentsSection } from '@/features/comments/CommentsSection';
 import type { Issue, IssueStatus, Priority, IssueType } from '@/types';
 import { KANBAN_COLUMNS } from './KanbanBoard';
 
@@ -802,6 +803,11 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                     </label>
                   </div>
                 </div>
+              )}
+
+              {/* ── Comments — left col, below Location ── */}
+              {isEdit && issue?.id && (
+                <CommentsSection issueId={issue.id} />
               )}
 
             </div>
