@@ -43,6 +43,7 @@ const UserManagementPage    = React.lazy(() => import('@/pages/UserManagementPag
 const ProjectSettingsPage   = React.lazy(() => import('@/pages/ProjectSettingsPage'));
 const AnalyticsPage         = React.lazy(() => import('@/pages/AnalyticsPage'));
 const IssuePage             = React.lazy(() => import('@/pages/IssuePage'));
+const AiSyncPage            = React.lazy(() => import('@/pages/AiSyncPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -140,6 +141,17 @@ export default function App() {
                 <ProtectedRoute>
                   <AppShell>
                     <AnalyticsPage />
+                  </AppShell>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/ai-sync"
+              element={
+                <ProtectedRoute permission="manageUsers">
+                  <AppShell>
+                    <AiSyncPage />
                   </AppShell>
                 </ProtectedRoute>
               }

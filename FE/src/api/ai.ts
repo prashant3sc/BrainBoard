@@ -36,6 +36,12 @@ export interface AnalyzeDraftPayload {
   project_id: string;
 }
 
+export interface SyncStatusData {
+  in_sync: boolean;
+  postgres: Record<string, number>;
+  chroma: Record<string, number>;
+}
+
 export const aiApi = {
   analyzeIssue: (issueId: string): Promise<AnalyzeIssueResponse> =>
     apiClient.post(`/ai/analyze-issue/${issueId}`, undefined, { timeout: 60_000 }).then((r: { data: AnalyzeIssueResponse }) => r.data),
@@ -50,6 +56,6 @@ export const aiApi = {
   sync: (projectId?: string) =>
     apiClient.post('/ai/sync', projectId ? { project_id: projectId } : {}).then((r: { data: unknown }) => r.data),
 
-  syncStatus: () =>
-    apiClient.get('/ai/sync/status').then((r: { data: unknown }) => r.data),
+  syncStatus: (): Promise<SyncStatusData> =>
+    apiClient.get('/ai/sync/status').then((r: { data: SyncStatusData }) => r.data),
 };
