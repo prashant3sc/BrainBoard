@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 from django.db.models import Q
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -428,4 +430,110 @@ class WorkloadView(APIView):
             "project_name": project.name,
             "total_issues": total_issues,
             "members":      members_data,
+        })
+
+
+class BurndownView(APIView):
+    """
+    GET /projects/<project_id>/analytics/burndown?sprint_id=<id>
+
+    Returns daily burndown/burnup data for a sprint.
+    Uses issue updated_at as a proxy for completion date (no per-status history tracked).
+    Defaults to the active sprint when sprint_id is omitted.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, project_id):
+        try:
+            project = Project.objects.get(pk=project_id)
+        except Project.DoesNotExist:
+            return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        sprint_id = request.query_params.get("sprint_id")
+        if sprint_id:
+            try:
+                sprint = Sprint.objects.get(pk=sprint_id, project=project)
+            except Sprint.DoesNotExist:
+                return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            try:
+                sprint = Sprint.objects.get(project=project, status=Sprint.ACTIVE)
+            except Sprint.DoesNotExist:
+                sprint = Sprint.objects.filter(project=project).order_by("-created_at").first()
+                if not sprint:
+                    return Response({"detail": "No sprints found."}, status=status.HTTP_404_NOT_FOUND)
+
+        issues = list(Issue.objects.filter(sprint=sprint))
+        total_points = sum(i.story_points or 0 for i in issues)
+        completed_points = sum(i.story_points or 0 for i in issues if i.status == Issue.DONE)
+
+        # All completed sprints for the project (for the sprint selector on the FE)
+        all_sprints = list(
+            Sprint.objects
+            .filter(project=project)
+            .exclude(status=Sprint.PLANNED)
+            .order_by("start_date", "created_at")
+            .values("id", "name", "status", "start_date", "end_date")
+        )
+        sprints_meta = [
+            {
+                "sprint_id": str(s["id"]),
+                "sprint_name": s["name"],
+                "status": s["status"],
+                "start_date": str(s["start_date"]) if s["start_date"] else None,
+                "end_date": str(s["end_date"]) if s["end_date"] else None,
+            }
+            for s in all_sprints
+        ]
+
+        if not sprint.start_date or not sprint.end_date:
+            return Response({
+                "sprint_id": str(sprint.id),
+                "sprint_name": sprint.name,
+                "status": sprint.status,
+                "start_date": None,
+                "end_date": None,
+                "total_points": total_points,
+                "completed_points": completed_points,
+                "days": [],
+                "all_sprints": sprints_meta,
+            })
+
+        today = date.today()
+        start = sprint.start_date
+        end = sprint.end_date
+        chart_end = min(end, today) if sprint.status == Sprint.ACTIVE else end
+        total_days = max((end - start).days, 1)
+
+        done_issues = [i for i in issues if i.status == Issue.DONE]
+
+        days = []
+        current = start
+        while current <= chart_end:
+            completed_by_day = sum(
+                i.story_points or 0
+                for i in done_issues
+                if i.updated_at.date() <= current
+            )
+            day_index = (current - start).days
+            ideal_remaining = round(total_points * (1 - day_index / total_days), 1)
+            days.append({
+                "date": str(current),
+                "ideal_remaining": max(ideal_remaining, 0),
+                "actual_remaining": max(total_points - completed_by_day, 0),
+                "completed": min(completed_by_day, total_points),
+            })
+            current += timedelta(days=1)
+
+        return Response({
+            "sprint_id": str(sprint.id),
+            "sprint_name": sprint.name,
+            "status": sprint.status,
+            "start_date": str(sprint.start_date),
+            "end_date": str(sprint.end_date),
+            "total_points": total_points,
+            "completed_points": completed_points,
+            "days": days,
+            "all_sprints": sprints_meta,
         })

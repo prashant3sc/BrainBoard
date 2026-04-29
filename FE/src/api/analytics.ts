@@ -42,6 +42,73 @@ export interface WorkloadData {
   members: WorkloadMember[];
 }
 
+export interface BurndownDay {
+  date: string;
+  ideal_remaining: number;
+  actual_remaining: number;
+  completed: number;
+}
+
+export interface BurndownSprintMeta {
+  sprint_id: string;
+  sprint_name: string;
+  status: 'active' | 'completed';
+  start_date: string | null;
+  end_date: string | null;
+}
+
+export interface BurndownData {
+  sprint_id: string;
+  sprint_name: string;
+  status: 'active' | 'completed' | 'planned';
+  start_date: string | null;
+  end_date: string | null;
+  total_points: number;
+  completed_points: number;
+  days: BurndownDay[];
+  all_sprints: BurndownSprintMeta[];
+}
+
+export interface KBSpace {
+  space_id: string | null;
+  name: string;
+  page_count: number;
+  edit_count: number;
+}
+
+export interface KBTopPage {
+  page_id: string;
+  title: string;
+  edit_count: number;
+  link_count: number;
+  updated_at: string;
+}
+
+export interface KBContributor {
+  user_id: string;
+  name: string;
+  edit_count: number;
+}
+
+export interface KBActivity {
+  page_id: string;
+  title: string;
+  version_number: number;
+  user: string;
+  date: string;
+}
+
+export interface KBAnalyticsData {
+  project_id: string;
+  total_pages: number;
+  total_edits: number;
+  total_links: number;
+  spaces: KBSpace[];
+  top_pages: KBTopPage[];
+  top_contributors: KBContributor[];
+  recent_activity: KBActivity[];
+}
+
 export const analyticsApi = {
   getVelocity: (projectId: string): Promise<VelocityData> =>
     apiClient
@@ -52,4 +119,14 @@ export const analyticsApi = {
     apiClient
       .get(`/projects/${projectId}/analytics/workload`)
       .then((r: { data: WorkloadData }) => r.data),
+
+  getBurndown: (projectId: string, sprintId?: string): Promise<BurndownData> =>
+    apiClient
+      .get(`/projects/${projectId}/analytics/burndown`, { params: sprintId ? { sprint_id: sprintId } : {} })
+      .then((r: { data: BurndownData }) => r.data),
+
+  getKBAnalytics: (projectId: string): Promise<KBAnalyticsData> =>
+    apiClient
+      .get(`/projects/${projectId}/analytics/kb`)
+      .then((r: { data: KBAnalyticsData }) => r.data),
 };
