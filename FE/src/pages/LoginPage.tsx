@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import useAuthStore from '@/store/useAuthStore';
 import useAppStore from '@/store/useAppStore';
 import { mockUsers } from '@/mocks/users';
@@ -205,11 +205,13 @@ function ThemeToggle() {
 
 /* ── Page ── */
 export function LoginPage() {
-  const { login, isLoggedIn } = useAuthStore();
+  const login      = useAuthStore((s) => s.login);
+  // Reactive selector — stable primitive, re-renders only when user changes
+  const isLoggedIn = useAuthStore((s) => s.user !== null);
+  const navigate   = useNavigate();
 
-  // Kick off the DashboardPage chunk download as soon as the login page mounts
-  // so by the time the user hits "Log in" (network round-trip ≥300 ms) the
-  // chunk is already cached and Suspense resolves instantly — no white flash.
+  // Pre-load the DashboardPage JS chunk while the user types credentials.
+  // Login API takes ≥300 ms; by then the chunk is cached → zero Suspense flash.
   useEffect(() => { import('@/pages/DashboardPage'); }, []);
 
   const [selectedUserId, setSelectedUserId] = useState(mockUsers[0].id);
@@ -221,7 +223,8 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [exiting, setExiting] = useState(false);
 
-  if (isLoggedIn()) return <Navigate to="/dashboard" replace />;
+  // Guard: if already logged in (e.g. user visits /login while session active)
+  if (isLoggedIn) return <Navigate to="/dashboard" replace />;
 
   function validate(): boolean {
     let ok = true;
@@ -251,9 +254,12 @@ export function LoginPage() {
         const data = await authApi.login(email, password);
         login(data.user, data.token);
       }
-      // Start exit animation — the isLoggedIn() guard above re-renders
-      // immediately to <Navigate to="/dashboard"> so no manual navigate() needed.
+      // Navigate immediately and explicitly — don't wait for a re-render cycle
+      // to hit the isLoggedIn guard above. This is the most reliable path:
+      // login() sets the token synchronously in localStorage so the axios
+      // interceptor picks it up before the first /projects request fires.
       setExiting(true);
+      navigate('/dashboard', { replace: true });
     } catch {
       setSubmitErr('Invalid email or password. Please try again.');
       setLoading(false);
