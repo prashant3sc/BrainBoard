@@ -7,6 +7,7 @@ import { useActiveSprint, useSprints } from '@/features/projects/useSprints';
 import { useLabels } from '@/features/projects/useLabels';
 import useAuthStore from '@/store/useAuthStore';
 import { CommentsSection } from '@/features/comments/CommentsSection';
+import { useAIAnalysis } from '@/features/ai/useAIAnalysis';
 import type { Issue, IssueStatus, Priority, IssueType } from '@/types';
 import { KANBAN_COLUMNS } from './KanbanBoard';
 
@@ -51,25 +52,6 @@ const STATUS_CONFIG: Record<string, { label: string; dot: string }> = {
   cancelled:   { label: 'Cancelled',   dot: '#888780' },
 };
 
-/* ── Mock AI data (replace with real API response later) ── */
-const MOCK_TITLE_SUGGESTION =
-  'Bulk-sync PostgreSQL user capacity to ChromaDB via AI ingestion layer';
-
-const MOCK_DESC_SUGGESTION = `BE endpoint to read all users and workloads from DB, compute capacity, and bulk-upload to ChromaDB via AI layer.
-
-Acceptance criteria:
-- Fetch all active users from PostgreSQL
-- Compute capacity as (workload / max_capacity) × 100
-- Upsert vectors with user_id as namespace key
-- Idempotent: re-runs must not duplicate records
-
-Edge cases:
-- Handle zero-workload users gracefully
-- Rate-limit ChromaDB calls to avoid 429s
-- Log individual failures without halting the batch`;
-
-const MOCK_LABELS_ADD    = ['ai engineer', 'devops'];
-const MOCK_LABELS_REMOVE = ['tester'];
 
 /* ── Icon helpers ─────────────────────────────── */
 function StatusDot({ status }: { status: string }) {
@@ -197,32 +179,40 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
   const { data: projectLabels = [] } = useLabels(projectId);
 
   /* ── Mock AI state ── */
-  const [mockAiLoading,  setMockAiLoading]  = useState(false);
-  const [mockAiShown,    setMockAiShown]    = useState(false);
+  // ── Real AI analysis ──────────────────────────────────────────────────────
+  const { analysis, isLoading: aiLoading, error: aiError, analyze, analyzeDraft, clear: clearAI } = useAIAnalysis();
   const [expandedCards,  setExpandedCards]  = useState<Set<number>>(new Set());
   const [appliedCards,   setAppliedCards]   = useState<Set<number>>(new Set());
   const [dismissedCards, setDismissedCards] = useState<Set<number>>(new Set());
 
-  const mockActiveCount = 4 - appliedCards.size - dismissedCards.size;
+  // Cards: 0=StoryPoints, 1=Labels, 2=Assignee (only rendered if API returns them)
+  const aiCards = analysis ? [
+    { id: 0, available: true },
+    { id: 1, available: (analysis.labels?.length ?? 0) > 0 },
+    { id: 2, available: analysis.recommended_user !== null },
+  ].filter(c => c.available) : [];
 
-  function resetMockAI() {
-    setMockAiShown(false);
-    setMockAiLoading(false);
+  const activeCardCount = aiCards.filter(c => !appliedCards.has(c.id) && !dismissedCards.has(c.id)).length;
+
+  function resetAI() {
+    clearAI();
     setExpandedCards(new Set());
     setAppliedCards(new Set());
     setDismissedCards(new Set());
   }
 
-  function handleMockAnalyze() {
-    setMockAiLoading(true);
-    setMockAiShown(false);
-    setExpandedCards(new Set());
-    setAppliedCards(new Set());
-    setDismissedCards(new Set());
-    setTimeout(() => {
-      setMockAiLoading(false);
-      setMockAiShown(true);
-    }, 2000);
+  async function handleAnalyze() {
+    resetAI();
+    if (isEdit && issue?.id) {
+      await analyze(issue.id);
+    } else {
+      await analyzeDraft({
+        title:      title.trim(),
+        description: desc.trim(),
+        labels:     projectLabels.filter(l => labelIds.includes(l.id)).map(l => l.name),
+        project_id: projectId,
+      });
+    }
   }
 
   function toggleCard(idx: number) {
@@ -234,41 +224,37 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
     });
   }
 
-  function applyMockCard(idx: number) {
-    if (idx === 0) setTitle(MOCK_TITLE_SUGGESTION);
-    if (idx === 1) setDesc(MOCK_DESC_SUGGESTION);
-    if (idx === 2) {
-      const toAdd    = projectLabels.filter(l => MOCK_LABELS_ADD.some(n => l.name.toLowerCase() === n)).map(l => l.id);
-      const toRemove = projectLabels.filter(l => MOCK_LABELS_REMOVE.some(n => l.name.toLowerCase() === n)).map(l => l.id);
-      setLabelIds(prev => [...new Set([...prev.filter(id => !toRemove.includes(id)), ...toAdd])]);
+  function applyCard(idx: number) {
+    if (!analysis) return;
+    if (idx === 0) setPoints(analysis.analysis.story_points);
+    if (idx === 1) {
+      const suggested = projectLabels.filter(l => analysis.labels.some(n => l.name.toLowerCase() === n.toLowerCase())).map(l => l.id);
+      setLabelIds(suggested);
     }
-    if (idx === 3) {
-      const harsh = members.find(m => m.user.name.toLowerCase().includes('harsh'));
-      if (harsh) setAssigneeId(harsh.user.id);
+    if (idx === 2 && analysis.recommended_user) {
+      setAssigneeId(analysis.recommended_user.id);
     }
     setAppliedCards(prev => new Set([...prev, idx]));
     setExpandedCards(prev => { const n = new Set(prev); n.delete(idx); return n; });
   }
 
-  function dismissMockCard(idx: number) {
+  function dismissCard(idx: number) {
     setDismissedCards(prev => new Set([...prev, idx]));
     setExpandedCards(prev => { const n = new Set(prev); n.delete(idx); return n; });
   }
 
-  function applyAllMockCards() {
-    const remaining = [0, 1, 2, 3].filter(i => !appliedCards.has(i) && !dismissedCards.has(i));
-    if (remaining.includes(0)) setTitle(MOCK_TITLE_SUGGESTION);
-    if (remaining.includes(1)) setDesc(MOCK_DESC_SUGGESTION);
-    if (remaining.includes(2)) {
-      const toAdd    = projectLabels.filter(l => MOCK_LABELS_ADD.some(n => l.name.toLowerCase() === n)).map(l => l.id);
-      const toRemove = projectLabels.filter(l => MOCK_LABELS_REMOVE.some(n => l.name.toLowerCase() === n)).map(l => l.id);
-      setLabelIds(prev => [...new Set([...prev.filter(id => !toRemove.includes(id)), ...toAdd])]);
+  function applyAllCards() {
+    if (!analysis) return;
+    const remaining = aiCards.map(c => c.id).filter(i => !appliedCards.has(i) && !dismissedCards.has(i));
+    if (remaining.includes(0)) setPoints(analysis.analysis.story_points);
+    if (remaining.includes(1)) {
+      const suggested = projectLabels.filter(l => analysis.labels.some(n => l.name.toLowerCase() === n.toLowerCase())).map(l => l.id);
+      setLabelIds(suggested);
     }
-    if (remaining.includes(3)) {
-      const harsh = members.find(m => m.user.name.toLowerCase().includes('harsh'));
-      if (harsh) setAssigneeId(harsh.user.id);
+    if (remaining.includes(2) && analysis.recommended_user) {
+      setAssigneeId(analysis.recommended_user.id);
     }
-    setAppliedCards(new Set([0, 1, 2, 3].filter(i => !dismissedCards.has(i))));
+    setAppliedCards(new Set(aiCards.map(c => c.id).filter(i => !dismissedCards.has(i))));
     setExpandedCards(new Set());
   }
 
@@ -297,7 +283,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
     return () => document.removeEventListener('mousedown', handleClick);
   }, [openDD]);
 
-  useEffect(() => { resetMockAI(); }, [issue?.id, isOpen]);
+  useEffect(() => { resetAI(); }, [issue?.id, isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!isOpen) return;
@@ -467,8 +453,8 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
           <div className="im-sugg-body">
             {body}
             <div className="im-sugg-footer">
-              <button className="im-sugg-dismiss-btn" onClick={() => dismissMockCard(idx)}>{dismissLabel}</button>
-              <button className="im-sugg-apply-btn"   onClick={() => applyMockCard(idx)}>{applyLabel}</button>
+              <button className="im-sugg-dismiss-btn" onClick={() => dismissCard(idx)}>{dismissLabel}</button>
+              <button className="im-sugg-apply-btn"   onClick={() => applyCard(idx)}>{applyLabel}</button>
             </div>
           </div>
         )}
@@ -554,183 +540,153 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                 />
 
                 {/* ── AI Suggestions Panel ── */}
-                {mockAiShown && (
+                {(aiLoading || analysis || aiError) && (
                   <div className="im-sugg-container">
-                    {/* Header */}
-                    <div className="im-sugg-hdr">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                        <span className="im-sugg-hdr-title">AI suggestions</span>
-                        <span className="im-sugg-count-badge">{mockActiveCount} suggestion{mockActiveCount !== 1 ? 's' : ''}</span>
+                    {/* Loading state */}
+                    {aiLoading && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px', color: 'var(--kb-field-label)', fontSize: 13 }}>
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }}>
+                          <circle cx="8" cy="8" r="6" stroke="#A32E0E" strokeWidth="2" strokeDasharray="20 18"/>
+                        </svg>
+                        Analyzing with AI…
                       </div>
-                      <button
-                        type="button"
-                        className="im-sugg-apply-all-btn"
-                        disabled={mockActiveCount === 0}
-                        onClick={applyAllMockCards}
-                      >
-                        Apply all →
-                      </button>
-                    </div>
+                    )}
 
-                    {/* Cards */}
-                    <div className="im-sugg-cards">
+                    {/* Error state */}
+                    {aiError && !aiLoading && (
+                      <div style={{ padding: '10px 14px', fontSize: 12, color: 'var(--bb-err-text)', background: 'var(--bb-err-bg)', borderRadius: 6, margin: 8 }}>
+                        {aiError}
+                      </div>
+                    )}
 
-                      {/* Card 0 — Title */}
-                      {!dismissedCards.has(0) && (
-                        <SuggCard
-                          idx={0}
-                          iconBg="#FAECE7"
-                          cardTitle="Sharpen the title"
-                          preview={MOCK_TITLE_SUGGESTION}
-                          applyLabel="Apply →"
-                          dismissLabel="Dismiss"
-                          icon={
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-                              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="#D85A30" strokeWidth="2" strokeLinecap="round"/>
-                              <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="#D85A30" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          }
-                          body={
-                            <div className="im-sugg-diff">
-                              <div className="im-diff-row im-diff-was">
-                                <span className="im-diff-pill im-diff-pill-was">Was</span>
-                                <span className="im-diff-was-text">{title || '(empty)'}</span>
-                              </div>
-                              <div className="im-diff-row im-diff-now">
-                                <span className="im-diff-pill im-diff-pill-now">Now</span>
-                                <span className="im-diff-now-text">{MOCK_TITLE_SUGGESTION}</span>
-                              </div>
-                            </div>
-                          }
-                        />
-                      )}
+                    {/* Results */}
+                    {analysis && !aiLoading && (
+                      <>
+                        <div className="im-sugg-hdr">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                            <span className="im-sugg-hdr-title">AI suggestions</span>
+                            <span className="im-sugg-count-badge">{activeCardCount} suggestion{activeCardCount !== 1 ? 's' : ''}</span>
+                          </div>
+                          <button type="button" className="im-sugg-apply-all-btn" disabled={activeCardCount === 0} onClick={applyAllCards}>
+                            Apply all →
+                          </button>
+                        </div>
 
-                      {/* Card 1 — Description */}
-                      {!dismissedCards.has(1) && (
-                        <SuggCard
-                          idx={1}
-                          iconBg="#E6F1FB"
-                          cardTitle="Expand description"
-                          preview="Add acceptance criteria, edge cases and expected behaviour"
-                          applyLabel="Apply →"
-                          dismissLabel="Keep mine"
-                          icon={
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-                              <path d="M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7.5L14.5 2z" stroke="#185FA5" strokeWidth="2" strokeLinejoin="round"/>
-                              <polyline points="14,2 14,8 20,8" stroke="#185FA5" strokeWidth="2" strokeLinejoin="round"/>
-                            </svg>
-                          }
-                          body={
-                            <div className="im-sugg-diff">
-                              <div className="im-diff-pane im-diff-pane-was">
-                                <span className="im-diff-pane-label">Your version</span>
-                                <p className="im-diff-pane-text im-diff-was-text">{desc || '(empty)'}</p>
-                              </div>
-                              <div className="im-diff-pane im-diff-pane-now">
-                                <span className="im-diff-pane-label">AI expanded</span>
-                                <p className="im-diff-pane-text" style={{ whiteSpace: 'pre-line' }}>{MOCK_DESC_SUGGESTION}</p>
-                              </div>
-                            </div>
-                          }
-                        />
-                      )}
+                        <div className="im-sugg-cards">
 
-                      {/* Card 2 — Labels */}
-                      {!dismissedCards.has(2) && (
-                        <SuggCard
-                          idx={2}
-                          iconBg="#FAEEDA"
-                          cardTitle="Label suggestions"
-                          preview={`Add ${MOCK_LABELS_ADD.join(', ')} · Remove ${MOCK_LABELS_REMOVE.join(', ')}`}
-                          applyLabel="Apply labels"
-                          dismissLabel="Dismiss"
-                          icon={
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-                              <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" stroke="#854F0B" strokeWidth="2" strokeLinejoin="round"/>
-                              <line x1="7" y1="7" x2="7.01" y2="7" stroke="#854F0B" strokeWidth="2.5" strokeLinecap="round"/>
-                            </svg>
-                          }
-                          body={
-                            <div className="im-sugg-diff">
-                              <div className="im-diff-label-table">
-                                <div className="im-diff-label-row">
-                                  <span className="im-diff-label-key">Currently</span>
-                                  <div className="im-diff-chips">
-                                    {currentLabelNames.length > 0
-                                      ? currentLabelNames.map(n => <span key={n} className="im-diff-chip">{n}</span>)
-                                      : <span style={{ fontSize: 11, color: 'var(--kb-field-label)' }}>No labels</span>
-                                    }
+                          {/* Card 0 — Story Points */}
+                          {!dismissedCards.has(0) && (
+                            <SuggCard
+                              idx={0}
+                              iconBg="#FAEEDA"
+                              cardTitle="Story points"
+                              preview={`${analysis.analysis.story_points} pt${analysis.analysis.story_points !== 1 ? 's' : ''} — ${analysis.analysis.justification}`}
+                              applyLabel={`Set ${analysis.analysis.story_points} pts`}
+                              dismissLabel="Dismiss"
+                              icon={
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                                  <circle cx="12" cy="12" r="9" stroke="#854F0B" strokeWidth="2"/>
+                                  <path d="M12 8v4l3 3" stroke="#854F0B" strokeWidth="2" strokeLinecap="round"/>
+                                </svg>
+                              }
+                              body={
+                                <div className="im-sugg-diff">
+                                  <div className="im-diff-row im-diff-now" style={{ flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                                    <span style={{ fontSize: 20, fontWeight: 700, color: '#854F0B' }}>{analysis.analysis.story_points} <span style={{ fontSize: 13, fontWeight: 400 }}>points</span></span>
+                                    <span style={{ fontSize: 12, color: 'var(--kb-field-label)', lineHeight: 1.5 }}>{analysis.analysis.justification}</span>
+                                    {analysis.analysis.required_roles.length > 0 && (
+                                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 2 }}>
+                                        {analysis.analysis.required_roles.map(r => (
+                                          <span key={r} className="im-diff-chip">{r}</span>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
-                                <div className="im-diff-label-row">
-                                  <span className="im-diff-label-key">After AI</span>
-                                  <div className="im-diff-chips">
-                                    {currentLabelNames
-                                      .filter(n => !MOCK_LABELS_REMOVE.includes(n.toLowerCase()))
-                                      .map(n => <span key={n} className="im-diff-chip">{n}</span>)
-                                    }
-                                    {MOCK_LABELS_ADD.map(n => (
-                                      <span key={n} className="im-diff-chip im-diff-chip-add">+ {n}</span>
-                                    ))}
-                                    {currentLabelNames
-                                      .filter(n => MOCK_LABELS_REMOVE.includes(n.toLowerCase()))
-                                      .map(n => <span key={n} className="im-diff-chip im-diff-chip-remove">− {n}</span>)
-                                    }
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          }
-                        />
-                      )}
+                              }
+                            />
+                          )}
 
-                      {/* Card 3 — Assignee */}
-                      {!dismissedCards.has(3) && (
-                        <SuggCard
-                          idx={3}
-                          iconBg="#E1F5EE"
-                          cardTitle="Assignee suggestion"
-                          preview="Suggest Harsh Malik — 1 open ticket, available"
-                          applyLabel="Assign to Harsh"
-                          dismissLabel="Dismiss"
-                          icon={
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-                              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="#0F6E56" strokeWidth="2" strokeLinecap="round"/>
-                              <circle cx="9" cy="7" r="4" stroke="#0F6E56" strokeWidth="2"/>
-                            </svg>
-                          }
-                          body={
-                            <div className="im-sugg-diff">
-                              <div className="im-diff-assignee-table">
-                                {/* Not recommended — current assignee */}
-                                <div className="im-diff-assignee-row">
-                                  <span className="im-diff-person-av" style={{ background: '#D85A30' }}>PP</span>
-                                  <div className="im-diff-person-info">
-                                    <div className="im-diff-person-top">
-                                      <span className="im-diff-person-name">Prashant Poonia</span>
-                                      <span className="im-diff-badge im-diff-badge-warn">2 high priority open</span>
+                          {/* Card 1 — Labels (only if API returned labels) */}
+                          {(analysis.labels?.length ?? 0) > 0 && !dismissedCards.has(1) && (
+                            <SuggCard
+                              idx={1}
+                              iconBg="#FAEEDA"
+                              cardTitle="Label suggestions"
+                              preview={analysis.labels.join(', ')}
+                              applyLabel="Apply labels"
+                              dismissLabel="Dismiss"
+                              icon={
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                                  <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" stroke="#854F0B" strokeWidth="2" strokeLinejoin="round"/>
+                                  <line x1="7" y1="7" x2="7.01" y2="7" stroke="#854F0B" strokeWidth="2.5" strokeLinecap="round"/>
+                                </svg>
+                              }
+                              body={
+                                <div className="im-sugg-diff">
+                                  <div className="im-diff-label-table">
+                                    <div className="im-diff-label-row">
+                                      <span className="im-diff-label-key">Currently</span>
+                                      <div className="im-diff-chips">
+                                        {currentLabelNames.length > 0
+                                          ? currentLabelNames.map(n => <span key={n} className="im-diff-chip">{n}</span>)
+                                          : <span style={{ fontSize: 11, color: 'var(--kb-field-label)' }}>No labels</span>
+                                        }
+                                      </div>
                                     </div>
-                                    <span className="im-diff-person-reason">Not recommended — already at capacity this sprint</span>
-                                  </div>
-                                </div>
-                                {/* Recommended */}
-                                <div className="im-diff-assignee-row im-diff-assignee-rec">
-                                  <span className="im-diff-person-av" style={{ background: '#378ADD' }}>HM</span>
-                                  <div className="im-diff-person-info">
-                                    <div className="im-diff-person-top">
-                                      <span className="im-diff-person-name">Harsh Malik</span>
-                                      <span className="im-diff-badge im-diff-badge-ok">1 open, available</span>
+                                    <div className="im-diff-label-row">
+                                      <span className="im-diff-label-key">AI suggests</span>
+                                      <div className="im-diff-chips">
+                                        {analysis.labels.map(n => (
+                                          <span key={n} className="im-diff-chip im-diff-chip-add">+ {n}</span>
+                                        ))}
+                                      </div>
                                     </div>
-                                    <span className="im-diff-person-reason">✓ Recommended — has bandwidth, familiar with this module</span>
                                   </div>
                                 </div>
-                              </div>
-                            </div>
-                          }
-                        />
-                      )}
+                              }
+                            />
+                          )}
 
-                    </div>
+                          {/* Card 2 — Assignee (only if API returned a recommendation) */}
+                          {analysis.recommended_user && !dismissedCards.has(2) && (
+                            <SuggCard
+                              idx={2}
+                              iconBg="#E1F5EE"
+                              cardTitle="Assignee suggestion"
+                              preview={`${analysis.recommended_user.name} · ${analysis.analysis.capacity_analysis}`}
+                              applyLabel={`Assign to ${analysis.recommended_user.name.split(' ')[0]}`}
+                              dismissLabel="Dismiss"
+                              icon={
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                                  <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="#0F6E56" strokeWidth="2" strokeLinecap="round"/>
+                                  <circle cx="9" cy="7" r="4" stroke="#0F6E56" strokeWidth="2"/>
+                                </svg>
+                              }
+                              body={
+                                <div className="im-sugg-diff">
+                                  <div className="im-diff-assignee-table">
+                                    <div className="im-diff-assignee-row im-diff-assignee-rec">
+                                      <span className="im-diff-person-av" style={{ background: '#378ADD' }}>
+                                        {analysis.recommended_user.name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
+                                      </span>
+                                      <div className="im-diff-person-info">
+                                        <div className="im-diff-person-top">
+                                          <span className="im-diff-person-name">{analysis.recommended_user.name}</span>
+                                          <span className="im-diff-badge im-diff-badge-ok">{analysis.recommended_user.role}</span>
+                                        </div>
+                                        <span className="im-diff-person-reason">{analysis.analysis.capacity_analysis}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              }
+                            />
+                          )}
+
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -740,18 +696,18 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                 <div className="im-section">
                   <button
                     type="button"
-                    disabled={mockAiLoading || (!isEdit && (!title.trim() || !desc.trim()))}
+                    disabled={aiLoading || (!isEdit && (!title.trim() || !desc.trim()))}
                     className="im-ai-btn"
-                    onClick={handleMockAnalyze}
+                    onClick={handleAnalyze}
                   >
-                    {mockAiLoading ? (
+                    {aiLoading ? (
                       <>
                         <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ animation: 'spin 1s linear infinite' }}>
                           <circle cx="8" cy="8" r="6" stroke="#A32E0E" strokeWidth="2" strokeDasharray="20 18"/>
                         </svg>
                         Analyzing<span className="im-ai-dots"><span>.</span><span>.</span><span>.</span></span>
                       </>
-                    ) : mockAiShown ? (
+                    ) : analysis ? (
                       <>
                         <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
                           <circle cx="6.5" cy="6.5" r="5.5" stroke="#A32E0E" strokeWidth="1.3"/>
@@ -769,7 +725,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
                       </>
                     )}
                   </button>
-                  {!isEdit && (!title.trim() || !desc.trim()) && !mockAiShown && !mockAiLoading && (
+                  {!isEdit && (!title.trim() || !desc.trim()) && !analysis && !aiLoading && (
                     <p style={{ fontSize: 11, color: 'var(--kb-field-label)', marginTop: 2 }}>
                       {!title.trim() ? 'Add a title and description to enable AI analysis' : 'Add a description for better AI results'}
                     </p>

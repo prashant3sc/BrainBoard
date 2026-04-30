@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
 import useAuthStore from '@/store/useAuthStore';
 import useAppStore from '@/store/useAppStore';
 import { mockUsers } from '@/mocks/users';
@@ -206,7 +206,11 @@ function ThemeToggle() {
 /* ── Page ── */
 export function LoginPage() {
   const { login, isLoggedIn } = useAuthStore();
-  const navigate = useNavigate();
+
+  // Kick off the DashboardPage chunk download as soon as the login page mounts
+  // so by the time the user hits "Log in" (network round-trip ≥300 ms) the
+  // chunk is already cached and Suspense resolves instantly — no white flash.
+  useEffect(() => { import('@/pages/DashboardPage'); }, []);
 
   const [selectedUserId, setSelectedUserId] = useState(mockUsers[0].id);
   const [email,    setEmail]    = useState('');
@@ -247,10 +251,9 @@ export function LoginPage() {
         const data = await authApi.login(email, password);
         login(data.user, data.token);
       }
-      // Play exit animation before navigating
+      // Start exit animation — the isLoggedIn() guard above re-renders
+      // immediately to <Navigate to="/dashboard"> so no manual navigate() needed.
       setExiting(true);
-      await new Promise((r) => setTimeout(r, 300));
-      navigate('/dashboard', { replace: true });
     } catch {
       setSubmitErr('Invalid email or password. Please try again.');
       setLoading(false);
