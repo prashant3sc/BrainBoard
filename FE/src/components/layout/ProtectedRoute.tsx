@@ -8,7 +8,7 @@ interface Props {
 }
 
 export default function ProtectedRoute({ children, permission }: Props) {
-  const isLoggedIn = useAuthStore((s) => s.isLoggedIn());
+  const isLoggedIn = useAuthStore((s) => s.user !== null);
   const { can } = useRBAC();
 
   if (!isLoggedIn) return <Navigate to="/login" replace />;

@@ -19,8 +19,15 @@ apiClient.interceptors.response.use(
     // the persisted `user` object keeps isLoggedIn() returning true and LoginPage
     // immediately redirects back to /dashboard — causing an infinite loop.
     if (error.response?.status === 401) {
-      useAuthStore.getState().logout();
-      window.location.href = '/login';
+      // Only clear session + redirect if we're not already on the login page
+      // and not currently in the middle of a login request itself.
+      const isLoginRequest = error.config?.url?.includes('/auth/login');
+      if (!isLoginRequest) {
+        useAuthStore.getState().logout();
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+      }
     }
     return Promise.reject(error);
   },

@@ -29,7 +29,7 @@ function AuthSync() {
   useEffect(() => {
     if (USE_MOCK || !token) return;
     authApi.me().then(setUser).catch(() => {/* 401 is handled by axios interceptor */});
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [token]); // re-run whenever token changes (e.g. right after login)
 
   return null;
 }
@@ -63,7 +63,15 @@ export default function App() {
       <AuthSync />
       {/* <Toaster /> */}
       <BrowserRouter>
-        <Suspense fallback={<div className="flex h-screen items-center justify-center text-sm text-gray-400">Loading…</div>}>
+        <Suspense fallback={
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            height: '100vh', fontSize: 13, color: 'var(--bb-text-muted)',
+            background: 'var(--bb-bg-page)',
+          }}>
+            Loading…
+          </div>
+        }>
           <Routes>
             {/* Public */}
             <Route path="/login" element={<LoginPage />} />

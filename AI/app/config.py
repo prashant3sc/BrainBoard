@@ -24,8 +24,8 @@ class Settings(BaseSettings):
     openai_api_key: str
     openai_model_rag: str = "gpt-4o-mini"   # Faster for structured JSON output
     openai_model_chat: str = "gpt-4o-mini"     # Smarter for chatbot responses
-    openai_max_tokens_rag: int = 250
-    openai_max_tokens_chat: int = 250
+    openai_max_tokens_rag: int = 1200   # analyze-task JSON needs ~800-1000 tokens
+    openai_max_tokens_chat: int = 500
 
     # --- Groq (Optional: Ultra-fast alternative LLM provider) ---
     # Sign up free at https://console.groq.com and set GROQ_API_KEY in .env
