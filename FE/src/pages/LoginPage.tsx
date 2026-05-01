@@ -258,9 +258,11 @@ export function LoginPage() {
       // to hit the isLoggedIn guard above. This is the most reliable path:
       // login() sets the token synchronously in localStorage so the axios
       // interceptor picks it up before the first /projects request fires.
+      // Navigate immediately — do NOT delay, or the isLoggedIn guard above
+      // fires first (Zustand already updated) and renders a blank <Navigate>.
+      // The exit animation class plays briefly as React unmounts this page.
       setExiting(true);
-      // Let the exit animation play (~280ms) before navigating
-      setTimeout(() => navigate('/dashboard', { replace: true }), 280);
+      navigate('/dashboard', { replace: true });
     } catch {
       setSubmitErr('Invalid email or password. Please try again.');
       setLoading(false);

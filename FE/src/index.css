@@ -614,15 +614,13 @@
   from { opacity: 0; transform: translateY(20px) scale(0.97); }
   to   { opacity: 1; transform: translateY(0)    scale(1);    }
 }
-@keyframes bb-login-exit {
-  from { opacity: 1; transform: translateY(0)    scale(1);    }
-  to   { opacity: 0; transform: translateY(-16px) scale(0.97); }
-}
 .bb-login-card {
   animation: bb-login-enter 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .bb-login-exiting {
-  animation: bb-login-exit 0.3s cubic-bezier(0.4, 0, 1, 1) forwards !important;
+  /* navigation fires immediately so this only plays for ~1 frame — keep it subtle */
+  opacity: 0.8;
+  transition: opacity 0.1s ease;
   pointer-events: none;
 }
 
