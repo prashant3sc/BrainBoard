@@ -7,6 +7,7 @@ import { useActiveSprint } from '@/features/projects/useSprints';
 import { KanbanColumn } from './KanbanColumn';
 import { KanbanEmptyState } from './KanbanEmptyState';
 import { useProjectMembers } from '@/features/projects/useProjects';
+import { useRBAC } from '@/hooks/useRBAC';
 import type { Issue, IssueStatus } from '@/types';
 
 export const KANBAN_COLUMNS: { id: IssueStatus; label: string; cls: string }[] = [
@@ -27,6 +28,7 @@ export function KanbanBoard({ projectId, searchQuery, assigneeFilter, onIssueCli
   const { data: activeSprintData, isLoading, isError } = useActiveSprint(projectId);
   const { mutate: updateIssue } = useUpdateIssue();
   const { data: members = [] } = useProjectMembers(projectId);
+  const { can } = useRBAC();
 
   /* Toast */
   const [toast, setToast] = useState<{ msg: string; visible: boolean }>({ msg: '', visible: false });
@@ -47,6 +49,8 @@ export function KanbanBoard({ projectId, searchQuery, assigneeFilter, onIssueCli
   }, [activeSprintData]);
 
   function onDragEnd(result: DropResult) {
+    if (!can('moveIssue')) return;
+
     const { destination, source, draggableId } = result;
 
     // Dropped outside any column
