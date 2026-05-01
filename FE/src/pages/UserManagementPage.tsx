@@ -6,6 +6,7 @@ import {
   useDeleteUser,
 } from '@/features/users/useUsers';
 import useAppStore from '@/store/useAppStore';
+import { CustomSelect } from '@/components/common/CustomSelect';
 import type { Role, User } from '@/types';
 
 /* ─────────────────── helpers ─────────────────── */
@@ -481,16 +482,13 @@ export function UserManagementPage() {
 
                 {/* Role */}
                 <Field label="Role" required error={errors.role}>
-                  <select
-                    className={`bb-modal-input bb-modal-select${errors.role ? ' bb-modal-input-error' : ''}`}
+                  <CustomSelect
                     value={role}
-                    onChange={(e) => { setRole(e.target.value as Role); setErrors((p) => ({ ...p, role: false })); }}
-                  >
-                    <option value="">Select role</option>
-                    {ROLES.map((r) => (
-                      <option key={r} value={r}>{roleLabel(r)}</option>
-                    ))}
-                  </select>
+                    onChange={(v) => { setRole(v as Role); setErrors((p) => ({ ...p, role: false })); }}
+                    placeholder="Select role"
+                    error={errors.role}
+                    options={ROLES.map((r) => ({ value: r, label: roleLabel(r) }))}
+                  />
                 </Field>
 
                 {/* Password */}
@@ -789,15 +787,12 @@ function UserRow({
 
       {/* Change role */}
       <td style={{ padding: '14px 20px', verticalAlign: 'middle' }}>
-        <select
-          className="bb-role-select"
+        <CustomSelect
+          size="sm"
           value={user.role}
-          onChange={(e) => onRoleChange(user.id, e.target.value as Role)}
-        >
-          {ROLES.map((r) => (
-            <option key={r} value={r}>{roleLabel(r)}</option>
-          ))}
-        </select>
+          onChange={(v) => onRoleChange(user.id, v as Role)}
+          options={ROLES.map((r) => ({ value: r, label: roleLabel(r) }))}
+        />
       </td>
 
       {/* Actions */}

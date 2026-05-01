@@ -4,6 +4,7 @@ import {
   Legend, ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 import { useBurndown } from '../useBurndown';
+import { CustomSelect } from '@/components/common/CustomSelect';
 import type { BurndownSprintMeta } from '@/api/analytics';
 
 interface Props {
@@ -61,32 +62,25 @@ function StatCard({ label, value, sub, color }: { label: string; value: string |
 
 /* ── Sprint selector ── */
 function SprintSelector({
-  sprints,
-  selected,
-  onChange,
+  sprints, selected, onChange,
 }: {
   sprints: BurndownSprintMeta[];
   selected: string;
   onChange: (id: string) => void;
 }) {
   return (
-    <select
-      value={selected}
-      onChange={(e) => onChange(e.target.value)}
-      style={{
-        fontSize: 12, padding: '5px 10px', borderRadius: 8,
-        border: '1.5px solid var(--bb-border)',
-        background: 'var(--bb-bg-input)',
-        color: 'var(--bb-text-primary)',
-        cursor: 'pointer', outline: 'none',
-      }}
-    >
-      {sprints.map((s) => (
-        <option key={s.sprint_id} value={s.sprint_id}>
-          {s.sprint_name} {s.status === 'active' ? '(active)' : ''}
-        </option>
-      ))}
-    </select>
+    <div style={{ width: 200 }}>
+      <CustomSelect
+        size="sm"
+        value={selected}
+        onChange={onChange}
+        options={sprints.map((s) => ({
+          value: s.sprint_id,
+          label: s.sprint_name,
+          hint: s.status === 'active' ? 'Active' : undefined,
+        }))}
+      />
+    </div>
   );
 }
 

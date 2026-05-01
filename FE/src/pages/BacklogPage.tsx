@@ -6,6 +6,7 @@ import { useSprints, useStartSprint, useCompleteSprint, useCreateSprint } from '
 import { useRBAC } from '@/hooks/useRBAC';
 import { IssueModal } from '@/features/kanban/components/IssueModal';
 import { SprintDatePicker } from '@/components/SprintDatePicker';
+import { CustomSelect } from '@/components/common/CustomSelect';
 import type { Sprint, Issue, SprintStatus } from '@/types';
 import type { AxiosError } from 'axios';
 
@@ -92,16 +93,13 @@ function CompleteSprintModal({ sprint, unfinishedIssues, plannedSprints, onConfi
                 </label>
 
                 {action === 'next_sprint' && plannedSprints.length > 0 && (
-                  <select
-                    className="kb-input kb-select"
-                    value={nextSprintId}
-                    onChange={(e) => setNextSprintId(e.target.value)}
-                    style={{ marginLeft: 24 }}
-                  >
-                    {plannedSprints.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
+                  <div style={{ marginLeft: 24 }}>
+                    <CustomSelect
+                      value={nextSprintId}
+                      onChange={setNextSprintId}
+                      options={plannedSprints.map((s) => ({ value: s.id, label: s.name }))}
+                    />
+                  </div>
                 )}
               </div>
             </>
@@ -439,20 +437,20 @@ function BulkActionBar({
       </span>
       <span style={{ color: 'var(--bb-border)', fontSize: 18 }}>|</span>
       <span style={{ fontSize: 12, color: 'var(--bb-text-muted)', whiteSpace: 'nowrap' }}>Move to:</span>
-      <select
-        value={targetSprintId}
-        onChange={(e) => setTargetSprintId(e.target.value)}
-        style={{
-          flex: 1, fontSize: 13, padding: '5px 8px', borderRadius: 6,
-          border: '1px solid var(--bb-border)', background: 'var(--bb-bg-input)',
-          color: 'var(--bb-text-primary)', cursor: 'pointer',
-        }}
-      >
-        <option value="__backlog__">Backlog</option>
-        {activeSprints.map((s) => (
-          <option key={s.id} value={s.id}>{s.name} ({s.status})</option>
-        ))}
-      </select>
+      <div style={{ flex: 1, minWidth: 160 }}>
+        <CustomSelect
+          value={targetSprintId}
+          onChange={setTargetSprintId}
+          options={[
+            { value: '__backlog__', label: 'Backlog' },
+            ...activeSprints.map((s) => ({
+              value: s.id,
+              label: s.name,
+              hint: s.status === 'active' ? 'Active' : 'Planned',
+            })),
+          ]}
+        />
+      </div>
       <button
         onClick={() => onMove(targetSprintId === '__backlog__' ? null : targetSprintId)}
         disabled={isMoving || selectedCount === 0}

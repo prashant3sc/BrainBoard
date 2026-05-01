@@ -1,6 +1,7 @@
 import type { User, Role } from '@/types';
 import { Avatar } from '@/components/common/Avatar';
 import { RoleBadge } from '@/components/common/RoleBadge';
+import { CustomSelect } from '@/components/common/CustomSelect';
 
 const ROLES: Role[] = ['admin', 'pm', 'developer', 'viewer'];
 
@@ -36,16 +37,13 @@ export function UserTable({ users, onRoleChange, canEdit }: Props) {
                 <RoleBadge role={user.role} />
               </td>
               {canEdit && (
-                <td className="px-4 py-3">
-                  <select
+                <td className="px-4 py-3" style={{ minWidth: 140 }}>
+                  <CustomSelect
+                    size="sm"
                     value={user.role}
-                    onChange={(e) => onRoleChange(user.id, e.target.value as Role)}
-                    className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  >
-                    {ROLES.map((r) => (
-                      <option key={r} value={r} className="capitalize">{r}</option>
-                    ))}
-                  </select>
+                    onChange={(v) => onRoleChange(user.id, v as Role)}
+                    options={ROLES.map((r) => ({ value: r, label: r.charAt(0).toUpperCase() + r.slice(1) }))}
+                  />
                 </td>
               )}
             </tr>
