@@ -195,7 +195,7 @@ export function DashboardPage() {
         {isError && <p style={{ fontSize: 13, color: 'var(--bb-error-color)' }}>Failed to load projects.</p>}
 
         {!isLoading && !isError && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          <div className="bb-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
             {displayed.map((project, i) => (
               <div
                 key={project.id}

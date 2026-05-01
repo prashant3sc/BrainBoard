@@ -543,7 +543,7 @@ function SprintBlock({ sprint, issues, search, collapsed, onToggle, canManage, o
       </div>
 
       {!collapsed && (
-        <div>
+        <div className="bb-sprint-issues-animate">
           {isActive && issues.length > 0 && (
             <>
               <div className="bb-stats-strip">
@@ -621,7 +621,7 @@ function BacklogBlock({
         )}
       </div>
       {!collapsed && (
-        <div className="bb-issue-list">
+        <div className="bb-issue-list bb-sprint-issues-animate">
           {filtered.length === 0
             ? <div style={{ padding: '16px 14px', fontSize: 12, color: 'var(--bb-bl-count)', fontStyle: 'italic' }}>No backlog issues.</div>
             : filtered.map((i) => (
@@ -912,7 +912,7 @@ export default function BacklogPage() {
 
       {/* Toast */}
       <div
-        className={`bb-toast${toastVisible ? ' bb-toast-show' : ''}`}
+        className={`bb-toast${toastVisible ? ' bb-toast-show bb-toast-enter' : ' bb-toast-exit'}`}
         style={toastIsError ? { background: '#FFF0EE', borderColor: '#FFBDAD' } : {}}
       >
         {toastIsError ? (

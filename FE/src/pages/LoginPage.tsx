@@ -259,7 +259,8 @@ export function LoginPage() {
       // login() sets the token synchronously in localStorage so the axios
       // interceptor picks it up before the first /projects request fires.
       setExiting(true);
-      navigate('/dashboard', { replace: true });
+      // Let the exit animation play (~280ms) before navigating
+      setTimeout(() => navigate('/dashboard', { replace: true }), 280);
     } catch {
       setSubmitErr('Invalid email or password. Please try again.');
       setLoading(false);
@@ -279,7 +280,7 @@ export function LoginPage() {
       <ThemeToggle />
 
       <div
-        className={exiting ? 'bb-login-exiting' : ''}
+        className={`bb-login-card${exiting ? ' bb-login-exiting' : ''}`}
         style={{
           width: '100%', maxWidth: 400,
           background: 'var(--bb-bg-card)',
