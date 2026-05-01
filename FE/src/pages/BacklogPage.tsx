@@ -649,7 +649,9 @@ function BacklogBlock({
 export default function BacklogPage() {
   const { projectId = '' } = useParams<{ projectId: string }>();
   const { can } = useRBAC();
-  const canManage = can('createProject');
+  const canManageSprints = can('manageProjectMembers'); // start / complete / create sprints
+  const canMoveIssue     = can('moveIssue');            // move backlog issues to a sprint
+  const canEditIssue     = can('editIssue');            // create issues
   const qc = useQueryClient();
 
   const { data: sprints = [], isLoading: sprintsLoading } = useSprints(projectId);
@@ -796,7 +798,7 @@ export default function BacklogPage() {
           </div>
         </div>
         <div style={{ flex: 1 }} />
-        {canManage && (
+        {canManageSprints && (
           <button
             className="bb-bl-tb-btn bb-bl-tb-btn-primary"
             onClick={() => setShowCreateModal(true)}
@@ -804,12 +806,14 @@ export default function BacklogPage() {
             + New sprint
           </button>
         )}
-        <button
-          className="bb-bl-tb-btn bb-bl-tb-btn-primary"
-          onClick={() => { setSelectedIssue(null); setIssueModalOpen(true); }}
-        >
-          + Create issue
-        </button>
+        {canEditIssue && (
+          <button
+            className="bb-bl-tb-btn bb-bl-tb-btn-primary"
+            onClick={() => { setSelectedIssue(null); setIssueModalOpen(true); }}
+          >
+            + Create issue
+          </button>
+        )}
       </div>
 
       {/* Scrollable content */}
@@ -840,7 +844,7 @@ export default function BacklogPage() {
             search={search}
             collapsed={sprint.id in collapsed ? !!collapsed[sprint.id] : sprint.status === 'completed'}
             onToggle={() => setCollapsed((p) => ({ ...p, [sprint.id]: !p[sprint.id] }))}
-            canManage={canManage}
+            canManage={canManageSprints}
             plannedSprints={plannedSprints}
             onStart={() => handleStartSprint(sprint)}
             onComplete={handleOpenCompleteModal}
@@ -854,7 +858,7 @@ export default function BacklogPage() {
           search={search}
           collapsed={!!collapsed['__backlog__']}
           onToggle={() => setCollapsed((p) => ({ ...p, __backlog__: !p.__backlog__ }))}
-          canManage={canManage}
+          canManage={canMoveIssue}
           onIssueClick={(issue) => { setSelectedIssue(issue); setIssueModalOpen(true); }}
           selectionMode={selectionMode}
           selectedIds={selectedIds}

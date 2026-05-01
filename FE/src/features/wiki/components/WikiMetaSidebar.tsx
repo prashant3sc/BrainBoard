@@ -4,6 +4,7 @@ import type { WikiPage, TocItem, Issue } from '@/types';
 import { useWikiHistory, useWikiLinks, useLinkTicket, useUnlinkTicket } from '@/features/wiki/useWiki';
 import { issuesApi } from '@/api/issues';
 import { IssueModal } from '@/features/kanban/components/IssueModal';
+import { useRBAC } from '@/hooks/useRBAC';
 
 interface Props {
   page: WikiPage;
@@ -35,6 +36,7 @@ function issueEmoji(type: 'bug' | 'story' | 'task') {
 }
 
 export function WikiMetaSidebar({ page, allPages, projectId }: Props) {
+  const { can } = useRBAC();
   const [activeToc,      setActiveToc]      = useState<string | null>(null);
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
   const [linkSearch,     setLinkSearch]     = useState('');
@@ -132,12 +134,14 @@ export function WikiMetaSidebar({ page, allPages, projectId }: Props) {
       <div className="ds-section">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <span className="ds-label" style={{ margin: 0 }}>Linked issues</span>
-          <button
-            className="wiki-link-btn"
-            onClick={() => { setLinkPickerOpen((v) => !v); setLinkSearch(''); }}
-          >
-            {linkPickerOpen ? '✕ Cancel' : '+ Link issue'}
-          </button>
+          {can('editWikiPage') && (
+            <button
+              className="wiki-link-btn"
+              onClick={() => { setLinkPickerOpen((v) => !v); setLinkSearch(''); }}
+            >
+              {linkPickerOpen ? '✕ Cancel' : '+ Link issue'}
+            </button>
+          )}
         </div>
 
         {/* Issue picker dropdown */}
@@ -194,14 +198,16 @@ export function WikiMetaSidebar({ page, allPages, projectId }: Props) {
                 >
                   {link.issue.title}
                 </button>
-                <button
-                  className="wiki-unlink-btn"
-                  disabled={unlinking}
-                  title="Unlink"
-                  onClick={() => unlinkTicket({ pageId: page.id, issueId: link.issue.id })}
-                >
-                  ✕
-                </button>
+                {can('editWikiPage') && (
+                  <button
+                    className="wiki-unlink-btn"
+                    disabled={unlinking}
+                    title="Unlink"
+                    onClick={() => unlinkTicket({ pageId: page.id, issueId: link.issue.id })}
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
             );
           })}

@@ -145,7 +145,7 @@ export function WikiPage() {
             onCreatePage={handleCreatePage}
             onDeletePage={handleDeletePage}
             canCreate={can('createWikiPage')}
-            canDelete={can('manageProjectMembers')}
+            canDelete={can('editWikiPage')}
           />
         )}
 
