@@ -628,18 +628,11 @@
 
 /* ── Page transitions ── */
 @keyframes bb-page-in {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0);    }
-}
-@keyframes bb-page-out {
-  from { opacity: 1; transform: translateY(0);    }
-  to   { opacity: 0; transform: translateY(-6px); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 .bb-page-enter {
-  animation: bb-page-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-.bb-page-exit {
-  animation: bb-page-out 0.15s ease forwards;
+  animation: bb-page-in 0.2s ease both;
 }
 
 /* ── Modal ── */

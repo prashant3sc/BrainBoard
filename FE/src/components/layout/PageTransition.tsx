@@ -39,7 +39,6 @@ export function PageTransition({ children }: Props) {
     <div
       key={location.pathname}
       className={phase === 'enter' ? 'bb-page-enter' : ''}
-      style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
     >
       {displayChildren}
     </div>

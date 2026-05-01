@@ -20,7 +20,7 @@ export default function AppShell({ children }: Props) {
     <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bb-content-bg)' }}>
       <SearchBar />
       <Sidebar />
-      <main className="flex-1 overflow-hidden" style={{ display: 'flex', flexDirection: 'column' }}>
+      <main className="flex-1 overflow-y-auto">
         <PageTransition>{children}</PageTransition>
       </main>
       <ChatPanelWrapper />
