@@ -6,6 +6,8 @@ import { useUsers } from '@/features/users/useUsers';
 import useAuthStore from '@/store/useAuthStore';
 import useAppStore from '@/store/useAppStore';
 import { useRBAC } from '@/hooks/useRBAC';
+import { useArchivedProject } from '@/hooks/useArchivedProject';
+import { ArchivedBanner } from '@/components/common/ArchivedBanner';
 import type { User, Role } from '@/types';
 
 /* ─── helpers ─── */
@@ -67,6 +69,7 @@ export default function ProjectSettingsPage() {
   const currentUser = useAuthStore((s) => s.user);
   const { togglePalette } = useAppStore();
   const { can } = useRBAC();
+  const { isArchived, isWriteLocked } = useArchivedProject(projectId);
   const { toastMsg, toastVisible, showToast } = useToast();
   const [activeTab, setActiveTab] = useState<SettingsTab>('members');
 
@@ -153,6 +156,9 @@ export default function ProjectSettingsPage() {
   /* ── render ── */
   return (
     <>
+      {/* ── Archived banner ── */}
+      {isArchived && <ArchivedBanner viewOnly={isWriteLocked} />}
+
       {/* ── Topbar ── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -243,7 +249,7 @@ export default function ProjectSettingsPage() {
             </div>
 
             {/* Create label form */}
-            {can('createProject') && (
+            {can('createProject') && !isWriteLocked && (
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20,
                 background: 'var(--bb-tbl-wrap-bg)', border: '1px solid var(--bb-tbl-wrap-border)',
@@ -320,7 +326,7 @@ export default function ProjectSettingsPage() {
                     }}>
                       {label.color}
                     </span>
-                    {can('createProject') && (
+                    {can('createProject') && !isWriteLocked && (
                       <button
                         className="bb-action-btn bb-action-danger"
                         disabled={deletingLabel}
@@ -375,8 +381,8 @@ export default function ProjectSettingsPage() {
                 />
               </div>
 
-              {/* Add member button */}
-              <button
+              {/* Add member button — hidden when project is write-locked */}
+              {!isWriteLocked && <button
                 onClick={() => setAddOpen(true)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
@@ -393,7 +399,7 @@ export default function ProjectSettingsPage() {
                   <path d="M7 2v10M2 7h10" stroke="white" strokeWidth="2" strokeLinecap="round" />
                 </svg>
                 Add Member
-              </button>
+              </button>}
             </div>
           </div>
 
@@ -440,7 +446,7 @@ export default function ProjectSettingsPage() {
                       const col       = avatarColor(idx);
                       const isOwner   = user.id === project?.ownerId;
                       const isSelf    = user.id === currentUser?.id;
-                      const canRemove = !isOwner && !isSelf;
+                      const canRemove = !isOwner && !isSelf && !isWriteLocked;
                       return (
                         <MemberRow
                           key={user.id}

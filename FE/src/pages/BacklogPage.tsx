@@ -4,6 +4,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { issuesApi } from '@/api/issues';
 import { useSprints, useStartSprint, useCompleteSprint, useCreateSprint } from '@/features/projects/useSprints';
 import { useRBAC } from '@/hooks/useRBAC';
+import { useArchivedProject } from '@/hooks/useArchivedProject';
+import { ArchivedBanner } from '@/components/common/ArchivedBanner';
 import { IssueModal } from '@/features/kanban/components/IssueModal';
 import { SprintDatePicker } from '@/components/SprintDatePicker';
 import { CustomSelect } from '@/components/common/CustomSelect';
@@ -647,9 +649,10 @@ function BacklogBlock({
 export default function BacklogPage() {
   const { projectId = '' } = useParams<{ projectId: string }>();
   const { can } = useRBAC();
-  const canManageSprints = can('manageProjectMembers'); // start / complete / create sprints
-  const canMoveIssue     = can('moveIssue');            // move backlog issues to a sprint
-  const canEditIssue     = can('editIssue');            // create issues
+  const { isArchived, isWriteLocked } = useArchivedProject(projectId);
+  const canManageSprints = can('manageProjectMembers') && !isWriteLocked;
+  const canMoveIssue     = can('moveIssue')            && !isWriteLocked;
+  const canEditIssue     = can('editIssue')            && !isWriteLocked;
   const qc = useQueryClient();
 
   const { data: sprints = [], isLoading: sprintsLoading } = useSprints(projectId);
@@ -784,6 +787,9 @@ export default function BacklogPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: 'var(--bb-content-bg)' }}>
 
+      {/* Archived banner */}
+      {isArchived && <ArchivedBanner viewOnly={isWriteLocked} />}
+
       {/* Topbar */}
       <div style={{ height: 52, background: 'var(--bb-topbar-bg)', borderBottom: '1px solid var(--bb-topbar-border)', display: 'flex', alignItems: 'center', padding: '0 20px', gap: 10, flexShrink: 0 }}>
         <div>
@@ -884,6 +890,7 @@ export default function BacklogPage() {
         projectId={projectId}
         onClose={() => { setIssueModalOpen(false); setSelectedIssue(null); }}
         onNavigate={(issue) => { setSelectedIssue(issue); setIssueModalOpen(true); }}
+        readOnly={isWriteLocked}
       />
 
       {/* Complete Sprint Modal */}

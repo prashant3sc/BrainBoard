@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { projectsApi } from '@/api/projects';
 import { useProjectMembers } from '@/features/projects/useProjects';
 import { useRBAC } from '@/hooks/useRBAC';
+import { useArchivedProject } from '@/hooks/useArchivedProject';
+import { ArchivedBanner } from '@/components/common/ArchivedBanner';
 import { useActiveSprint } from '@/features/projects/useSprints';
 import { KanbanBoard } from '@/features/kanban/components/KanbanBoard';
 import { IssueListView } from '@/features/kanban/components/IssueListView';
@@ -32,6 +34,7 @@ function getInitials(name: string) {
 export function KanbanPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const { can } = useRBAC();
+  const { isArchived, isWriteLocked } = useArchivedProject(projectId);
 
   const [searchQuery,        setSearchQuery]        = useState('');
   const [modalOpen,          setModalOpen]          = useState(false);
@@ -90,6 +93,9 @@ export function KanbanPage() {
 
   return (
     <div className="kb-page">
+
+      {/* ── Archived banner ── */}
+      {isArchived && <ArchivedBanner viewOnly={isWriteLocked} />}
 
       {/* ── Topbar ── */}
       <div className="kb-topbar">
@@ -211,7 +217,7 @@ export function KanbanPage() {
           </div>
 
           {/* Add Card */}
-          {can('editIssue') && (
+          {can('editIssue') && !isWriteLocked && (
             <button className="kb-btn-primary" onClick={() => openAdd()}>
               <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
                 <path d="M7 2v10M2 7h10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
@@ -229,6 +235,7 @@ export function KanbanPage() {
           searchQuery={searchQuery}
           assigneeFilter={assigneeFilter}
           onIssueClick={openEdit}
+          isWriteLocked={isWriteLocked}
         />
       ) : (
         <IssueListView
@@ -249,6 +256,7 @@ export function KanbanPage() {
         projectId={projectId}
         onClose={closeModal}
         onNavigate={openEdit}
+        readOnly={isWriteLocked}
       />
     </div>
   );
