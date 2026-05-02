@@ -80,4 +80,10 @@ export const wikiApi = {
     if (USE_MOCK) return Promise.resolve();
     return apiClient.delete(`/wiki/${id}/link-ticket`, { data: { issueId } }).then(() => undefined);
   },
+
+  // Fetch all wiki pages linked to an issue (reverse lookup)
+  getIssueLinks(issueId: string): Promise<{ id: string; wikiPage: { id: string; title: string; icon: string | null }; createdAt: string }[]> {
+    if (USE_MOCK) return Promise.resolve([]);
+    return apiClient.get(`/issues/${issueId}/wiki-links`).then((r) => r.data);
+  },
 };

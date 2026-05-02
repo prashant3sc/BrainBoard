@@ -132,3 +132,27 @@ class TicketPageLinkSerializer(serializers.ModelSerializer):
         rep["issue"]["id"] = str(rep["issue"]["id"])
         rep["wikiPage"]    = str(rep["wikiPage"])
         return rep
+
+
+class LinkedWikiPageSerializer(serializers.Serializer):
+    """Minimal wiki page shape returned inside an issue's wiki-link list."""
+    id    = serializers.UUIDField()
+    title = serializers.CharField()
+    icon  = serializers.CharField(allow_null=True, default=None)
+
+
+class IssueWikiLinkSerializer(serializers.ModelSerializer):
+    """Serializer for TicketPageLink viewed from the issue side."""
+    wikiPage = LinkedWikiPageSerializer(source="wiki_page", read_only=True)
+
+    class Meta:
+        model = TicketPageLink
+        fields = ["id", "wikiPage", "created_at"]
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        rep["createdAt"] = rep.pop("created_at")
+        rep["id"]        = str(rep["id"])
+        wp = rep["wikiPage"]
+        wp["id"] = str(wp["id"])
+        return rep
