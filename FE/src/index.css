@@ -609,6 +609,127 @@
   }
 }
 
+/* ══ Login Splash ══ */
+
+/* Overlay */
+@keyframes bb-splash-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes bb-splash-overlay-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+.bb-splash-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--bb-bg-page);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  animation: bb-splash-overlay-in 0.25s ease both;
+}
+.bb-splash-out {
+  animation: bb-splash-overlay-out 0.4s cubic-bezier(0.4, 0, 1, 1) forwards !important;
+}
+
+/* Logo block — single centered column containing everything */
+@keyframes bb-splash-logo-in {
+  from { opacity: 0; transform: scale(0.75) translateY(12px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+@keyframes bb-splash-logo-settle {
+  from { transform: scale(1.06); }
+  to   { transform: scale(1); }
+}
+.bb-splash-logo {
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
+  animation: bb-splash-logo-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  position: relative; z-index: 1;
+}
+.bb-splash-logo-hold {
+  animation: bb-splash-logo-settle 0.3s cubic-bezier(0.22, 1, 0.36, 1) both !important;
+}
+
+/* Icon wrapper — rings are centered exactly on the icon */
+.bb-splash-icon-wrap {
+  position: relative;
+  width: 72px; height: 72px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Soft radial glow that breathes behind the icon */
+@keyframes bb-splash-glow-pulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1);    opacity: 0.9; }
+  50%       { transform: translate(-50%, -50%) scale(1.6);  opacity: 0.35; }
+}
+.bb-splash-glow {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 220px; height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(231,80,38,0.75) 0%, rgba(231,80,38,0.18) 50%, rgba(231,80,38,0) 75%);
+  transform: translate(-50%, -50%);
+  animation: bb-splash-glow-pulse 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Individual rect animations — cascade in */
+@keyframes bb-splash-rect-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.85); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+.bb-splash-rect { animation: bb-splash-rect-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.bb-splash-rect-1 { animation-delay: 60ms; }
+.bb-splash-rect-2 { animation-delay: 120ms; }
+.bb-splash-rect-3 { animation-delay: 180ms; }
+.bb-splash-rect-4 { animation-delay: 140ms; }
+.bb-splash-rect-5 { animation-delay: 200ms; }
+.bb-splash-rect-6 { animation-delay: 160ms; }
+
+/* Wordmark */
+@keyframes bb-splash-word-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.bb-splash-wordmark {
+  font-size: 28px; font-weight: 700; letter-spacing: -0.5px;
+  animation: bb-splash-word-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+}
+.bb-splash-word-brain { color: var(--bb-page-title); }
+.bb-splash-word-board { color: #E75026; }
+
+.bb-splash-tagline {
+  font-size: 13px; color: var(--bb-text-muted); letter-spacing: 0.02em;
+  animation: bb-splash-word-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.32s both;
+}
+
+/* Progress bar */
+.bb-splash-bar-wrap {
+  width: 140px; height: 3px; border-radius: 3px;
+  background: var(--bb-border); overflow: hidden;
+  margin-top: 4px;
+}
+/* Slow fill to ~75% while waiting for data */
+@keyframes bb-splash-bar-loading {
+  from { width: 0%; }
+  to   { width: 75%; }
+}
+/* Jump to 100% once data is ready */
+@keyframes bb-splash-bar-done {
+  from { width: 75%; }
+  to   { width: 100%; }
+}
+.bb-splash-bar {
+  height: 100%; width: 0%; border-radius: 3px;
+  background: #E75026;
+  transition: width 0.2s ease;
+}
+.bb-splash-bar-loading {
+  animation: bb-splash-bar-loading 3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.bb-splash-bar-done {
+  animation: bb-splash-bar-done 0.25s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
 /* ── Login card ── */
 @keyframes bb-login-enter {
   from { opacity: 0; transform: translateY(20px) scale(0.97); }

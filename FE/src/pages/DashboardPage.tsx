@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProjects, useDeleteProject, useUpdateProject, useArchiveProject } from '@/features/projects/useProjects';
 import { ProjectCard } from '@/features/projects/components/ProjectCard';
@@ -40,10 +40,17 @@ export function DashboardPage() {
   const [editDesc, setEditDesc]                   = useState('');
 
   const { can } = useRBAC();
-  const { togglePalette } = useAppStore();
+  const { togglePalette, showLoginSplash, signalSplashReady } = useAppStore();
   const navigate    = useNavigate();
   const canManage   = can('manageProjectMembers'); // admin + pm
   const { toastMsg, toastVisible, toastIsError, showToast } = useToast();
+
+  // Tell the login splash to exit once dashboard data has finished loading
+  useEffect(() => {
+    if (showLoginSplash && !isLoading) {
+      signalSplashReady();
+    }
+  }, [showLoginSplash, isLoading]);
 
   function handleProjectClick(project: Project) {
     if (!project.isArchived) navigate(`/projects/${project.id}/kanban`);
