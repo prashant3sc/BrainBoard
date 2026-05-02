@@ -140,54 +140,6 @@ function CreateSprintModal({ onConfirm, onClose, isPending, serverError, onClear
   const [startDate,   setStartDate]   = useState('');
   const [endDate,     setEndDate]     = useState('');
   const [showCal,     setShowCal]     = useState(false);
-  const [popPos,      setPopPos]      = useState<{ top: number; left: number } | null>(null);
-  const dateRowRef    = useRef<HTMLDivElement>(null);
-  const calPopoverRef = useRef<HTMLDivElement>(null);
-
-  // Compute popover position when it opens
-  useEffect(() => {
-    if (!showCal) { setPopPos(null); return; }
-    const anchor = dateRowRef.current;
-    if (!anchor) return;
-    const rect     = anchor.getBoundingClientRect();
-    const popW     = 516;   // approx popover width (padding + two month grids)
-    const popH     = 300;   // approx popover height
-    const gap      = 8;
-    const vw       = window.innerWidth;
-    const vh       = window.innerHeight;
-
-    // Prefer below; flip above if not enough room
-    let top = rect.bottom + gap;
-    if (top + popH > vh - 8) top = rect.top - popH - gap;
-    if (top < 8) top = 8;
-
-    // Align left-edge with anchor; clamp to viewport
-    let left = rect.left;
-    if (left + popW > vw - 8) left = vw - popW - 8;
-    if (left < 8) left = 8;
-
-    setPopPos({ top, left });
-  }, [showCal]);
-
-  // Close popover on outside click
-  useEffect(() => {
-    if (!showCal) return;
-    function handleClick(e: MouseEvent) {
-      if (
-        calPopoverRef.current && !calPopoverRef.current.contains(e.target as Node) &&
-        dateRowRef.current && !dateRowRef.current.contains(e.target as Node)
-      ) {
-        setShowCal(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [showCal]);
-
-  // Auto-close popover once both dates picked
-  useEffect(() => {
-    if (startDate && endDate) setShowCal(false);
-  }, [startDate, endDate]);
 
   function handleConfirm() {
     onConfirm(name.trim(), goal.trim(), startDate, endDate);
@@ -207,7 +159,7 @@ function CreateSprintModal({ onConfirm, onClose, isPending, serverError, onClear
 
   return (
     <div className="kb-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="kb-modal-wide bb-modal-animate" style={{ maxWidth: 500, display: 'flex', flexDirection: 'column' }}>
+      <div className="kb-modal-wide bb-modal-animate" style={{ maxWidth: 580, display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
         <div className="kb-modal-header">
           <span className="kb-modal-title">Create Sprint</span>
           <button className="kb-modal-close" onClick={onClose}>
@@ -217,7 +169,7 @@ function CreateSprintModal({ onConfirm, onClose, isPending, serverError, onClear
           </button>
         </div>
 
-        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto' }}>
           <div className="kb-field">
             <label className="kb-label">Sprint name <span className="kb-required">*</span></label>
             <input className="kb-input" placeholder="e.g. Sprint 14" value={name} onChange={(e) => setName(e.target.value)} />
@@ -231,7 +183,6 @@ function CreateSprintModal({ onConfirm, onClose, isPending, serverError, onClear
           <div>
             <label className="kb-label">Sprint dates</label>
             <div
-              ref={dateRowRef}
               onClick={() => setShowCal((v) => !v)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 8,
@@ -268,22 +219,14 @@ function CreateSprintModal({ onConfirm, onClose, isPending, serverError, onClear
             </div>
           </div>
 
-          {/* Calendar popover — rendered into a portal-like fixed layer */}
-          {showCal && popPos && (
-            <div
-              ref={calPopoverRef}
-              style={{
-                position: 'fixed',
-                top: popPos.top,
-                left: popPos.left,
-                zIndex: 10001,
-                background: 'var(--kb-modal-bg, var(--bb-surface))',
-                border: '1px solid var(--bb-border)',
-                borderRadius: 12,
-                boxShadow: '0 16px 48px rgba(23,43,77,.28)',
-                padding: '16px 20px 14px',
-              }}
-            >
+          {/* Calendar — inline, no fixed positioning */}
+          {showCal && (
+            <div style={{
+              background: 'var(--kb-modal-bg, var(--bb-surface))',
+              border: '1px solid var(--bb-border)',
+              borderRadius: 12,
+              padding: '16px 20px 14px',
+            }}>
               <SprintDatePicker
                 startDate={startDate}
                 endDate={endDate}
