@@ -19,6 +19,7 @@ interface Props {
   projectId: string;
   onClose: () => void;
   onNavigate?: (issue: Issue) => void;
+  readOnly?: boolean;    // force view-only (e.g. archived project)
 }
 
 const PRIORITIES: Priority[]   = ['critical', 'high', 'medium', 'low'];
@@ -119,7 +120,7 @@ function ChevronIcon({ open }: { open: boolean }) {
   );
 }
 
-export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Props) {
+export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, readOnly = false }: Props) {
   const isEdit  = issue !== null;
   const { can } = useRBAC();
   const qc      = useQueryClient();
@@ -134,7 +135,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate }: Pr
     sprints.some((s) => s.id === issue.sprintId && s.status === 'planned');
   const isInCompletedSprint = isEdit && !!issue?.sprintId &&
     sprints.some((s) => s.id === issue.sprintId && s.status === 'completed');
-  const isReadOnly = isInPlannedSprint || isInCompletedSprint;
+  const isReadOnly = isInPlannedSprint || isInCompletedSprint || readOnly;
   const currentUser = useAuthStore((s) => s.user);
 
   const { data: allIssues = [] } = useQuery({

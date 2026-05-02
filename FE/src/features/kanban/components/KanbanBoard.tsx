@@ -22,9 +22,10 @@ interface Props {
   searchQuery:    string;
   assigneeFilter: string[];
   onIssueClick:   (issue: Issue) => void;
+  isWriteLocked?: boolean;
 }
 
-export function KanbanBoard({ projectId, searchQuery, assigneeFilter, onIssueClick }: Props) {
+export function KanbanBoard({ projectId, searchQuery, assigneeFilter, onIssueClick, isWriteLocked = false }: Props) {
   const { data: activeSprintData, isLoading, isError } = useActiveSprint(projectId);
   const { mutate: updateIssue } = useUpdateIssue();
   const { data: members = [] } = useProjectMembers(projectId);
@@ -49,7 +50,7 @@ export function KanbanBoard({ projectId, searchQuery, assigneeFilter, onIssueCli
   }, [activeSprintData]);
 
   function onDragEnd(result: DropResult) {
-    if (!can('moveIssue')) return;
+    if (!can('moveIssue') || isWriteLocked) return;
 
     const { destination, source, draggableId } = result;
 

@@ -53,7 +53,7 @@ export function DashboardPage() {
   }, [showLoginSplash, isLoading]);
 
   function handleProjectClick(project: Project) {
-    if (!project.isArchived) navigate(`/projects/${project.id}/kanban`);
+    navigate(`/projects/${project.id}/kanban`);
   }
 
   function handlePulse(project: Project, index: number) {

@@ -5,6 +5,7 @@ import { useWikiHistory, useWikiLinks, useLinkTicket, useUnlinkTicket } from '@/
 import { issuesApi } from '@/api/issues';
 import { IssueModal } from '@/features/kanban/components/IssueModal';
 import { useRBAC } from '@/hooks/useRBAC';
+import { useArchivedProject } from '@/hooks/useArchivedProject';
 
 interface Props {
   page: WikiPage;
@@ -37,6 +38,7 @@ function issueEmoji(type: 'bug' | 'story' | 'task') {
 
 export function WikiMetaSidebar({ page, allPages, projectId }: Props) {
   const { can } = useRBAC();
+  const { isWriteLocked } = useArchivedProject(projectId);
   const [activeToc,      setActiveToc]      = useState<string | null>(null);
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
   const [linkSearch,     setLinkSearch]     = useState('');
@@ -221,6 +223,7 @@ export function WikiMetaSidebar({ page, allPages, projectId }: Props) {
         projectId={projectId}
         onClose={() => { setModalOpen(false); setSelectedIssue(null); }}
         onNavigate={(issue) => { setSelectedIssue(issue); setModalOpen(true); }}
+        readOnly={isWriteLocked}
       />
 
       {/* Related pages */}
