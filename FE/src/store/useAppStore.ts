@@ -19,22 +19,32 @@ function getInitialSemantic(): boolean {
 }
 
 interface AppState {
-  paletteOpen:     boolean;
-  theme:           'light' | 'dark';
-  semanticEnabled: boolean;
-  togglePalette:   () => void;
-  closePalette:    () => void;
-  toggleTheme:     () => void;
-  toggleSemantic:  () => void;
+  paletteOpen:         boolean;
+  theme:               'light' | 'dark';
+  semanticEnabled:     boolean;
+  showLoginSplash:     boolean;
+  splashReady:         boolean;   // true when dashboard data is loaded → triggers exit
+  togglePalette:       () => void;
+  closePalette:        () => void;
+  toggleTheme:         () => void;
+  toggleSemantic:      () => void;
+  triggerLoginSplash:  () => void; // call on login button click
+  signalSplashReady:   () => void; // call when dashboard data is ready
+  hideLoginSplash:     () => void; // call after exit animation finishes
 }
 
 const useAppStore = create<AppState>()((set) => ({
   paletteOpen:     false,
   theme:           getInitialTheme(),
   semanticEnabled: getInitialSemantic(),
+  showLoginSplash: false,
+  splashReady:     false,
 
   togglePalette: () => set((s) => ({ paletteOpen: !s.paletteOpen })),
   closePalette:  () => set({ paletteOpen: false }),
+  triggerLoginSplash:  () => set({ showLoginSplash: true, splashReady: false }),
+  signalSplashReady:   () => set({ splashReady: true }),
+  hideLoginSplash:     () => set({ showLoginSplash: false, splashReady: false }),
 
   toggleTheme: () =>
     set((s) => {

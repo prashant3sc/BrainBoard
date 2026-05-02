@@ -121,7 +121,8 @@ export default function AnalyticsPage() {
       </div>
 
       {/* ── Chart panels — all mounted (API fires for all), only active is visible ── */}
-      <div>
+      {/* Animated wrapper re-keyed on tab so the enter animation reruns on switch */}
+      <div key={activeTab} className="bb-tab-content">
         <div style={{ display: activeTab === 'velocity'  ? 'block' : 'none' }}>
           <VelocityChart projectId={projectId} />
         </div>

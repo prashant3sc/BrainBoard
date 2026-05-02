@@ -596,6 +596,267 @@
   box-shadow: 0 0 0 3px rgba(222,53,11,.1) !important;
 }
 
+/* ══════════════════════════════════════════════════
+   GLOBAL ANIMATIONS
+   ══════════════════════════════════════════════════ */
+
+/* ── Respect reduced-motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ══ Login Splash ══ */
+
+/* Overlay */
+@keyframes bb-splash-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes bb-splash-overlay-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+.bb-splash-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--bb-bg-page);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  animation: bb-splash-overlay-in 0.25s ease both;
+}
+.bb-splash-out {
+  animation: bb-splash-overlay-out 0.4s cubic-bezier(0.4, 0, 1, 1) forwards !important;
+}
+
+/* Logo block — single centered column containing everything */
+@keyframes bb-splash-logo-in {
+  from { opacity: 0; transform: scale(0.75) translateY(12px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+@keyframes bb-splash-logo-settle {
+  from { transform: scale(1.06); }
+  to   { transform: scale(1); }
+}
+.bb-splash-logo {
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
+  animation: bb-splash-logo-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  position: relative; z-index: 1;
+}
+.bb-splash-logo-hold {
+  animation: bb-splash-logo-settle 0.3s cubic-bezier(0.22, 1, 0.36, 1) both !important;
+}
+
+/* Icon wrapper — rings are centered exactly on the icon */
+.bb-splash-icon-wrap {
+  position: relative;
+  width: 72px; height: 72px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Soft radial glow that breathes behind the icon */
+@keyframes bb-splash-glow-pulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1);    opacity: 0.9; }
+  50%       { transform: translate(-50%, -50%) scale(1.6);  opacity: 0.35; }
+}
+.bb-splash-glow {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 220px; height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(231,80,38,0.75) 0%, rgba(231,80,38,0.18) 50%, rgba(231,80,38,0) 75%);
+  transform: translate(-50%, -50%);
+  animation: bb-splash-glow-pulse 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Individual rect animations — cascade in */
+@keyframes bb-splash-rect-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.85); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+.bb-splash-rect { animation: bb-splash-rect-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.bb-splash-rect-1 { animation-delay: 60ms; }
+.bb-splash-rect-2 { animation-delay: 120ms; }
+.bb-splash-rect-3 { animation-delay: 180ms; }
+.bb-splash-rect-4 { animation-delay: 140ms; }
+.bb-splash-rect-5 { animation-delay: 200ms; }
+.bb-splash-rect-6 { animation-delay: 160ms; }
+
+/* Wordmark */
+@keyframes bb-splash-word-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.bb-splash-wordmark {
+  font-size: 28px; font-weight: 700; letter-spacing: -0.5px;
+  animation: bb-splash-word-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+}
+.bb-splash-word-brain { color: var(--bb-page-title); }
+.bb-splash-word-board { color: #E75026; }
+
+.bb-splash-tagline {
+  font-size: 13px; color: var(--bb-text-muted); letter-spacing: 0.02em;
+  animation: bb-splash-word-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.32s both;
+}
+
+/* Progress bar */
+.bb-splash-bar-wrap {
+  width: 140px; height: 3px; border-radius: 3px;
+  background: var(--bb-border); overflow: hidden;
+  margin-top: 4px;
+}
+/* Slow fill to ~75% while waiting for data */
+@keyframes bb-splash-bar-loading {
+  from { width: 0%; }
+  to   { width: 75%; }
+}
+/* Jump to 100% once data is ready */
+@keyframes bb-splash-bar-done {
+  from { width: 75%; }
+  to   { width: 100%; }
+}
+.bb-splash-bar {
+  height: 100%; width: 0%; border-radius: 3px;
+  background: #E75026;
+  transition: width 0.2s ease;
+}
+.bb-splash-bar-loading {
+  animation: bb-splash-bar-loading 3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.bb-splash-bar-done {
+  animation: bb-splash-bar-done 0.25s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* ── Login card ── */
+@keyframes bb-login-enter {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+.bb-login-card {
+  animation: bb-login-enter 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.bb-login-exiting {
+  /* navigation fires immediately so this only plays for ~1 frame — keep it subtle */
+  opacity: 0.8;
+  transition: opacity 0.1s ease;
+  pointer-events: none;
+}
+
+/* ── Page transitions ── */
+@keyframes bb-page-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.bb-page-enter {
+  animation: bb-page-in 0.2s ease both;
+}
+
+/* ── Modal ── */
+@keyframes bb-modal-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes bb-modal-panel-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+@keyframes bb-modal-panel-out {
+  from { opacity: 1; transform: scale(1);    }
+  to   { opacity: 0; transform: scale(0.96); }
+}
+
+/* ── Sidebar nav item active indicator ── */
+.bb-nav-item {
+  transition: background 0.15s ease, color 0.15s ease !important;
+}
+.bb-nav-item::before {
+  transition: opacity 0.15s ease, transform 0.15s ease !important;
+}
+
+/* ── Dropdown menus ── */
+@keyframes bb-dropdown-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+.csel-menu,
+.im-ddm,
+.wks-dropdown,
+.kbl-status-dropdown,
+.tree-item-dropdown {
+  animation: bb-dropdown-in 0.14s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: top center;
+}
+
+/* ── Kanban card lift on hover ── */
+.kb-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease !important;
+}
+.kb-card:hover {
+  transform: translateY(-2px) !important;
+}
+
+/* ── Issue list row ── */
+.kbl-row {
+  transition: background 0.12s ease !important;
+}
+
+/* ── Backlog sprint block expand ── */
+@keyframes bb-sprint-expand {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.bb-sprint-issues-animate {
+  animation: bb-sprint-expand 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Staggered list items (dashbard cards, issue rows) ── */
+@keyframes bb-stagger-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.bb-stagger > * {
+  opacity: 0;
+  animation: bb-stagger-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.bb-stagger > *:nth-child(1)  { animation-delay: 0ms; }
+.bb-stagger > *:nth-child(2)  { animation-delay: 40ms; }
+.bb-stagger > *:nth-child(3)  { animation-delay: 80ms; }
+.bb-stagger > *:nth-child(4)  { animation-delay: 120ms; }
+.bb-stagger > *:nth-child(5)  { animation-delay: 160ms; }
+.bb-stagger > *:nth-child(6)  { animation-delay: 200ms; }
+.bb-stagger > *:nth-child(7)  { animation-delay: 240ms; }
+.bb-stagger > *:nth-child(8)  { animation-delay: 280ms; }
+.bb-stagger > *:nth-child(n+9) { animation-delay: 300ms; }
+
+/* ── Tab content switch ── */
+@keyframes bb-tab-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.bb-tab-content {
+  animation: bb-tab-in 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Toast ── */
+@keyframes bb-toast-in {
+  from { opacity: 0; transform: translateX(100%) scale(0.95); }
+  to   { opacity: 1; transform: translateX(0)     scale(1);   }
+}
+@keyframes bb-toast-out {
+  from { opacity: 1; transform: translateX(0)     scale(1);   }
+  to   { opacity: 0; transform: translateX(100%) scale(0.95); }
+}
+.bb-toast-enter { animation: bb-toast-in  0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.bb-toast-exit  { animation: bb-toast-out 0.2s  ease forwards; }
+
+/* ── Spin utility ── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Skeleton pulse animation */
 @keyframes pulse {
   0%, 100% { opacity: 1; }
@@ -865,28 +1126,18 @@
 /* ── Toast ── */
 .bb-toast {
   position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%) translateY(60px);
+  bottom: 24px; right: 24px;
   background: var(--bb-toast-bg);
   color: var(--bb-toast-color);
-  font-size: 13px;
-  font-weight: 500;
-  padding: 10px 20px;
-  border-radius: 8px;
-  white-space: nowrap;
-  z-index: 300;
-  transition: transform 0.25s ease, opacity 0.25s ease;
-  opacity: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  font-size: 13px; font-weight: 500;
+  padding: 10px 20px; border-radius: 8px;
+  white-space: nowrap; z-index: 300;
+  display: flex; align-items: center; gap: 8px;
   pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0,0,0,.12);
+  border: 1px solid var(--bb-border);
 }
-.bb-toast.bb-toast-show {
-  transform: translateX(-50%) translateY(0);
-  opacity: 1;
-}
+.bb-toast.bb-toast-show { pointer-events: auto; }
 
 /* ── Modal animation ── */
 @keyframes bb-modal-in {
@@ -2389,11 +2640,11 @@
 .kb-card {
   background: var(--kb-card-bg); border: 1px solid var(--kb-card-border);
   border-radius: 8px; padding: 14px; cursor: grab; user-select: none;
-  transition: border-color .15s, box-shadow .15s, transform .15s, opacity .15s;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s cubic-bezier(0.22,1,0.36,1), opacity .15s;
   will-change: transform;
 }
-.kb-card:active { cursor: grabbing; }
-.kb-card:hover  { border-color: var(--kb-card-hover-border); box-shadow: 0 2px 10px var(--kb-card-hover-shadow); transform: translateY(-1px); }
+.kb-card:active { cursor: grabbing; transform: scale(1.02); box-shadow: 0 8px 24px rgba(0,0,0,.14); }
+.kb-card:hover  { border-color: var(--kb-card-hover-border); box-shadow: 0 4px 14px var(--kb-card-hover-shadow); transform: translateY(-3px); }
 
 .kb-card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; gap: 6px; }
 .kb-card-badges { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -2483,13 +2734,14 @@
   background: var(--kb-modal-overlay); z-index: 100;
   align-items: center; justify-content: center; padding: 24px;
   backdrop-filter: blur(2px);
+  animation: bb-modal-overlay-in 0.2s ease both;
 }
 
 /* Wide two-column modal */
 .kb-modal-wide {
   background: var(--kb-modal-bg); border-radius: 14px; width: 100%; max-width: 1080px;
   box-shadow: 0 24px 56px rgba(23,43,77,.2);
-  animation: bb-modal-in .18s ease;
+  animation: bb-modal-panel-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
   display: flex; flex-direction: column;
   max-height: calc(100vh - 40px);
   overflow: hidden;
