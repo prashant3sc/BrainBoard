@@ -9,6 +9,7 @@ from issues.views import (
     LabelListView,
     ProjectIssueListView,
 )
+from wiki.views import IssueWikiLinksView
 
 urlpatterns = [
     path("projects/<uuid:project_id>/issues", ProjectIssueListView.as_view(), name="project-issue-list"),
@@ -19,6 +20,7 @@ urlpatterns = [
     path("issues/<str:ticket_id>", IssueDetailView.as_view(), name="issue-detail-by-key"),
     # Comments
     path("issues/<uuid:pk>/comments", IssueCommentListView.as_view(), name="issue-comments"),
+    path("issues/<uuid:pk>/wiki-links", IssueWikiLinksView.as_view(), name="issue-wiki-links"),
     path("comments/<uuid:pk>", CommentDetailView.as_view(), name="comment-detail"),
     # Labels
     path("projects/<uuid:project_id>/labels", LabelListView.as_view(), name="label-list"),

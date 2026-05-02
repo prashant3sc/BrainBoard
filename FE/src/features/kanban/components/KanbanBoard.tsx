@@ -22,9 +22,10 @@ interface Props {
   searchQuery:    string;
   assigneeFilter: string[];
   onIssueClick:   (issue: Issue) => void;
+  isWriteLocked?: boolean;
 }
 
-export function KanbanBoard({ projectId, searchQuery, assigneeFilter, onIssueClick }: Props) {
+export function KanbanBoard({ projectId, searchQuery, assigneeFilter, onIssueClick, isWriteLocked = false }: Props) {
   const { data: activeSprintData, isLoading, isError } = useActiveSprint(projectId);
   const { mutate: updateIssue } = useUpdateIssue();
   const { data: members = [] } = useProjectMembers(projectId);
@@ -49,7 +50,7 @@ export function KanbanBoard({ projectId, searchQuery, assigneeFilter, onIssueCli
   }, [activeSprintData]);
 
   function onDragEnd(result: DropResult) {
-    if (!can('moveIssue')) return;
+    if (!can('moveIssue') || isWriteLocked) return;
 
     const { destination, source, draggableId } = result;
 
@@ -126,14 +127,12 @@ export function KanbanBoard({ projectId, searchQuery, assigneeFilter, onIssueCli
     </DragDropContext>
 
     {/* Kanban error toast */}
-    <div style={{
-      position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)',
+    <div className={toast.visible ? 'bb-toast-enter' : 'bb-toast-exit'} style={{
+      position: 'fixed', bottom: 28, right: 28,
       background: '#FFF0EE', border: '1px solid #FFBDAD', borderRadius: 10,
       padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 8,
       boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 300,
       fontSize: 13, fontWeight: 500, color: '#DE350B',
-      transition: 'opacity 0.2s, transform 0.2s',
-      opacity: toast.visible ? 1 : 0,
       pointerEvents: toast.visible ? 'auto' : 'none',
       whiteSpace: 'nowrap',
     }}>

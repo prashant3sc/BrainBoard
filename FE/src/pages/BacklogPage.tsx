@@ -3,8 +3,12 @@ import { useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { issuesApi } from '@/api/issues';
 import { useSprints, useStartSprint, useCompleteSprint, useCreateSprint } from '@/features/projects/useSprints';
+import { useProjectMembers } from '@/features/projects/useProjects';
 import { useRBAC } from '@/hooks/useRBAC';
+import { useArchivedProject } from '@/hooks/useArchivedProject';
+import { ArchivedBanner } from '@/components/common/ArchivedBanner';
 import { IssueModal } from '@/features/kanban/components/IssueModal';
+import { SprintSummaryModal } from '@/features/sprints/SprintSummaryModal';
 import { SprintDatePicker } from '@/components/SprintDatePicker';
 import { CustomSelect } from '@/components/common/CustomSelect';
 import type { Sprint, Issue, SprintStatus } from '@/types';
@@ -138,54 +142,6 @@ function CreateSprintModal({ onConfirm, onClose, isPending, serverError, onClear
   const [startDate,   setStartDate]   = useState('');
   const [endDate,     setEndDate]     = useState('');
   const [showCal,     setShowCal]     = useState(false);
-  const [popPos,      setPopPos]      = useState<{ top: number; left: number } | null>(null);
-  const dateRowRef    = useRef<HTMLDivElement>(null);
-  const calPopoverRef = useRef<HTMLDivElement>(null);
-
-  // Compute popover position when it opens
-  useEffect(() => {
-    if (!showCal) { setPopPos(null); return; }
-    const anchor = dateRowRef.current;
-    if (!anchor) return;
-    const rect     = anchor.getBoundingClientRect();
-    const popW     = 516;   // approx popover width (padding + two month grids)
-    const popH     = 300;   // approx popover height
-    const gap      = 8;
-    const vw       = window.innerWidth;
-    const vh       = window.innerHeight;
-
-    // Prefer below; flip above if not enough room
-    let top = rect.bottom + gap;
-    if (top + popH > vh - 8) top = rect.top - popH - gap;
-    if (top < 8) top = 8;
-
-    // Align left-edge with anchor; clamp to viewport
-    let left = rect.left;
-    if (left + popW > vw - 8) left = vw - popW - 8;
-    if (left < 8) left = 8;
-
-    setPopPos({ top, left });
-  }, [showCal]);
-
-  // Close popover on outside click
-  useEffect(() => {
-    if (!showCal) return;
-    function handleClick(e: MouseEvent) {
-      if (
-        calPopoverRef.current && !calPopoverRef.current.contains(e.target as Node) &&
-        dateRowRef.current && !dateRowRef.current.contains(e.target as Node)
-      ) {
-        setShowCal(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [showCal]);
-
-  // Auto-close popover once both dates picked
-  useEffect(() => {
-    if (startDate && endDate) setShowCal(false);
-  }, [startDate, endDate]);
 
   function handleConfirm() {
     onConfirm(name.trim(), goal.trim(), startDate, endDate);
@@ -205,7 +161,7 @@ function CreateSprintModal({ onConfirm, onClose, isPending, serverError, onClear
 
   return (
     <div className="kb-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="kb-modal-wide bb-modal-animate" style={{ maxWidth: 500, display: 'flex', flexDirection: 'column' }}>
+      <div className="kb-modal-wide bb-modal-animate" style={{ maxWidth: 580, display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
         <div className="kb-modal-header">
           <span className="kb-modal-title">Create Sprint</span>
           <button className="kb-modal-close" onClick={onClose}>
@@ -215,7 +171,7 @@ function CreateSprintModal({ onConfirm, onClose, isPending, serverError, onClear
           </button>
         </div>
 
-        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto' }}>
           <div className="kb-field">
             <label className="kb-label">Sprint name <span className="kb-required">*</span></label>
             <input className="kb-input" placeholder="e.g. Sprint 14" value={name} onChange={(e) => setName(e.target.value)} />
@@ -229,7 +185,6 @@ function CreateSprintModal({ onConfirm, onClose, isPending, serverError, onClear
           <div>
             <label className="kb-label">Sprint dates</label>
             <div
-              ref={dateRowRef}
               onClick={() => setShowCal((v) => !v)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 8,
@@ -266,22 +221,14 @@ function CreateSprintModal({ onConfirm, onClose, isPending, serverError, onClear
             </div>
           </div>
 
-          {/* Calendar popover — rendered into a portal-like fixed layer */}
-          {showCal && popPos && (
-            <div
-              ref={calPopoverRef}
-              style={{
-                position: 'fixed',
-                top: popPos.top,
-                left: popPos.left,
-                zIndex: 10001,
-                background: 'var(--kb-modal-bg, var(--bb-surface))',
-                border: '1px solid var(--bb-border)',
-                borderRadius: 12,
-                boxShadow: '0 16px 48px rgba(23,43,77,.28)',
-                padding: '16px 20px 14px',
-              }}
-            >
+          {/* Calendar — inline, no fixed positioning */}
+          {showCal && (
+            <div style={{
+              background: 'var(--kb-modal-bg, var(--bb-surface))',
+              border: '1px solid var(--bb-border)',
+              borderRadius: 12,
+              padding: '16px 20px 14px',
+            }}>
               <SprintDatePicker
                 startDate={startDate}
                 endDate={endDate}
@@ -491,9 +438,10 @@ interface SprintBlockProps {
   onStart: () => void;
   onComplete: (sprint: Sprint, unfinished: Issue[]) => void;
   onIssueClick: (issue: Issue) => void;
+  onViewSummary: (sprint: Sprint, issues: Issue[]) => void;
 }
 
-function SprintBlock({ sprint, issues, search, collapsed, onToggle, canManage, onStart, onComplete, onIssueClick }: SprintBlockProps) {
+function SprintBlock({ sprint, issues, search, collapsed, onToggle, canManage, onStart, onComplete, onIssueClick, onViewSummary }: SprintBlockProps) {
   const q = search.toLowerCase();
   const filtered = search.trim()
     ? issues.filter((i) => i.title.toLowerCase().includes(q))
@@ -540,10 +488,15 @@ function SprintBlock({ sprint, issues, search, collapsed, onToggle, canManage, o
             Complete sprint
           </button>
         )}
+        {isCompleted && (
+          <button className="bb-sprint-action" onClick={(e) => { e.stopPropagation(); onViewSummary(sprint, issues); }}>
+            View Summary
+          </button>
+        )}
       </div>
 
       {!collapsed && (
-        <div>
+        <div className="bb-sprint-issues-animate">
           {isActive && issues.length > 0 && (
             <>
               <div className="bb-stats-strip">
@@ -621,7 +574,7 @@ function BacklogBlock({
         )}
       </div>
       {!collapsed && (
-        <div className="bb-issue-list">
+        <div className="bb-issue-list bb-sprint-issues-animate">
           {filtered.length === 0
             ? <div style={{ padding: '16px 14px', fontSize: 12, color: 'var(--bb-bl-count)', fontStyle: 'italic' }}>No backlog issues.</div>
             : filtered.map((i) => (
@@ -647,9 +600,10 @@ function BacklogBlock({
 export default function BacklogPage() {
   const { projectId = '' } = useParams<{ projectId: string }>();
   const { can } = useRBAC();
-  const canManageSprints = can('manageProjectMembers'); // start / complete / create sprints
-  const canMoveIssue     = can('moveIssue');            // move backlog issues to a sprint
-  const canEditIssue     = can('editIssue');            // create issues
+  const { isArchived, isWriteLocked } = useArchivedProject(projectId);
+  const canManageSprints = can('manageProjectMembers') && !isWriteLocked;
+  const canMoveIssue     = can('moveIssue')            && !isWriteLocked;
+  const canEditIssue     = can('editIssue')            && !isWriteLocked;
   const qc = useQueryClient();
 
   const { data: sprints = [], isLoading: sprintsLoading } = useSprints(projectId);
@@ -663,11 +617,19 @@ export default function BacklogPage() {
   const completeSprint = useCompleteSprint();
   const createSprint   = useCreateSprint();
 
+  const { data: projectMembers = [] } = useProjectMembers(projectId);
+  const memberNames = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const pm of projectMembers) map[pm.user.id] = pm.user.name;
+    return map;
+  }, [projectMembers]);
+
   const { toastMsg, toastVisible, toastIsError, showToast } = useToast();
 
   const [collapsed,       setCollapsed]       = useState<Record<string, boolean>>({});
   const [search,          setSearch]          = useState('');
   const [completeModal,   setCompleteModal]   = useState<{ sprint: Sprint; unfinished: Issue[] } | null>(null);
+  const [summaryModal,    setSummaryModal]    = useState<{ sprint: Sprint; issues: Issue[]; movedInfo?: { action: 'backlog' | 'next_sprint'; nextSprintName?: string; count: number } } | null>(null);
   const [showCreateModal,    setShowCreateModal]    = useState(false);
   const [createSprintError,  setCreateSprintError]  = useState<string | null>(null);
   const [issueModalOpen,  setIssueModalOpen]  = useState(false);
@@ -710,11 +672,23 @@ export default function BacklogPage() {
 
   function handleConfirmComplete(action: 'backlog' | 'next_sprint', nextSprintId?: string) {
     if (!completeModal) return;
+    const { sprint, unfinished } = completeModal;
+    const sprintIssues = issuesBySprint[sprint.id] ?? [];
+    const nextSprintName = nextSprintId ? sprints.find((s) => s.id === nextSprintId)?.name : undefined;
     completeSprint.mutate(
-      { sprintId: completeModal.sprint.id, projectId, dto: { unfinishedAction: action, nextSprintId } },
+      { sprintId: sprint.id, projectId, dto: { unfinishedAction: action, nextSprintId } },
       {
-        onSuccess: () => { setCompleteModal(null); showToast(`${completeModal.sprint.name} completed`); },
-        onError:   (err) => { setCompleteModal(null); showToast(beError(err), true); },
+        onSuccess: () => {
+          setCompleteModal(null);
+          setSummaryModal({
+            sprint,
+            issues: sprintIssues,
+            movedInfo: unfinished.length > 0
+              ? { action, nextSprintName, count: unfinished.length }
+              : undefined,
+          });
+        },
+        onError: (err) => { setCompleteModal(null); showToast(beError(err), true); },
       },
     );
   }
@@ -784,6 +758,9 @@ export default function BacklogPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: 'var(--bb-content-bg)' }}>
 
+      {/* Archived banner */}
+      {isArchived && <ArchivedBanner viewOnly={isWriteLocked} />}
+
       {/* Topbar */}
       <div style={{ height: 53, background: 'var(--bb-topbar-bg)', borderBottom: '1px solid var(--bb-topbar-border)', display: 'flex', alignItems: 'center', padding: '0 28px', gap: 10, flexShrink: 0 }}>
         <div>
@@ -847,6 +824,7 @@ export default function BacklogPage() {
             onStart={() => handleStartSprint(sprint)}
             onComplete={handleOpenCompleteModal}
             onIssueClick={(issue) => { setSelectedIssue(issue); setIssueModalOpen(true); }}
+            onViewSummary={(s, issues) => setSummaryModal({ sprint: s, issues })}
           />
         ))}
 
@@ -884,7 +862,19 @@ export default function BacklogPage() {
         projectId={projectId}
         onClose={() => { setIssueModalOpen(false); setSelectedIssue(null); }}
         onNavigate={(issue) => { setSelectedIssue(issue); setIssueModalOpen(true); }}
+        readOnly={isWriteLocked}
       />
+
+      {/* Sprint Summary Modal */}
+      {summaryModal && (
+        <SprintSummaryModal
+          sprint={summaryModal.sprint}
+          issues={summaryModal.issues}
+          movedInfo={summaryModal.movedInfo}
+          memberNames={memberNames}
+          onClose={() => setSummaryModal(null)}
+        />
+      )}
 
       {/* Complete Sprint Modal */}
       {completeModal && (
@@ -912,7 +902,7 @@ export default function BacklogPage() {
 
       {/* Toast */}
       <div
-        className={`bb-toast${toastVisible ? ' bb-toast-show' : ''}`}
+        className={`bb-toast${toastVisible ? ' bb-toast-show bb-toast-enter' : ' bb-toast-exit'}`}
         style={toastIsError ? { background: '#FFF0EE', borderColor: '#FFBDAD' } : {}}
       >
         {toastIsError ? (

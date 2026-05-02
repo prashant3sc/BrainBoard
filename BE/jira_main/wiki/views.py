@@ -9,6 +9,7 @@ from projects.models import Project
 from wiki.filters import WikiPageFilter
 from wiki.models import TicketPageLink, WikiPage, WikiPageVersion, WikiSpace
 from wiki.serializers import (
+    IssueWikiLinkSerializer,
     TicketPageLinkSerializer,
     WikiPageCreateSerializer,
     WikiPageSerializer,
@@ -177,6 +178,21 @@ class TicketPageLinkView(APIView):
         if not deleted:
             return Response({"detail": "Link not found"}, status=status.HTTP_404_NOT_FOUND)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class IssueWikiLinksView(APIView):
+    """GET /issues/<pk>/wiki-links — all wiki pages linked to an issue."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        from issues.models import Issue
+        try:
+            issue = Issue.objects.get(pk=pk)
+        except Issue.DoesNotExist:
+            return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        links = TicketPageLink.objects.filter(issue=issue).select_related("wiki_page")
+        return Response(IssueWikiLinkSerializer(links, many=True).data)
 
 
 class KBAnalyticsView(APIView):

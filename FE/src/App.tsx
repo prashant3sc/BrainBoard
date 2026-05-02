@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import ProtectedRoute from '@/components/layout/ProtectedRoute';
 import AppShell from '@/components/layout/AppShell';
+import { LoginSplash } from '@/components/layout/LoginSplash';
 import useAppStore from '@/store/useAppStore';
 import useAuthStore from '@/store/useAuthStore';
 import { authApi } from '@/api/auth';
@@ -56,11 +57,20 @@ const queryClient = new QueryClient({
   },
 });
 
+function GlobalSplash() {
+  const show       = useAppStore((s) => s.showLoginSplash);
+  const ready      = useAppStore((s) => s.splashReady);
+  const hideSplash = useAppStore((s) => s.hideLoginSplash);
+  if (!show) return null;
+  return <LoginSplash ready={ready} onDone={hideSplash} />;
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeSync />
       <AuthSync />
+      <GlobalSplash />
       {/* <Toaster /> */}
       <BrowserRouter>
         <Suspense fallback={

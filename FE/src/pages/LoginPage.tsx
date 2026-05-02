@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import useAuthStore from '@/store/useAuthStore';
 import useAppStore from '@/store/useAppStore';
@@ -205,10 +205,10 @@ function ThemeToggle() {
 
 /* ── Page ── */
 export function LoginPage() {
-  const login      = useAuthStore((s) => s.login);
-  // Reactive selector — stable primitive, re-renders only when user changes
-  const isLoggedIn = useAuthStore((s) => s.user !== null);
-  const navigate   = useNavigate();
+  const login             = useAuthStore((s) => s.login);
+  const isLoggedIn        = useAuthStore((s) => s.user !== null);
+  const triggerSplash     = useAppStore((s) => s.triggerLoginSplash);
+  const navigate          = useNavigate();
 
   // Pre-load the DashboardPage JS chunk while the user types credentials.
   // Login API takes ≥300 ms; by then the chunk is cached → zero Suspense flash.
@@ -222,9 +222,12 @@ export function LoginPage() {
   const [submitErr,   setSubmitErr]   = useState('');
   const [loading, setLoading] = useState(false);
   const [exiting, setExiting] = useState(false);
+  // Ref — no re-render needed; just blocks the guard while login() + navigate() are in flight
+  const loggingIn = useRef(false);
 
-  // Guard: if already logged in (e.g. user visits /login while session active)
-  if (isLoggedIn) return <Navigate to="/dashboard" replace />;
+  // Guard: if already logged in (e.g. user visits /login while session active).
+  // Bypassed while loggingIn so the Zustand update from login() doesn't race with navigate().
+  if (isLoggedIn && !loggingIn.current) return <Navigate to="/dashboard" replace />;
 
   function validate(): boolean {
     let ok = true;
@@ -245,7 +248,14 @@ export function LoginPage() {
     e.preventDefault();
     setSubmitErr('');
     if (!USE_MOCK && !validate()) return;
+
+    // Block the isLoggedIn guard so login() → navigate() don't race
+    loggingIn.current = true;
+    // Fire the global splash immediately on click — it lives above the router
+    // so it survives the route change and plays over the dashboard loading.
+    triggerSplash();
     setLoading(true);
+
     try {
       if (USE_MOCK) {
         const user = mockUsers.find((u) => u.id === selectedUserId)!;
@@ -254,13 +264,14 @@ export function LoginPage() {
         const data = await authApi.login(email, password);
         login(data.user, data.token);
       }
-      // Navigate immediately and explicitly — don't wait for a re-render cycle
-      // to hit the isLoggedIn guard above. This is the most reliable path:
-      // login() sets the token synchronously in localStorage so the axios
-      // interceptor picks it up before the first /projects request fires.
+      // Navigate immediately — splash continues playing above the dashboard.
+      // isLoggedIn guard won't interfere because navigate fires in the same tick.
       setExiting(true);
       navigate('/dashboard', { replace: true });
     } catch {
+      loggingIn.current = false;
+      // Dismiss the splash immediately — login failed, go back to form
+      useAppStore.getState().hideLoginSplash();
       setSubmitErr('Invalid email or password. Please try again.');
       setLoading(false);
     }
@@ -279,7 +290,7 @@ export function LoginPage() {
       <ThemeToggle />
 
       <div
-        className={exiting ? 'bb-login-exiting' : ''}
+        className={`bb-login-card${exiting ? ' bb-login-exiting' : ''}`}
         style={{
           width: '100%', maxWidth: 400,
           background: 'var(--bb-bg-card)',

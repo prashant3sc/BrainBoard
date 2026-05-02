@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useRef, useState, useEffect } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useWikiPages, useCreateWikiPage, useUpdateWikiPage, useDeleteWikiPage } from '@/features/wiki/useWiki';
 import { WikiSidebar } from '@/features/wiki/components/WikiSidebar';
@@ -7,14 +7,18 @@ import { WikiEditor, type WikiEditorHandle } from '@/features/wiki/components/Wi
 import { WikiMetaSidebar } from '@/features/wiki/components/WikiMetaSidebar';
 import { LoadingSkeleton } from '@/components/common/LoadingSkeleton';
 import { useRBAC } from '@/hooks/useRBAC';
+import { useArchivedProject } from '@/hooks/useArchivedProject';
+import { ArchivedBanner } from '@/components/common/ArchivedBanner';
 import { projectsApi } from '@/api/projects';
 import type { WikiPage as WikiPageType } from '@/types';
 
 export function WikiPage() {
   const { projectId } = useParams<{ projectId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { can } = useRBAC();
+  const { isArchived, isWriteLocked } = useArchivedProject(projectId);
 
-  const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
+  const [selectedPageId, setSelectedPageId] = useState<string | null>(searchParams.get('page'));
   const [isEditing, setIsEditing] = useState(false);
 
   const editorRef = useRef<WikiEditorHandle>(null);
@@ -28,6 +32,16 @@ export function WikiPage() {
   const { mutate: createPage } = useCreateWikiPage();
   const { mutate: updatePage, isPending: isSaving } = useUpdateWikiPage();
   const { mutate: deletePage } = useDeleteWikiPage();
+
+  /* If we landed with ?page=<id> in the URL, select it once pages have loaded */
+  useEffect(() => {
+    const paramId = searchParams.get('page');
+    if (paramId && pages.length > 0) {
+      setSelectedPageId(paramId);
+      // Clean the param from the URL without a navigation push
+      setSearchParams((prev) => { prev.delete('page'); return prev; }, { replace: true });
+    }
+  }, [pages]);
 
   const selectedPage = pages.find((p) => p.id === selectedPageId) ?? null;
   const parentPage = selectedPage?.parentId
@@ -91,6 +105,9 @@ export function WikiPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
 
+      {/* ── Archived banner ── */}
+      {isArchived && <ArchivedBanner viewOnly={isWriteLocked} />}
+
       {/* ── Wiki topbar ── */}
       <div className="wiki-topbar">
         <div className="wiki-topbar-left">
@@ -137,7 +154,7 @@ export function WikiPage() {
               </button>
             </>
           ) : (
-            can('editWikiPage') && selectedPage && (
+            can('editWikiPage') && !isWriteLocked && selectedPage && (
               <button className="wiki-tb-btn wiki-tb-btn-primary" onClick={handleEdit}>
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                   <path d="M8 2l2 2L4 10H2V8L8 2z" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
@@ -169,8 +186,8 @@ export function WikiPage() {
             onSelect={handleSelectPage}
             onCreatePage={handleCreatePage}
             onDeletePage={handleDeletePage}
-            canCreate={can('createWikiPage')}
-            canDelete={can('editWikiPage')}
+            canCreate={can('createWikiPage') && !isWriteLocked}
+            canDelete={can('editWikiPage') && !isWriteLocked}
           />
         )}
 
@@ -181,7 +198,7 @@ export function WikiPage() {
           parentPage={parentPage}
           onSave={handleSave}
           isSaving={isSaving}
-          canEdit={can('editWikiPage')}
+          canEdit={can('editWikiPage') && !isWriteLocked}
           isEditing={isEditing}
         />
 

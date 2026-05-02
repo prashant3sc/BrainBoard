@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { Sprint } from '@/types';
 
 interface Props {
@@ -43,7 +44,7 @@ interface MonthGridProps {
   hoverDate: string;
   existingSprints: Sprint[];
   onDayClick: (iso: string) => void;
-  onDayHover: (iso: string, el: HTMLElement | null) => void;
+  onDayHover: (iso: string, occupied: boolean, x: number, y: number) => void;
   onDayLeave: () => void;
 }
 
@@ -126,7 +127,7 @@ function MonthGrid({ year, month, startDate, endDate, hoverDate, existingSprints
       <div
         key={iso}
         onClick={() => !isOccupied && onDayClick(iso)}
-        onMouseEnter={(e) => onDayHover(iso, isOccupied ? e.currentTarget : null)}
+        onMouseEnter={(e) => onDayHover(iso, isOccupied, e.clientX, e.clientY)}
         onMouseLeave={onDayLeave}
         style={{
           height: 30,
@@ -206,15 +207,14 @@ export function SprintDatePicker({ startDate, endDate, onStartChange, onEndChang
     }
   }
 
-  function handleDayHover(iso: string, el: HTMLElement | null) {
+  function handleDayHover(iso: string, occupied: boolean, x: number, y: number) {
     setHoverDate(iso);
-    if (el) {
-      const rect = el.getBoundingClientRect();
+    if (occupied) {
       const sp = existingSprints.find(
         (s) => s.startDate && s.endDate && s.status !== 'completed' && iso >= s.startDate && iso <= s.endDate
       );
       if (sp) {
-        setTooltip({ x: rect.left + rect.width / 2, y: rect.top, name: sp.name });
+        setTooltip({ x, y, name: sp.name });
       }
     } else {
       setTooltip(null);
@@ -269,12 +269,12 @@ export function SprintDatePicker({ startDate, endDate, onStartChange, onEndChang
         </div>
       )}
 
-      {/* Tooltip */}
-      {tooltip && (
+      {/* Tooltip — portalled to body to escape any CSS transform stacking context */}
+      {tooltip && createPortal(
         <div style={{
           position: 'fixed',
           left: tooltip.x,
-          top: tooltip.y - 6,
+          top: tooltip.y - 12,
           transform: 'translate(-50%, -100%)',
           background: '#172B4D',
           color: '#fff',
@@ -283,13 +283,14 @@ export function SprintDatePicker({ startDate, endDate, onStartChange, onEndChang
           padding: '4px 10px',
           borderRadius: 5,
           pointerEvents: 'none',
-          zIndex: 9999,
+          zIndex: 99999,
           whiteSpace: 'nowrap',
           boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
         }}>
           {tooltip.name}
           <div style={{ position: 'absolute', bottom: -4, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: '4px solid #172B4D' }} />
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
