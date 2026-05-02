@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useRef, useState, useEffect } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useWikiPages, useCreateWikiPage, useUpdateWikiPage, useDeleteWikiPage } from '@/features/wiki/useWiki';
 import { WikiSidebar } from '@/features/wiki/components/WikiSidebar';
@@ -14,10 +14,11 @@ import type { WikiPage as WikiPageType } from '@/types';
 
 export function WikiPage() {
   const { projectId } = useParams<{ projectId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { can } = useRBAC();
   const { isArchived, isWriteLocked } = useArchivedProject(projectId);
 
-  const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
+  const [selectedPageId, setSelectedPageId] = useState<string | null>(searchParams.get('page'));
   const [isEditing, setIsEditing] = useState(false);
 
   const editorRef = useRef<WikiEditorHandle>(null);
@@ -31,6 +32,16 @@ export function WikiPage() {
   const { mutate: createPage } = useCreateWikiPage();
   const { mutate: updatePage, isPending: isSaving } = useUpdateWikiPage();
   const { mutate: deletePage } = useDeleteWikiPage();
+
+  /* If we landed with ?page=<id> in the URL, select it once pages have loaded */
+  useEffect(() => {
+    const paramId = searchParams.get('page');
+    if (paramId && pages.length > 0) {
+      setSelectedPageId(paramId);
+      // Clean the param from the URL without a navigation push
+      setSearchParams((prev) => { prev.delete('page'); return prev; }, { replace: true });
+    }
+  }, [pages]);
 
   const selectedPage = pages.find((p) => p.id === selectedPageId) ?? null;
   const parentPage = selectedPage?.parentId

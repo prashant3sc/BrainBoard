@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { issuesApi } from '@/api/issues';
 import { useRBAC } from '@/hooks/useRBAC';
@@ -8,6 +9,7 @@ import { useLabels } from '@/features/projects/useLabels';
 import useAuthStore from '@/store/useAuthStore';
 import { CommentsSection } from '@/features/comments/CommentsSection';
 import { useAIAnalysis } from '@/features/ai/useAIAnalysis';
+import { useIssueWikiLinks, useLinkWikiToIssue, useUnlinkTicket, useWikiPages } from '@/features/wiki/useWiki';
 import type { Issue, IssueStatus, Priority, IssueType } from '@/types';
 import { KANBAN_COLUMNS } from './KanbanBoard';
 
@@ -121,7 +123,8 @@ function ChevronIcon({ open }: { open: boolean }) {
 }
 
 export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, readOnly = false }: Props) {
-  const isEdit  = issue !== null;
+  const isEdit   = issue !== null;
+  const navigate = useNavigate();
   const { can } = useRBAC();
   const qc      = useQueryClient();
   const canEdit = can('editIssue');
@@ -176,8 +179,17 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
   const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [parentSearch, setParentSearch] = useState('');
   const [openDD,       setOpenDD]       = useState<string | null>(null);
+  const [wikiPickerOpen, setWikiPickerOpen] = useState(false);
+  const [wikiSearch,     setWikiSearch]     = useState('');
   const assigneeRef = useRef<HTMLDivElement>(null);
   const { data: projectLabels = [] } = useLabels(projectId);
+
+  /* ── Wiki links (edit mode only) ── */
+  const { data: issueWikiLinks = [] } = useIssueWikiLinks(isEdit ? issue?.id ?? null : null);
+  const { data: allWikiPages   = [] } = useWikiPages(projectId);
+  const linkWikiMut   = useLinkWikiToIssue();
+  const unlinkWikiMut = useUnlinkTicket();
+  const linkedPageIds = new Set(issueWikiLinks.map((l) => l.wikiPage.id));
 
   /* ── Mock AI state ── */
   // ── Real AI analysis ──────────────────────────────────────────────────────
@@ -1146,6 +1158,145 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
                       </button>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* LINKED WIKI PAGES */}
+              {isEdit && (
+                <div className="im-srow">
+                  <div className="im-sl" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>Wiki Pages</span>
+                    {!isReadOnly && (
+                      <button
+                        type="button"
+                        onClick={() => { setWikiPickerOpen((v) => !v); setWikiSearch(''); }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', display: 'flex', alignItems: 'center', color: 'var(--kb-field-label)' }}
+                        title="Link a wiki page"
+                      >
+                        <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                          <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Picker dropdown */}
+                  {wikiPickerOpen && !isReadOnly && (
+                    <div style={{
+                      border: '1px solid var(--kb-border)',
+                      borderRadius: 6,
+                      background: 'var(--kb-modal-bg)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                      overflow: 'hidden',
+                      marginBottom: 4,
+                    }}>
+                      <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--kb-border)' }}>
+                        <input
+                          autoFocus
+                          value={wikiSearch}
+                          onChange={(e) => setWikiSearch(e.target.value)}
+                          placeholder="Search wiki pages…"
+                          style={{
+                            width: '100%', border: 'none', outline: 'none', background: 'transparent',
+                            fontSize: 12, color: 'var(--kb-text)',
+                          }}
+                        />
+                      </div>
+                      <div style={{ maxHeight: 160, overflowY: 'auto' }}>
+                        {allWikiPages
+                          .filter((p) =>
+                            !wikiSearch || p.title.toLowerCase().includes(wikiSearch.toLowerCase())
+                          )
+                          .map((p) => {
+                            const linked = linkedPageIds.has(p.id);
+                            return (
+                              <button
+                                key={p.id}
+                                type="button"
+                                disabled={linked || linkWikiMut.isPending}
+                                onClick={() => {
+                                  if (!linked && issue?.id) {
+                                    linkWikiMut.mutate({ pageId: p.id, issueId: issue.id });
+                                    setWikiPickerOpen(false);
+                                  }
+                                }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: 6,
+                                  width: '100%', padding: '6px 10px', border: 'none',
+                                  background: 'none', cursor: linked ? 'default' : 'pointer',
+                                  fontSize: 12, color: linked ? 'var(--kb-field-label)' : 'var(--kb-text)',
+                                  textAlign: 'left',
+                                }}
+                              >
+                                <svg width="12" height="12" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0, opacity: 0.5 }}>
+                                  <path d="M5 9H3a3 3 0 0 1 0-6h2M9 5h2a3 3 0 0 1 0 6H9M5 7h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                                </svg>
+                                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
+                                {linked && (
+                                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none" style={{ color: '#1D9E75', flexShrink: 0 }}>
+                                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                )}
+                              </button>
+                            );
+                          })}
+                        {allWikiPages.filter((p) =>
+                          !wikiSearch || p.title.toLowerCase().includes(wikiSearch.toLowerCase())
+                        ).length === 0 && (
+                          <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--kb-field-label)' }}>No pages found</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Linked pages list */}
+                  {issueWikiLinks.length === 0 ? (
+                    <div style={{ fontSize: 12, color: 'var(--kb-field-label)', padding: '2px 0' }}>No linked pages</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      {issueWikiLinks.map((link) => (
+                        <div
+                          key={link.id}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            padding: '5px 8px', borderRadius: 5,
+                            background: 'var(--kb-tag-bg, rgba(0,0,0,0.04))',
+                            fontSize: 12,
+                          }}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0, opacity: 0.45 }}>
+                            <path d="M5 9H3a3 3 0 0 1 0-6h2M9 5h2a3 3 0 0 1 0 6H9M5 7h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                          </svg>
+                          <button
+                            type="button"
+                            title="Open wiki page"
+                            onClick={() => { close(); navigate(`/projects/${projectId}/wiki?page=${link.wikiPage.id}`); }}
+                            style={{
+                              flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                              background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                              color: 'var(--bb-accent, #4F8EF7)', textAlign: 'left', fontSize: 12,
+                              textDecoration: 'underline', textUnderlineOffset: 2,
+                            }}
+                          >
+                            {link.wikiPage.title}
+                          </button>
+                          {!isReadOnly && (
+                            <button
+                              type="button"
+                              title="Unlink"
+                              disabled={unlinkWikiMut.isPending}
+                              onClick={() => issue?.id && unlinkWikiMut.mutate({ pageId: link.wikiPage.id, issueId: issue.id })}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', color: 'var(--kb-field-label)', opacity: 0.7 }}
+                            >
+                              <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                                <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

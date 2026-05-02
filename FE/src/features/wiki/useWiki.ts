@@ -75,8 +75,29 @@ export function useUnlinkTicket() {
   return useMutation({
     mutationFn: ({ pageId, issueId }: { pageId: string; issueId: string }) =>
       wikiApi.unlinkTicket(pageId, issueId),
-    onSuccess: (_data, { pageId }) => {
+    onSuccess: (_data, { pageId, issueId }) => {
       qc.invalidateQueries({ queryKey: ['wiki-links', pageId] });
+      qc.invalidateQueries({ queryKey: ['issue-wiki-links', issueId] });
+    },
+  });
+}
+
+export function useIssueWikiLinks(issueId: string | null) {
+  return useQuery({
+    queryKey: ['issue-wiki-links', issueId],
+    queryFn:  () => wikiApi.getIssueLinks(issueId!),
+    enabled:  !!issueId,
+  });
+}
+
+export function useLinkWikiToIssue() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ pageId, issueId }: { pageId: string; issueId: string }) =>
+      wikiApi.linkTicket(pageId, issueId),
+    onSuccess: (_data, { pageId, issueId }) => {
+      qc.invalidateQueries({ queryKey: ['wiki-links', pageId] });
+      qc.invalidateQueries({ queryKey: ['issue-wiki-links', issueId] });
     },
   });
 }
