@@ -3,10 +3,12 @@ import { useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { issuesApi } from '@/api/issues';
 import { useSprints, useStartSprint, useCompleteSprint, useCreateSprint } from '@/features/projects/useSprints';
+import { useProjectMembers } from '@/features/projects/useProjects';
 import { useRBAC } from '@/hooks/useRBAC';
 import { useArchivedProject } from '@/hooks/useArchivedProject';
 import { ArchivedBanner } from '@/components/common/ArchivedBanner';
 import { IssueModal } from '@/features/kanban/components/IssueModal';
+import { SprintSummaryModal } from '@/features/sprints/SprintSummaryModal';
 import { SprintDatePicker } from '@/components/SprintDatePicker';
 import { CustomSelect } from '@/components/common/CustomSelect';
 import type { Sprint, Issue, SprintStatus } from '@/types';
@@ -436,9 +438,10 @@ interface SprintBlockProps {
   onStart: () => void;
   onComplete: (sprint: Sprint, unfinished: Issue[]) => void;
   onIssueClick: (issue: Issue) => void;
+  onViewSummary: (sprint: Sprint, issues: Issue[]) => void;
 }
 
-function SprintBlock({ sprint, issues, search, collapsed, onToggle, canManage, onStart, onComplete, onIssueClick }: SprintBlockProps) {
+function SprintBlock({ sprint, issues, search, collapsed, onToggle, canManage, onStart, onComplete, onIssueClick, onViewSummary }: SprintBlockProps) {
   const q = search.toLowerCase();
   const filtered = search.trim()
     ? issues.filter((i) => i.title.toLowerCase().includes(q))
@@ -483,6 +486,11 @@ function SprintBlock({ sprint, issues, search, collapsed, onToggle, canManage, o
         {canManage && isActive && (
           <button className="bb-sprint-action" onClick={(e) => { e.stopPropagation(); onComplete(sprint, unfinished); }}>
             Complete sprint
+          </button>
+        )}
+        {isCompleted && (
+          <button className="bb-sprint-action" onClick={(e) => { e.stopPropagation(); onViewSummary(sprint, issues); }}>
+            View Summary
           </button>
         )}
       </div>
@@ -609,11 +617,19 @@ export default function BacklogPage() {
   const completeSprint = useCompleteSprint();
   const createSprint   = useCreateSprint();
 
+  const { data: projectMembers = [] } = useProjectMembers(projectId);
+  const memberNames = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const pm of projectMembers) map[pm.user.id] = pm.user.name;
+    return map;
+  }, [projectMembers]);
+
   const { toastMsg, toastVisible, toastIsError, showToast } = useToast();
 
   const [collapsed,       setCollapsed]       = useState<Record<string, boolean>>({});
   const [search,          setSearch]          = useState('');
   const [completeModal,   setCompleteModal]   = useState<{ sprint: Sprint; unfinished: Issue[] } | null>(null);
+  const [summaryModal,    setSummaryModal]    = useState<{ sprint: Sprint; issues: Issue[]; movedInfo?: { action: 'backlog' | 'next_sprint'; nextSprintName?: string; count: number } } | null>(null);
   const [showCreateModal,    setShowCreateModal]    = useState(false);
   const [createSprintError,  setCreateSprintError]  = useState<string | null>(null);
   const [issueModalOpen,  setIssueModalOpen]  = useState(false);
@@ -656,11 +672,23 @@ export default function BacklogPage() {
 
   function handleConfirmComplete(action: 'backlog' | 'next_sprint', nextSprintId?: string) {
     if (!completeModal) return;
+    const { sprint, unfinished } = completeModal;
+    const sprintIssues = issuesBySprint[sprint.id] ?? [];
+    const nextSprintName = nextSprintId ? sprints.find((s) => s.id === nextSprintId)?.name : undefined;
     completeSprint.mutate(
-      { sprintId: completeModal.sprint.id, projectId, dto: { unfinishedAction: action, nextSprintId } },
+      { sprintId: sprint.id, projectId, dto: { unfinishedAction: action, nextSprintId } },
       {
-        onSuccess: () => { setCompleteModal(null); showToast(`${completeModal.sprint.name} completed`); },
-        onError:   (err) => { setCompleteModal(null); showToast(beError(err), true); },
+        onSuccess: () => {
+          setCompleteModal(null);
+          setSummaryModal({
+            sprint,
+            issues: sprintIssues,
+            movedInfo: unfinished.length > 0
+              ? { action, nextSprintName, count: unfinished.length }
+              : undefined,
+          });
+        },
+        onError: (err) => { setCompleteModal(null); showToast(beError(err), true); },
       },
     );
   }
@@ -796,6 +824,7 @@ export default function BacklogPage() {
             onStart={() => handleStartSprint(sprint)}
             onComplete={handleOpenCompleteModal}
             onIssueClick={(issue) => { setSelectedIssue(issue); setIssueModalOpen(true); }}
+            onViewSummary={(s, issues) => setSummaryModal({ sprint: s, issues })}
           />
         ))}
 
@@ -835,6 +864,17 @@ export default function BacklogPage() {
         onNavigate={(issue) => { setSelectedIssue(issue); setIssueModalOpen(true); }}
         readOnly={isWriteLocked}
       />
+
+      {/* Sprint Summary Modal */}
+      {summaryModal && (
+        <SprintSummaryModal
+          sprint={summaryModal.sprint}
+          issues={summaryModal.issues}
+          movedInfo={summaryModal.movedInfo}
+          memberNames={memberNames}
+          onClose={() => setSummaryModal(null)}
+        />
+      )}
 
       {/* Complete Sprint Modal */}
       {completeModal && (
