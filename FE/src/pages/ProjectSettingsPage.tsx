@@ -33,7 +33,7 @@ function initials(name: string) {
 }
 
 const ROLE_LABELS: Record<Role, string> = {
-  admin: 'Admin', pm: 'PM', developer: 'Developer', viewer: 'Viewer',
+  admin: 'Admin', pm: 'Project Manager', developer: 'Developer', viewer: 'Viewer',
 };
 
 const ROLE_CLS: Record<Role, string> = {
@@ -156,10 +156,10 @@ export default function ProjectSettingsPage() {
       {/* ── Topbar ── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '14px 32px',
+        minHeight: 53, padding: '0 32px',
         background: 'var(--bb-topbar-bg)',
         borderBottom: '1px solid var(--bb-topbar-border)',
-        position: 'sticky', top: 0, zIndex: 10,
+        position: 'sticky', top: 0, zIndex: 10, flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <NavLink

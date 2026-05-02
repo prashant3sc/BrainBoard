@@ -103,7 +103,7 @@ export function IssueCard({ issue, index, members, onClick }: Props) {
               : undefined,
           }}
         >
-          {/* Top row: badges + menu */}
+          {/* Top row: badges */}
           <div className="kb-card-top">
             <div className="kb-card-badges">
               <span className={`kb-badge ${priorityClass(issue.priority)}`}>
@@ -115,17 +115,6 @@ export function IssueCard({ issue, index, members, onClick }: Props) {
                 </span>
               )}
             </div>
-            <button
-              className="kb-card-menu-btn"
-              onClick={(e) => e.stopPropagation()}
-              title="Options"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="3"  r="1.2" fill="currentColor"/>
-                <circle cx="8" cy="8"  r="1.2" fill="currentColor"/>
-                <circle cx="8" cy="13" r="1.2" fill="currentColor"/>
-              </svg>
-            </button>
           </div>
 
           {/* Title */}
@@ -188,17 +177,6 @@ export function IssueCard({ issue, index, members, onClick }: Props) {
                   </svg>
                   {formatDate(issue.due)}
                 </span>
-              )}
-
-              {/* Reporter avatar */}
-              {rc && reporter && (
-                <div
-                  className="kb-card-avatar kb-card-avatar-reporter"
-                  style={{ background: rc.bg, color: rc.text }}
-                  title={`Reporter: ${reporter.name}`}
-                >
-                  {getInitials(reporter.name)}
-                </div>
               )}
 
               {/* Assignee avatar */}
