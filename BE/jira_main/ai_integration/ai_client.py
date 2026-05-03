@@ -4,6 +4,7 @@ from django.conf import settings
 AI_BASE_URL = getattr(settings, "AI_SERVICE_URL", "http://localhost:8001")
 _TIMEOUT_SHORT = 10
 _TIMEOUT_LONG = 180
+_TIMEOUT_SYNC = 600   # sync re-embeds all documents locally — can take up to 10 min
 
 
 def _post(path: str, payload: dict, timeout: int = _TIMEOUT_LONG) -> dict:
@@ -34,7 +35,7 @@ def full_sync(
         "users":     users or [],
         "projects":  projects or [],
         "sprints":   sprints or [],
-    })
+    }, timeout=_TIMEOUT_SYNC)
 
 
 def sync_status() -> dict:

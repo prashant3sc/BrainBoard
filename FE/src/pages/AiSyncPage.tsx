@@ -52,10 +52,10 @@ export default function AiSyncPage() {
   const qc = useQueryClient();
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
-  const { data, isLoading, isError, dataUpdatedAt } = useQuery({
+  const { data, isLoading, isError, dataUpdatedAt, refetch, isFetching } = useQuery({
     queryKey: ['ai', 'sync-status'],
     queryFn: aiApi.syncStatus,
-    refetchInterval: 30_000,
+    enabled: false,   // never auto-fetch — only runs when refetch() is called explicitly
   });
 
   const { mutate: triggerSync, isPending: isSyncing } = useMutation({
@@ -117,8 +117,8 @@ export default function AiSyncPage() {
         </div>
       )}
 
-      {/* Sync button + last checked */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+      {/* Sync button + Check Status + last checked */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
         <button
           onClick={() => triggerSync()}
           disabled={isSyncing}
@@ -147,6 +147,39 @@ export default function AiSyncPage() {
                 <path d="M8 1v3l2-1.5L8 1z" fill="#fff"/>
               </svg>
               Sync Now
+            </>
+          )}
+        </button>
+
+        <button
+          onClick={() => refetch()}
+          disabled={isFetching}
+          style={{
+            background: 'var(--bb-bg-card)', color: 'var(--bb-text-primary)',
+            border: '1.5px solid var(--bb-border)',
+            borderRadius: 8, padding: '9px 20px', fontSize: 13,
+            fontWeight: 600, cursor: isFetching ? 'not-allowed' : 'pointer',
+            opacity: isFetching ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: 7,
+            transition: 'background 0.12s',
+          }}
+          onMouseEnter={(e) => { if (!isFetching) e.currentTarget.style.background = 'var(--bb-bg-input)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--bb-bg-card)'; }}
+        >
+          {isFetching ? (
+            <>
+              <svg viewBox="0 0 16 16" fill="none" width="14" height="14" style={{ animation: 'spin 1s linear infinite' }}>
+                <circle cx="8" cy="8" r="6" stroke="var(--bb-border)" strokeWidth="2"/>
+                <path d="M8 2a6 6 0 0 1 6 6" stroke="var(--bb-text-primary)" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+              Checking…
+            </>
+          ) : (
+            <>
+              <svg viewBox="0 0 16 16" fill="none" width="14" height="14">
+                <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.5"/>
+                <path d="M8 5v3.5l2 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Check Status
             </>
           )}
         </button>
