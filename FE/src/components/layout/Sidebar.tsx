@@ -198,8 +198,8 @@ export default function Sidebar() {
       className="flex h-full flex-col"
       style={{
         position: 'relative',
-        width: collapsed ? 52 : 232,
-        minWidth: collapsed ? 52 : 232,
+        width: collapsed ? 44 : 196,
+        minWidth: collapsed ? 44 : 196,
         background: 'var(--bb-sidebar-bg)',
         borderRight: '1px solid var(--bb-sidebar-border)',
         transition: 'width 0.2s ease, min-width 0.2s ease',
@@ -251,7 +251,7 @@ export default function Sidebar() {
         alignItems: 'center',
         justifyContent: collapsed ? 'center' : 'flex-start',
         gap: 10,
-        padding: collapsed ? '20px 0 16px' : '20px 20px 16px',
+        padding: collapsed ? '10px 0' : '10px 20px',
         borderBottom: '1px solid var(--bb-sidebar-border)',
         overflow: 'hidden',
         transition: 'padding 0.2s ease',
@@ -460,73 +460,40 @@ export default function Sidebar() {
       {user && (
         <div style={{
           borderTop: '1px solid var(--bb-footer-border)',
-          padding: collapsed ? '12px 0' : '12px 14px',
-          transition: 'padding 0.2s ease',
+          padding: '10px 10px',
+          display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          {collapsed ? (
-            /* Collapsed: centered column — avatar, theme toggle, logout */
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-              <button
-                className="bb-avatar-btn"
-                onClick={() => setProfileOpen(true)}
-                title={user.name}
-              >
-                {getInitials(user.name)}
-                <span className="bb-avatar-btn-ring" />
-              </button>
-              <button
-                onClick={toggleTheme}
-                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                className="bb-sidebar-btn"
-                style={{ padding: '4px 6px' }}
-              >
-                {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-              </button>
-              <button
-                onClick={logout}
-                className="bb-sidebar-btn"
-                style={{ padding: '4px 8px', fontSize: 11 }}
-                title="Log out"
-              >
-                Out
-              </button>
-            </div>
-          ) : (
-            /* Expanded: horizontal row */
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <button
-                className="bb-avatar-btn"
-                onClick={() => setProfileOpen(true)}
-                title="View profile"
-              >
-                {getInitials(user.name)}
-                <span className="bb-avatar-btn-ring" />
-              </button>
-              <button
-                className="bb-user-info-btn"
-                onClick={() => setProfileOpen(true)}
-              >
-                <span className="bb-user-info-name">{user.name}</span>
-                <span className="bb-user-info-role">{user.role}</span>
-              </button>
-              <button
-                onClick={toggleTheme}
-                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                className="bb-sidebar-btn"
-                style={{ padding: '4px 6px' }}
-              >
-                {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-              </button>
-              <button
-                onClick={logout}
-                className="bb-sidebar-btn"
-                style={{ padding: '4px 8px', fontSize: 11 }}
-                title="Log out"
-              >
-                Out
-              </button>
-            </div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <button
+              className="bb-avatar-btn"
+              onClick={() => setProfileOpen(true)}
+              title={`${user.name} (${user.role})`}
+            >
+              {getInitials(user.name)}
+              <span className="bb-avatar-btn-ring" />
+            </button>
+            <span className={`bb-role-badge bb-role-${user.role}`} style={{ fontSize: 10.5, padding: '2px 7px', ...hideText }}>
+              {({ admin: 'Admin', pm: 'PM', developer: 'Dev', viewer: 'Viewer' } as Record<string,string>)[user.role] ?? user.role}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button
+              onClick={toggleTheme}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="bb-sidebar-btn"
+              style={{ padding: '4px 6px' }}
+            >
+              {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+            </button>
+            <button
+              onClick={logout}
+              className="bb-sidebar-btn"
+              style={{ padding: '4px 8px', fontSize: 11 }}
+              title="Log out"
+            >
+              Out
+            </button>
+          </div>
         </div>
       )}
 

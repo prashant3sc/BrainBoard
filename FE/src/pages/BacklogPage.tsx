@@ -762,7 +762,7 @@ export default function BacklogPage() {
       {isArchived && <ArchivedBanner viewOnly={isWriteLocked} />}
 
       {/* Topbar */}
-      <div style={{ height: 52, background: 'var(--bb-topbar-bg)', borderBottom: '1px solid var(--bb-topbar-border)', display: 'flex', alignItems: 'center', padding: '0 20px', gap: 10, flexShrink: 0 }}>
+      <div style={{ height: 53, background: 'var(--bb-topbar-bg)', borderBottom: '1px solid var(--bb-topbar-border)', display: 'flex', alignItems: 'center', padding: '0 28px', gap: 10, flexShrink: 0 }}>
         <div>
           <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--bb-page-title)' }}>Backlog</div>
           <div style={{ fontSize: 11, color: 'var(--bb-bc-root)', marginTop: 2 }}>

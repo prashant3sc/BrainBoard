@@ -103,10 +103,10 @@ export function DashboardPage() {
       {/* ── Topbar ── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '14px 32px',
+        minHeight: 53, padding: '0 32px',
         background: 'var(--bb-topbar-bg)',
         borderBottom: '1px solid var(--bb-topbar-border)',
-        position: 'sticky', top: 0, zIndex: 10,
+        position: 'sticky', top: 0, zIndex: 10, flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ fontSize: 13, color: 'var(--bb-bc-root)' }}>Workspace</span>

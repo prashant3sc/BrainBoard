@@ -1642,7 +1642,7 @@
 
 /* ── Topbar ── */
 .wiki-topbar {
-  height: 54px; flex-shrink: 0;
+  height: 53px; flex-shrink: 0;
   background: var(--bb-topbar-bg);
   border-bottom: 1px solid var(--bb-topbar-border);
   display: flex; align-items: center;
@@ -2294,7 +2294,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 28px;
+  min-height: 53px;
+  padding: 0 28px;
   background: var(--bb-topbar-bg);
   border-bottom: 1px solid var(--bb-topbar-border);
   flex-shrink: 0;
@@ -2553,18 +2554,24 @@
 /* ── Board Area ── */
 .kb-board-area {
   flex: 1; overflow-x: auto; overflow-y: hidden;
-  padding: 20px 28px 28px; display: flex; gap: 14px;
-  align-items: stretch; background: var(--kb-board-bg);
+  padding: 20px 28px 28px;
+  background: var(--kb-board-bg);
+  display: flex; align-items: stretch;
+}
+.kb-board-inner {
+  display: flex; gap: 14px; align-items: stretch;
+  flex: 1; min-width: 0;
 }
 
 /* ── Column ── */
 .kb-col {
-  flex-shrink: 0; width: 272px; display: flex;
+  flex: 1; min-width: 220px; display: flex;
   flex-direction: column; min-height: 100%;
+  border-radius: 10px; overflow: hidden;
 }
 .kb-col-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 12px; border-radius: 8px 8px 0 0;
+  padding: 10px 12px;
 }
 .kb-col-header-left { display: flex; align-items: center; gap: 8px; }
 .kb-col-dot   { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
@@ -2608,6 +2615,10 @@
 .kb-col-done .kb-col-dot       { background: var(--kb-done-dot); }
 .kb-col-done .kb-col-count     { background: var(--kb-done-count-bg); color: var(--kb-done-count); }
 .kb-col-done .kb-col-add-btn   { color: var(--kb-done-name); }
+
+/* Column plate backgrounds (body area behind cards) */
+.kb-col-todo, .kb-col-inprog, .kb-col-review, .kb-col-done { background: #F4F5F7; }
+.dark .kb-col-todo, .dark .kb-col-inprog, .dark .kb-col-review, .dark .kb-col-done { background: #1C2128; }
 
 /* ── Card List ── */
 .kb-card-list {

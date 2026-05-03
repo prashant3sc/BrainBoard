@@ -111,27 +111,18 @@ export function KanbanBoard({ projectId, searchQuery, assigneeFilter, onIssueCli
     <>
     <DragDropContext onDragEnd={onDragEnd}>
       <div className="kb-board-area">
-        {KANBAN_COLUMNS.map((col) => (
-          <KanbanColumn
-            key={col.id}
-            col={col}
-            issues={visible.filter((i) => i.status === col.id)}
-            isLoading={isLoading}
-            members={members}
-            onIssueClick={onIssueClick}
-          />
-        ))}
-
-        {/* Add column placeholder */}
-        <button
-          className="kb-add-col-btn"
-          onClick={() => {/* coming soon */}}
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-          </svg>
-          Add column
-        </button>
+        <div className="kb-board-inner">
+          {KANBAN_COLUMNS.map((col) => (
+            <KanbanColumn
+              key={col.id}
+              col={col}
+              issues={visible.filter((i) => i.status === col.id)}
+              isLoading={isLoading}
+              members={members}
+              onIssueClick={onIssueClick}
+            />
+          ))}
+        </div>
       </div>
     </DragDropContext>
 
