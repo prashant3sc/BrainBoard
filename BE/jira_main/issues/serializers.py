@@ -90,12 +90,14 @@ class IssueCreateSerializer(serializers.ModelSerializer):
         choices=Issue.ISSUE_TYPE_CHOICES, required=False, write_only=True, source="issue_type"
     )
     dueDate = serializers.DateField(required=False, allow_null=True, write_only=True, source="due_date")
+    status = serializers.ChoiceField(choices=Issue.STATUS_CHOICES, required=False)
 
     class Meta:
         model = Issue
         fields = [
             "title",
             "description",
+            "status",
             "priority",
             "issueType",
             "storyPoints",
@@ -124,6 +126,7 @@ class IssueCreateSerializer(serializers.ModelSerializer):
         parent_id   = validated_data.pop("parentId", None)
         sprint_id   = validated_data.pop("sprintId", None)
         label_ids   = validated_data.pop("labelIds", [])
+        issue_status = validated_data.pop("status", Issue.TODO)
         request     = self.context.get("request")
 
         try:
@@ -167,7 +170,7 @@ class IssueCreateSerializer(serializers.ModelSerializer):
             issue = Issue.objects.create(
                 project=project,
                 sprint=sprint,
-                status=Issue.TODO,
+                status=issue_status,
                 assignee=assignee,
                 reporter=request.user if request else None,
                 parent=parent,

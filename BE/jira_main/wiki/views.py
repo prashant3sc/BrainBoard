@@ -45,10 +45,28 @@ class ProjectWikiListView(APIView):
 
 class WikiPageListView(APIView):
     """
+    GET  /wiki — list all wiki pages accessible to the requesting user.
+                 Admin sees all; others see only pages in projects they belong to.
     POST /wiki — create a wiki page (admin, pm, developer)
     """
 
     permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from projects.models import ProjectMember
+        if request.user.is_org_admin:
+            queryset = WikiPage.objects.all().select_related("project")
+        else:
+            member_project_ids = ProjectMember.objects.filter(
+                user=request.user
+            ).values_list("project_id", flat=True)
+            queryset = WikiPage.objects.filter(
+                project_id__in=member_project_ids
+            ).select_related("project")
+        filterset = WikiPageFilter(request.query_params, queryset=queryset)
+        if filterset.is_valid():
+            queryset = filterset.qs
+        return Response(WikiPageSerializer(queryset, many=True).data)
 
     def post(self, request):
         if not request.user.can_write_wiki:

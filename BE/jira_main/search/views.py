@@ -34,70 +34,65 @@ def _excerpt(text, query):
 
 class SearchView(APIView):
     """
-    POST /search
-    Body: { "query": "csv export" }
+    GET  /search?q=<query>        — full-text search via query param
+    POST /search { "query": "..." } — full-text search via request body
     Returns a flat array of SearchResult objects (type: "issue" | "wiki").
     """
 
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
-        query = request.data.get("query", "").strip()
+    def _run_search(self, query):
+        """Shared search logic used by both GET and POST."""
         if not query:
-            return Response([])
-
+            return []
         results = []
-
-        # Search issues
         issues = Issue.objects.filter(
             Q(title__icontains=query) | Q(description__icontains=query)
         ).select_related("project")[:20]
-
         for issue in issues:
-            results.append(
-                {
-                    "id": str(issue.pk),
-                    "type": "issue",
-                    "title": issue.title,
-                    "excerpt": _excerpt(issue.description or issue.title, query),
-                    "projectId": str(issue.project_id),
-                }
-            )
-
-        # Search wiki pages
+            results.append({
+                "id":        str(issue.pk),
+                "type":      "issue",
+                "title":     issue.title,
+                "excerpt":   _excerpt(issue.description or issue.title, query),
+                "projectId": str(issue.project_id),
+            })
         pages = WikiPage.objects.filter(
             Q(title__icontains=query) | Q(content__icontains=query)
         ).select_related("project")[:20]
-
         for page in pages:
-            results.append(
-                {
-                    "id": str(page.pk),
-                    "type": "wiki",
-                    "title": page.title,
-                    "excerpt": _excerpt(page.content or page.title, query),
-                    "projectId": str(page.project_id),
-                }
-            )
+            results.append({
+                "id":        str(page.pk),
+                "type":      "wiki",
+                "title":     page.title,
+                "excerpt":   _excerpt(page.content or page.title, query),
+                "projectId": str(page.project_id),
+            })
+        return results
 
-        return Response(results)
+    def get(self, request):
+        query = request.query_params.get("q", "").strip()
+        return Response(self._run_search(query))
+
+    def post(self, request):
+        query = request.data.get("query", "").strip()
+        return Response(self._run_search(query))
 
 
 class SemanticSearchView(APIView):
     """
-    POST /search/semantic
-    Body: { "query": "..." }
+    GET  /search/semantic?q=<query>       — vector similarity search via query param
+    POST /search/semantic { "query": "..." } — vector similarity search via request body
     Calls the AI service for vector similarity search, then enriches each result
     with the projectId from Postgres before returning.
     """
 
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
-        query = request.data.get("query", "").strip()
+    def _run_semantic_search(self, query, request):
+        """Shared semantic search logic used by both GET and POST."""
         if not query:
             return Response([])
-
         try:
             raw_results = ai_client.semantic_search(query)
         except requests.RequestException as exc:
@@ -105,11 +100,8 @@ class SemanticSearchView(APIView):
                 {"detail": f"AI layer unreachable: {exc}"},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
-
-        # Bulk-fetch matching issues and wiki pages to resolve projectId in 2 queries
         issue_ids = [r["id"] for r in raw_results if r.get("type") == "issue" and r.get("id")]
         wiki_ids  = [r["id"] for r in raw_results if r.get("type") == "wiki"  and r.get("id")]
-
         issue_map = {
             str(i.pk): str(i.project_id)
             for i in Issue.objects.filter(pk__in=issue_ids).only("id", "project_id")
@@ -118,7 +110,6 @@ class SemanticSearchView(APIView):
             str(p.pk): str(p.project_id)
             for p in WikiPage.objects.filter(pk__in=wiki_ids).only("id", "project_id")
         }
-
         enriched = []
         for item in raw_results:
             item_id   = item.get("id", "")
@@ -139,5 +130,12 @@ class SemanticSearchView(APIView):
                     "excerpt":   item.get("excerpt", ""),
                     "projectId": wiki_map[item_id],
                 })
-
         return Response(enriched)
+
+    def get(self, request):
+        query = request.query_params.get("q", "").strip()
+        return self._run_semantic_search(query, request)
+
+    def post(self, request):
+        query = request.data.get("query", "").strip()
+        return self._run_semantic_search(query, request)
