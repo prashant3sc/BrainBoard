@@ -2319,6 +2319,11 @@
   border: 2px solid var(--bb-topbar-bg);
   font-size: 9px; font-weight: 600;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, z-index 0s;
+}
+.kb-t-avatar:hover {
+  transform: scale(1.25);
+  z-index: 999 !important;
 }
 
 .kb-search-box {

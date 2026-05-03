@@ -135,16 +135,14 @@ export function KanbanPage() {
                   onKeyDown={(e) => e.key === 'Enter' && toggleAssignee(m.user.id)}
                   title={selected ? `Remove ${m.user.name} filter` : `Filter by ${m.user.name}`}
                   style={{
-                    background: bg,
+                    background: selected ? `color-mix(in srgb, ${bg} 75%, #000 25%)` : bg,
                     color:      text,
                     marginLeft: i === 0 ? 0 : -6,
                     zIndex:     selected ? members.length + 1 : members.length - i,
                     cursor:     'pointer',
-                    boxShadow:  selected
-                      ? `0 0 0 2px var(--bb-content-bg), 0 0 0 4px ${text}`
-                      : undefined,
-                    transform:  selected ? 'scale(1.15)' : undefined,
-                    transition: 'box-shadow 0.15s, transform 0.15s',
+                    boxShadow:  selected ? `0 2px 6px rgba(0,0,0,0.28)` : undefined,
+                    transform:  selected ? 'translateY(-1px)' : undefined,
+                    transition: 'background 0.15s, box-shadow 0.15s, transform 0.15s',
                   }}
                 >
                   {getInitials(m.user.name)}
@@ -159,22 +157,6 @@ export function KanbanPage() {
               >
                 +{members.length - 5}
               </div>
-            )}
-            {/* Clear filter indicator */}
-            {assigneeFilter.length > 0 && (
-              <button
-                onClick={() => setAssigneeFilter([])}
-                title="Clear assignee filter"
-                style={{
-                  marginLeft: 8, fontSize: 11, fontWeight: 600,
-                  color: '#E75026', background: '#FFF3F0',
-                  border: '1px solid #FFD9CC', borderRadius: 20,
-                  padding: '2px 8px', cursor: 'pointer', fontFamily: 'inherit',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                ✕ {assigneeFilter.length} {assigneeFilter.length === 1 ? 'user' : 'users'}
-              </button>
             )}
           </div>
 
