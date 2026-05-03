@@ -230,9 +230,12 @@ class SprintListView(APIView):
 
 
 class SprintDetailView(APIView):
-    """PATCH /sprints/:id — start (planned→active) or end (active→completed) a sprint."""
+    """
+    GET   /sprints/:id — retrieve sprint details (any authenticated user)
+    PATCH /sprints/:id — start (planned→active) or end (active→completed) a sprint (admin, pm only)
+    """
 
-    permission_classes = [IsAdminOrPM]
+    permission_classes = [IsAuthenticated]
 
     def _get_sprint(self, pk):
         try:
@@ -240,7 +243,15 @@ class SprintDetailView(APIView):
         except Sprint.DoesNotExist:
             return None
 
+    def get(self, request, pk):
+        sprint = self._get_sprint(pk)
+        if not sprint:
+            return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(SprintSerializer(sprint).data)
+
     def patch(self, request, pk):
+        if not request.user.can_plan_sprints:
+            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
         sprint = self._get_sprint(pk)
         if not sprint:
             return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
