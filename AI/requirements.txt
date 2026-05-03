@@ -12,3 +12,4 @@ chromadb
 tiktoken
 langchain-core
 slowapi
+rank_bm25

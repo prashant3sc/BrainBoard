@@ -262,30 +262,107 @@ def get_sync_status() -> dict:
     }
 
 
+def _get_logical_id(meta: dict) -> str:
+    """
+    Extract a stable logical ID from document metadata.
+    Handles both full_sync format (issue_id, wiki_id) and
+    Celery-task format (ticket_id, page_id).
+    """
+    return (
+        meta.get("issue_id")
+        or meta.get("ticket_id")
+        or meta.get("wiki_id")
+        or meta.get("page_id")
+        or meta.get("sprint_id")
+        or meta.get("user_id")
+        or meta.get("project_id")
+        or ""
+    )
+
+
+def _extract_excerpt(text: str) -> str:
+    for prefix in ("Description: ", "Content: "):
+        for line in text.split("\n"):
+            if line.startswith(prefix):
+                return line[len(prefix):].strip()[:200]
+    return ""
+
+
+def _extract_title_simple(text: str) -> str:
+    for line in text.split("\n"):
+        if line.startswith("Title: "):
+            return line[7:].strip()
+    return ""
+
+
 def semantic_search(query: str, k: int = 10) -> list[dict]:
-    """Semantic similarity search across issues and wiki pages stored in ChromaDB."""
+    """
+    Hybrid semantic search (BM25 + vector + RRF) across issues and wiki pages.
+
+    Falls back to pure vector search when rank_bm25 is not installed.
+    """
+    from app.services.hybrid_search import bm25_search, reciprocal_rank_fusion, is_available as bm25_available
+
+    _ISSUE_WIKI_TYPES = {"issue", "wiki", "ticket"}
     vector_store = get_vector_store()
-    docs = vector_store.similarity_search(query, k=k)
 
-    results = []
-    for doc in docs:
+    # ── Build corpus for BM25 ────────────────────────────────────────────────
+    # logical_id → (page_content, metadata)
+    corpus: dict[str, tuple[str, dict]] = {}
+
+    if bm25_available():
+        try:
+            raw = vector_store._collection.get(include=["documents", "metadatas"])
+            for text, meta in zip(raw.get("documents", []), raw.get("metadatas", [])):
+                doc_type = meta.get("doc_type") or meta.get("type", "")
+                if doc_type in _ISSUE_WIKI_TYPES:
+                    lid = _get_logical_id(meta)
+                    if lid:
+                        corpus[lid] = (text, meta)
+        except Exception as exc:
+            logger.warning(f"semantic_search: BM25 corpus fetch failed — {exc}")
+
+    # ── Vector search (over-retrieve) ────────────────────────────────────────
+    vector_k = min(k * 3, max(k, len(corpus))) if corpus else k
+    vector_docs = vector_store.similarity_search(query, k=vector_k)
+
+    vector_ids: list[str] = []
+    for doc in vector_docs:
         meta = doc.metadata
-        doc_type = meta.get("doc_type", "issue")
+        doc_type = meta.get("doc_type") or meta.get("type", "")
+        if doc_type not in _ISSUE_WIKI_TYPES:
+            continue
+        lid = _get_logical_id(meta)
+        if lid:
+            vector_ids.append(lid)
+            corpus.setdefault(lid, (doc.page_content, meta))
 
-        title = ""
-        for line in doc.page_content.split("\n"):
-            if line.startswith("Title: "):
-                title = line[7:].strip()
-                break
+    # ── BM25 search ──────────────────────────────────────────────────────────
+    bm25_ids: list[str] = []
+    if bm25_available() and corpus:
+        all_ids = list(corpus.keys())
+        all_texts = [corpus[i][0] for i in all_ids]
+        bm25_ids = bm25_search(all_texts, all_ids, query, top_k=min(k * 3, len(all_ids)))
+        logger.info(f"semantic_search: hybrid — {len(vector_ids)} vector + {len(bm25_ids)} BM25 candidates")
+    else:
+        logger.info(f"semantic_search: pure vector — {len(vector_ids)} candidates")
 
-        excerpt = ""
-        for prefix in ("Description: ", "Content: "):
-            for line in doc.page_content.split("\n"):
-                if line.startswith(prefix):
-                    excerpt = line[len(prefix):].strip()[:200]
-                    break
-            if excerpt:
-                break
+    # ── RRF merge ────────────────────────────────────────────────────────────
+    merged_ids = (
+        reciprocal_rank_fusion(vector_ids, bm25_ids)[:k]
+        if bm25_ids
+        else vector_ids[:k]
+    )
+
+    # ── Build output ─────────────────────────────────────────────────────────
+    results = []
+    for lid in merged_ids:
+        if lid not in corpus:
+            continue
+        text, meta = corpus[lid]
+        doc_type = meta.get("doc_type") or meta.get("type", "")
+        title = _extract_title_simple(text)
+        excerpt = _extract_excerpt(text)
 
         if doc_type == "issue":
             results.append({
@@ -294,9 +371,16 @@ def semantic_search(query: str, k: int = 10) -> list[dict]:
                 "title": title,
                 "excerpt": excerpt,
             })
+        elif doc_type == "ticket":
+            results.append({
+                "id": meta.get("ticket_id", ""),
+                "type": "issue",
+                "title": title,
+                "excerpt": excerpt,
+            })
         elif doc_type == "wiki":
             results.append({
-                "id": meta.get("wiki_id", ""),
+                "id": meta.get("wiki_id") or meta.get("page_id", ""),
                 "type": "wiki",
                 "title": title or meta.get("title", ""),
                 "excerpt": excerpt,
@@ -431,6 +515,8 @@ def query_chromadb(
     if not doc_types:
         return []
 
+    from app.services.hybrid_search import bm25_search, reciprocal_rank_fusion, is_available as bm25_available
+
     try:
         vector_store = get_vector_store()
 
@@ -456,7 +542,52 @@ def query_chromadb(
             f"project_id={project_id} sprint_id={sprint_id} k={top_k}"
         )
 
-        docs = vector_store.similarity_search(query, k=top_k, filter=where)
+        # ── Build corpus for BM25 ─────────────────────────────────────────────
+        # logical_id → (page_content, metadata)
+        corpus: dict[str, tuple[str, dict]] = {}
+
+        if bm25_available():
+            try:
+                raw = vector_store._collection.get(
+                    where=where,
+                    include=["documents", "metadatas"],
+                )
+                for text, meta in zip(raw.get("documents", []), raw.get("metadatas", [])):
+                    lid = _get_logical_id(meta)
+                    if lid:
+                        corpus[lid] = (text, meta)
+            except Exception as exc:
+                logger.warning(f"query_chromadb: BM25 corpus fetch failed — {exc}")
+
+        # ── Vector search (over-retrieve) ─────────────────────────────────────
+        vector_k = min(top_k * 3, max(top_k, len(corpus))) if corpus else top_k
+        docs = vector_store.similarity_search(query, k=vector_k, filter=where)
+
+        vector_ids: list[str] = []
+        for doc in docs:
+            lid = _get_logical_id(doc.metadata)
+            if lid:
+                vector_ids.append(lid)
+                corpus.setdefault(lid, (doc.page_content, doc.metadata))
+
+        # ── BM25 search ───────────────────────────────────────────────────────
+        bm25_ids: list[str] = []
+        if bm25_available() and corpus:
+            all_ids = list(corpus.keys())
+            all_texts = [corpus[i][0] for i in all_ids]
+            bm25_ids = bm25_search(all_texts, all_ids, query, top_k=min(top_k * 3, len(all_ids)))
+            logger.info(
+                f"query_chromadb: hybrid — {len(vector_ids)} vector + {len(bm25_ids)} BM25 candidates"
+            )
+        else:
+            logger.info(f"query_chromadb: pure vector — {len(vector_ids)} candidates")
+
+        # ── RRF merge ─────────────────────────────────────────────────────────
+        merged_ids = (
+            reciprocal_rank_fusion(vector_ids, bm25_ids)[:top_k]
+            if bm25_ids
+            else vector_ids[:top_k]
+        )
 
     except Exception as exc:
         logger.error(
@@ -465,36 +596,36 @@ def query_chromadb(
         )
         return []
 
-    # ── Extract {type, id, title, text} from each result ────────────────────
+    # ── Build output from merged ranking ────────────────────────────────────
     results: list[dict] = []
-    for doc in docs:
-        meta = doc.metadata
+    for lid in merged_ids:
+        if lid not in corpus:
+            continue
+        text, meta = corpus[lid]
 
-        # Normalise type — handle both new (type) and old (doc_type) formats
         doc_type = meta.get("type") or meta.get("doc_type", "")
 
-        # Resolve the entity ID per type (Celery-format keys first, then old format)
         id_lookup: dict[str, str | None] = {
             "ticket":    meta.get("ticket_id"),
-            "issue":     meta.get("issue_id"),           # old full_sync name
+            "issue":     meta.get("issue_id"),
             "wiki":      meta.get("page_id") or meta.get("wiki_id"),
             "sprint":    meta.get("sprint_id"),
-            "analytics": meta.get("project_id"),         # analytics keyed by project + week
+            "analytics": meta.get("project_id"),
             "project":   meta.get("project_id"),
             "user":      meta.get("user_id"),
         }
         doc_id = id_lookup.get(doc_type) or ""
 
-        title = _extract_title_from_doc(doc.page_content, meta, doc_type)
+        title = _extract_title_from_doc(text, meta, doc_type)
 
         results.append({
             "type":  doc_type,
             "id":    doc_id,
             "title": title,
-            "text":  doc.page_content,
+            "text":  text,
         })
 
-    logger.info(f"query_chromadb: returned {len(results)} results")
+    logger.info(f"query_chromadb: returned {len(results)} results (hybrid)")
     return results
 
 
