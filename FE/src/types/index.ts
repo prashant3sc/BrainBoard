@@ -105,6 +105,7 @@ export interface WikiPage {
   tags?: string[];
   viewCount?: number;
   commentCount?: number;
+  updatedBy?: { name: string; initials: string } | null;
   contributors?: WikiContributor[];
   versions?: WikiVersion[];
   linkedIssues?: WikiLinkedIssue[];

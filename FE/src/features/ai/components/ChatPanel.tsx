@@ -188,6 +188,18 @@ export function ChatPanel({ projectId, projectName }: Props) {
     }
   }, [open, messages.length]);
 
+  useEffect(() => {
+    function handleExplain(e: Event) {
+      const text = (e as CustomEvent<{ text: string }>).detail.text;
+      setOpen(true);
+      const prompt = `Explain this:\n\n"${text}"`;
+      setInput(prompt);
+      setTimeout(() => inputRef.current?.focus(), 80);
+    }
+    window.addEventListener('wiki:explain', handleExplain);
+    return () => window.removeEventListener('wiki:explain', handleExplain);
+  }, []);
+
   function handleSend() {
     const text = input.trim();
     if (!text || isLoading) return;
@@ -238,15 +250,17 @@ export function ChatPanel({ projectId, projectName }: Props) {
         style={{
           position: 'fixed', bottom: 28, right: 28, zIndex: 1000,
           width: 44, height: 44, borderRadius: 13,
-          background: open ? 'var(--bb-bg-card)' : 'none',
+          background: open ? 'var(--bb-bg-card)' : 'transparent',
           border: open ? '2px solid #E75026' : 'none',
           padding: 0,
           cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          transition: 'all 0.2s',
+          transition: 'background 0.2s, border 0.2s',
           boxShadow: 'none',
+          outline: 'none',
+          overflow: 'hidden',
           filter: !open && btnHover ? 'brightness(0.85)' : 'none',
-          animation: 'none',
+          appearance: 'none',
         }}
       >
         {open ? (

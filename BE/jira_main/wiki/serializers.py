@@ -15,12 +15,21 @@ class WikiPageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = WikiPage
-        fields = ["id", "title", "content", "parentId", "projectId", "updated_at", "created_at"]
+        fields = ["id", "title", "content", "parentId", "projectId", "updated_at", "created_at", "updated_by"]
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
         rep["updatedAt"] = rep.pop("updated_at")
         rep["createdAt"] = rep.pop("created_at")
+        user = instance.updated_by
+        if user:
+            full_name = user.get_full_name() or user.email
+            parts = full_name.split()
+            initials = (parts[0][0] + parts[-1][0]).upper() if len(parts) >= 2 else full_name[:2].upper()
+            rep["updatedBy"] = {"name": full_name, "initials": initials}
+        else:
+            rep["updatedBy"] = None
+        rep.pop("updated_by", None)
         return rep
 
 

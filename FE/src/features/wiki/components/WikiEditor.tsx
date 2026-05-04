@@ -1,4 +1,4 @@
-import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -23,6 +23,14 @@ interface Props {
   isSaving: boolean;
   canEdit: boolean;
   isEditing: boolean;
+  onExplain?: (text: string) => void;
+  linkedCount?: number;
+}
+
+function readTime(html: string): number {
+  const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  const words = text ? text.split(' ').length : 0;
+  return Math.max(1, Math.round(words / 200));
 }
 
 /* ── SVG icon set ── */
@@ -52,11 +60,81 @@ function TbBtn({ active, title: tip, onClick, disabled, children }: {
   );
 }
 
+/* ── Selection popup ── */
+interface SelectionPopupProps {
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  onExplain: (text: string) => void;
+}
+function SelectionPopup({ containerRef, onExplain }: SelectionPopupProps) {
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const [selText, setSelText] = useState('');
+
+  useEffect(() => {
+    function handleMouseUp() {
+      const sel = window.getSelection();
+      const text = sel?.toString().trim() ?? '';
+      if (!text || !sel || sel.rangeCount === 0) { setPos(null); return; }
+
+      const container = containerRef.current;
+      if (!container) { setPos(null); return; }
+      const range = sel.getRangeAt(0);
+      const selRect = range.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      if (!container.contains(range.commonAncestorContainer)) { setPos(null); return; }
+
+      setSelText(text);
+      setPos({
+        x: selRect.left + selRect.width / 2 - containerRect.left,
+        y: selRect.top - containerRect.top - 8,
+      });
+    }
+    function handleMouseDown(e: MouseEvent) {
+      const popup = document.getElementById('wiki-sel-popup');
+      if (popup && popup.contains(e.target as Node)) return;
+      setPos(null);
+    }
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => {
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mousedown', handleMouseDown);
+    };
+  }, [containerRef]);
+
+  if (!pos) return null;
+  return (
+    <div
+      id="wiki-sel-popup"
+      className="wiki-sel-popup"
+      style={{ left: pos.x, top: pos.y }}
+    >
+      <button
+        className="wiki-sel-explain-btn"
+        onClick={() => { onExplain(selText); setPos(null); window.getSelection()?.removeAllRanges(); }}
+      >
+        <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+          <path d="M7 2l1.2 2.4L11 5l-2 1.95.47 2.75L7 8.5l-2.47 1.2L5 6.95 3 5l2.8-.6L7 2z" fill="currentColor"/>
+        </svg>
+        Explain this
+      </button>
+      <div className="wiki-sel-sep" />
+      <button className="wiki-sel-more-btn" title="More options">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+          <circle cx="2.5" cy="7" r="1.2" fill="currentColor"/>
+          <circle cx="7" cy="7" r="1.2" fill="currentColor"/>
+          <circle cx="11.5" cy="7" r="1.2" fill="currentColor"/>
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 export const WikiEditor = forwardRef<WikiEditorHandle, Props>(function WikiEditor(
-  { page, parentPage, onSave, isSaving: _isSaving, canEdit, isEditing },
+  { page, parentPage, onSave, isSaving: _isSaving, canEdit, isEditing, onExplain, linkedCount },
   ref,
 ) {
   const [title, setTitle] = useState('');
+  const areaRef = useRef<HTMLDivElement>(null);
 
   const editor = useEditor({
     extensions: [
@@ -137,33 +215,10 @@ export const WikiEditor = forwardRef<WikiEditorHandle, Props>(function WikiEdito
   }
 
   return (
-    <div className="wke-area">
+    <div className="wke-area" ref={areaRef} style={{ position: 'relative' }}>
+      {!isEditing && onExplain && <SelectionPopup containerRef={areaRef} onExplain={onExplain} />}
       <div className="wke-inner">
 
-        {/* Breadcrumb */}
-        <div className="wke-breadcrumb">
-          <span className="wke-crumb wke-crumb-link">Wiki</span>
-          <svg width="6" height="10" viewBox="0 0 6 10" fill="none" style={{ opacity: .4 }}>
-            <path d="M1 1.5l4 3.5-4 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          {page.section && (
-            <>
-              <span className="wke-crumb wke-crumb-link">{page.section}</span>
-              <svg width="6" height="10" viewBox="0 0 6 10" fill="none" style={{ opacity: .4 }}>
-                <path d="M1 1.5l4 3.5-4 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </>
-          )}
-          {parentPage && (
-            <>
-              <span className="wke-crumb wke-crumb-link">{parentPage.title}</span>
-              <svg width="6" height="10" viewBox="0 0 6 10" fill="none" style={{ opacity: .4 }}>
-                <path d="M1 1.5l4 3.5-4 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </>
-          )}
-          <span className="wke-crumb wke-crumb-current">{page.title}</span>
-        </div>
 
         {/* Doc header */}
         <div className="wke-doc-header">
@@ -182,49 +237,51 @@ export const WikiEditor = forwardRef<WikiEditorHandle, Props>(function WikiEdito
 
           {/* Meta row */}
           <div className="wke-meta-row">
-            {page.contributors?.[0] && (
-              <div className="wke-meta-chip">
-                <div className={`wke-meta-avatar ${page.contributors[0].colorClass}`}>
-                  {page.contributors[0].initials}
+            {/* Author chip */}
+            <div className="wke-meta-chip">
+              {page.updatedBy && (
+                <div className="wke-meta-avatar">
+                  {page.updatedBy.initials}
                 </div>
-                <span>{page.contributors[0].name}</span>
-                <span className="wke-meta-sep">·</span>
-                <span>{formatRelativeDate(page.updatedAt)}</span>
-              </div>
+              )}
+              <span>
+                Updated {formatRelativeDate(page.updatedAt)}
+                {page.updatedBy && <> by <strong>{page.updatedBy.name}</strong></>}
+              </span>
+            </div>
+            <span className="wke-meta-dot">•</span>
+            {/* Read time */}
+            <div className="wke-meta-chip">
+              {readTime(page.content ?? '')} min read
+            </div>
+            {/* Linked issues */}
+            {linkedCount !== undefined && linkedCount > 0 && (
+              <>
+                <span className="wke-meta-dot">•</span>
+                <div className="wke-meta-chip wke-meta-chip--badge">
+                  <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+                    <path d="M5.5 8.5a3.5 3.5 0 0 0 5 0l1.5-1.5a3.5 3.5 0 0 0-5-5L6.5 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                    <path d="M8.5 5.5a3.5 3.5 0 0 0-5 0L2 7a3.5 3.5 0 0 0 5 5l.5-.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                  </svg>
+                  Linked issues {linkedCount}
+                </div>
+              </>
             )}
-            {page.viewCount !== undefined && (
-              <div className="wke-meta-chip">
-                <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-                  <ellipse cx="7" cy="7" rx="6" ry="4" stroke="currentColor" strokeWidth="1.3"/>
-                  <circle cx="7" cy="7" r="2" fill="currentColor" opacity=".5"/>
-                </svg>
-                {page.viewCount} views
-              </div>
-            )}
-            {page.commentCount !== undefined && page.commentCount > 0 && (
-              <div className="wke-meta-chip">
-                <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-                  <path d="M2 2h10a1 1 0 011 1v6a1 1 0 01-1 1H5l-3 2V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
-                </svg>
-                {page.commentCount} comments
-              </div>
-            )}
+            {/* Tags as team badges */}
+            {page.tags && page.tags.map((tag) => (
+              <>
+                <span className="wke-meta-dot">•</span>
+                <div key={tag} className="wke-meta-chip wke-meta-chip--tag">{tag}</div>
+              </>
+            ))}
           </div>
 
-          {/* Tags */}
-          {page.tags && page.tags.length > 0 && (
-            <div className="wke-tags">
-              {page.tags.map((tag) => (
-                <span key={tag} className="wke-tag">{tag}</span>
-              ))}
-            </div>
-          )}
         </div>
 
         <div className="wke-divider" />
 
-        {/* Editor toolbar — always shown but disabled when not editing */}
-        <div className={`wke-toolbar${disabled ? ' wke-toolbar-disabled' : ''}`}>
+        {/* Editor toolbar — only visible in edit mode */}
+        {!disabled && <div className="wke-toolbar">
           {/* Heading selector */}
           <button className="wke-tb-label" onClick={cycleHeading} disabled={disabled} type="button">
             <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
@@ -331,7 +388,7 @@ export const WikiEditor = forwardRef<WikiEditorHandle, Props>(function WikiEdito
               <path d="M1 5.5h12M5 5.5v6M5 1.5v4" stroke="currentColor" strokeWidth="1.1"/>
             </svg>
           </TbBtn>
-        </div>
+        </div>}
 
         {/* Tiptap content */}
         <EditorContent editor={editor} />
@@ -353,3 +410,4 @@ function formatRelativeDate(dateStr: string): string {
   if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
   return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
+
