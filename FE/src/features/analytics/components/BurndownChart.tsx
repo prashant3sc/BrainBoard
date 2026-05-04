@@ -45,7 +45,7 @@ function CustomTooltip({ active, payload, label }: any) {
 function StatCard({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color?: string }) {
   return (
     <div style={{
-      flex: 1, background: 'var(--bb-bg-input)',
+      flex: '1 1 140px', minWidth: 140, background: 'var(--bb-bg-input)',
       border: '1.5px solid var(--bb-border)',
       borderRadius: 12, padding: '14px 16px',
     }}>
@@ -69,26 +69,25 @@ function SprintSelector({
   onChange: (id: string) => void;
 }) {
   return (
-    <div style={{ width: 200 }}>
-      <CustomSelect
-        size="sm"
-        value={selected}
-        onChange={onChange}
-        options={sprints.map((s) => ({
-          value: s.sprint_id,
-          label: s.sprint_name,
-          hint: s.status === 'active' ? 'Active' : undefined,
-        }))}
-      />
-    </div>
+    <CustomSelect
+      size="sm"
+      value={selected}
+      onChange={onChange}
+      options={sprints.map((s) => ({
+        value: s.sprint_id,
+        label: s.sprint_name,
+        hint: s.status === 'active' ? 'Active' : undefined,
+      }))}
+    />
   );
 }
 
 export function BurndownChart({ projectId }: Props) {
   const [selectedSprintId, setSelectedSprintId] = useState<string | undefined>(undefined);
-  const { data, isLoading, isError } = useBurndown(projectId, selectedSprintId);
+  const { data, isLoading, isFetching, isError } = useBurndown(projectId, selectedSprintId);
 
-  if (isLoading) return (
+  /* Initial load — no data at all yet */
+  if (isLoading && !data) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: 'var(--bb-text-muted)', fontSize: 13 }}>
       Loading burndown data…
     </div>
@@ -116,11 +115,12 @@ export function BurndownChart({ projectId }: Props) {
     ? Math.round((data.completed_points / data.total_points) * 100)
     : 0;
 
-  const activeSprint = selectedSprintId
-    ? data.all_sprints.find((s) => s.sprint_id === selectedSprintId) ?? data.all_sprints[0]
-    : data.all_sprints.find((s) => s.status === 'active') ?? data.all_sprints[data.all_sprints.length - 1];
-
-  const resolvedSprintId = activeSprint?.sprint_id ?? '';
+  // resolvedSprintId drives the dropdown — always show what the user picked,
+  // not what data.sprint_id says (which lags behind during fetch)
+  const resolvedSprintId = selectedSprintId
+    ?? data.all_sprints.find((s) => s.status === 'active')?.sprint_id
+    ?? data.all_sprints[data.all_sprints.length - 1]?.sprint_id
+    ?? '';
 
   const chartData = data.days.map((d) => ({
     date: d.date,
@@ -133,7 +133,7 @@ export function BurndownChart({ projectId }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
       {/* Header row: stat cards + sprint selector */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
         <StatCard label="Total Points" value={data.total_points} sub="sprint scope" />
         <StatCard label="Completed" value={`${data.completed_points} pts`} sub={`${pctDone}% done`} color="#E75026" />
         <StatCard
@@ -143,7 +143,7 @@ export function BurndownChart({ projectId }: Props) {
           color={remaining === 0 ? '#006644' : remaining > data.total_points * 0.5 ? '#DE350B' : '#FF8B00'}
         />
         <div style={{
-          flex: 1, background: 'var(--bb-bg-input)',
+          flex: '1 1 160px', minWidth: 160, background: 'var(--bb-bg-input)',
           border: '1.5px solid var(--bb-border)',
           borderRadius: 12, padding: '14px 16px',
           display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
@@ -164,7 +164,18 @@ export function BurndownChart({ projectId }: Props) {
         background: 'var(--bb-bg-card)',
         border: '1.5px solid var(--bb-border)',
         borderRadius: 14, padding: '20px 16px 12px',
+        position: 'relative',
       }}>
+        {isFetching && (
+          <div style={{
+            position: 'absolute', inset: 0, borderRadius: 14,
+            background: 'var(--bb-bg-card)', opacity: 0.7,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 10, fontSize: 12, color: 'var(--bb-text-muted)',
+          }}>
+            Loading…
+          </div>
+        )}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--bb-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Burndown / Burnup — {data.sprint_name}

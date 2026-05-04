@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useProjectMembers } from '@/features/projects/useProjects';
@@ -42,6 +43,18 @@ export function KanbanPage() {
   const [modalOpen,          setModalOpen]          = useState(false);
   const [viewMode,           setViewMode]           = useState<'board' | 'list'>('board');
   const [assigneeFilter,     setAssigneeFilter]     = useState<string[]>([]);
+  const [overflowOpen,       setOverflowOpen]       = useState(false);
+  const [overflowPos,        setOverflowPos]        = useState({ top: 0, right: 0 });
+  const overflowRef    = useRef<HTMLDivElement>(null);
+  const overflowBtnRef = useRef<HTMLDivElement>(null);
+
+  const openOverflow = useCallback(() => {
+    if (overflowBtnRef.current) {
+      const r = overflowBtnRef.current.getBoundingClientRect();
+      setOverflowPos({ top: r.bottom + 8, right: window.innerWidth - r.right });
+    }
+    setOverflowOpen((v) => !v);
+  }, []);
   const { data: members  = [] } = useProjectMembers(projectId ?? '');
   const { data: activeSprintData, isLoading: issuesLoading } = useActiveSprint(projectId ?? '');
   const allIssues = activeSprintData?.issues ?? [];
@@ -71,6 +84,18 @@ export function KanbanPage() {
       setSearchParams({}, { replace: true });
     }
   }, [deepLinkedIssue]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Close overflow panel on outside click */
+  useEffect(() => {
+    if (!overflowOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (overflowRef.current && !overflowRef.current.contains(e.target as Node)) {
+        setOverflowOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [overflowOpen]);
 
 
   if (!projectId) {
@@ -160,12 +185,88 @@ export function KanbanPage() {
               );
             })}
             {members.length > 5 && (
-              <div
-                className="kb-t-avatar"
-                style={{ background: '#F4F5F7', color: '#42526E', marginLeft: -6, zIndex: 0 }}
-                title={`+${members.length - 5} more`}
-              >
-                +{members.length - 5}
+              <div ref={overflowRef} style={{ marginLeft: -6, zIndex: 0 }}>
+                {/* +N chip */}
+                <div
+                  ref={overflowBtnRef}
+                  role="button"
+                  tabIndex={0}
+                  className="kb-t-avatar"
+                  title={`Show ${members.length - 5} more members`}
+                  style={{ background: '#F4F5F7', color: '#42526E', cursor: 'pointer', fontWeight: 700 }}
+                  onClick={openOverflow}
+                  onKeyDown={(e) => e.key === 'Enter' && openOverflow()}
+                >
+                  +{members.length - 5}
+                </div>
+
+                {/* Overflow dropdown — portalled to body so it floats above the kanban board */}
+                {overflowOpen && createPortal(
+                  <div
+                    style={{
+                      position: 'fixed',
+                      top: overflowPos.top,
+                      right: overflowPos.right,
+                      background: 'var(--kb-modal-bg, #fff)',
+                      border: '1.5px solid var(--bb-border)',
+                      borderRadius: 10,
+                      boxShadow: '0 6px 24px rgba(9,30,66,0.18)',
+                      padding: '6px 0',
+                      minWidth: 192,
+                      zIndex: 9999,
+                    }}
+                    /* prevent outside-click handler firing when clicking inside */
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    {members.slice(5).map((m) => {
+                      const { bg, text } = memberColor(m.user.id);
+                      const selected = assigneeFilter.includes(m.user.id);
+                      const status = getStatus(m.user.id);
+                      return (
+                        <button
+                          key={m.user.id}
+                          type="button"
+                          onClick={() => { toggleAssignee(m.user.id); setOverflowOpen(false); }}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 10,
+                            width: '100%', padding: '7px 14px',
+                            border: 'none', background: selected ? 'var(--bb-bg-input)' : 'transparent',
+                            cursor: 'pointer', textAlign: 'left',
+                          }}
+                        >
+                          <div style={{
+                            width: 28, height: 28, borderRadius: '50%',
+                            background: selected ? `color-mix(in srgb, ${bg} 75%, #000 25%)` : bg,
+                            color: text,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 10, fontWeight: 700, flexShrink: 0,
+                            boxShadow: selected ? '0 0 0 2px #E75026' : undefined,
+                          }}>
+                            {getInitials(m.user.name)}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              fontSize: 12, fontWeight: 600,
+                              color: 'var(--bb-text-primary)',
+                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            }}>
+                              {m.user.name}
+                            </div>
+                            <div style={{ fontSize: 10, color: status === 'on_leave' ? '#FF8B00' : '#36B37E' }}>
+                              {status === 'on_leave' ? 'On leave' : 'Working today'}
+                            </div>
+                          </div>
+                          {selected && (
+                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
+                              <path d="M2 6l3 3 5-5" stroke="#E75026" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>,
+                  document.body,
+                )}
               </div>
             )}
           </div>
