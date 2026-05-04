@@ -50,6 +50,8 @@ export interface Issue {
   issueType?:    IssueType;
   progress?:     number;
   subtaskCount?: number;
+  commentCount?: number;
+  wikiLinked?:   boolean;
 }
 
 export interface WikiContributor {

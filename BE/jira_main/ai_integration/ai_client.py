@@ -52,10 +52,16 @@ def analyze_task(heading: str, description: str, labels: list[str]) -> dict:
     })
 
 
-def chat(message: str, project_name: str | None = None) -> dict:
+def chat(
+    message: str,
+    project_name: str | None = None,
+    workspace_context: str | None = None,
+) -> dict:
     payload: dict = {"message": message}
     if project_name:
         payload["project_name"] = project_name
+    if workspace_context:
+        payload["workspace_context"] = workspace_context
     return _post("/chat", payload)
 
 

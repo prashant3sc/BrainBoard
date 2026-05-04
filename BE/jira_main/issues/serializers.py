@@ -16,9 +16,11 @@ class IssueSerializer(serializers.ModelSerializer):
     sprintId     = serializers.PrimaryKeyRelatedField(source="sprint", read_only=True)
     parentId     = serializers.PrimaryKeyRelatedField(source="parent", read_only=True)
     labelIds     = serializers.PrimaryKeyRelatedField(source="labels", many=True, read_only=True)
-    subtaskCount = serializers.SerializerMethodField()
-    progress     = serializers.SerializerMethodField()
-    ticketId     = serializers.SerializerMethodField()
+    subtaskCount  = serializers.SerializerMethodField()
+    commentCount  = serializers.SerializerMethodField()
+    wikiLinked    = serializers.SerializerMethodField()
+    progress      = serializers.SerializerMethodField()
+    ticketId      = serializers.SerializerMethodField()
 
     class Meta:
         model = Issue
@@ -40,6 +42,8 @@ class IssueSerializer(serializers.ModelSerializer):
             "parentId",
             "labelIds",
             "subtaskCount",
+            "commentCount",
+            "wikiLinked",
             "progress",
             "created_at",
             "updated_at",
@@ -52,6 +56,16 @@ class IssueSerializer(serializers.ModelSerializer):
         if hasattr(instance, "subtask_count"):
             return instance.subtask_count
         return instance.subtasks.count()
+
+    def get_commentCount(self, instance):
+        if hasattr(instance, "comment_count"):
+            return instance.comment_count
+        return instance.comments.count()
+
+    def get_wikiLinked(self, instance):
+        if hasattr(instance, "wiki_link_count"):
+            return instance.wiki_link_count > 0
+        return instance.wiki_links.exists()
 
     def get_progress(self, instance):
         if hasattr(instance, "subtask_count"):

@@ -1,5 +1,6 @@
 import { Draggable } from '@hello-pangea/dnd';
 import type { Issue, ProjectMember } from '@/types';
+import { useAvailability } from '@/hooks/useAvailability';
 
 interface Props {
   issue:   Issue;
@@ -72,6 +73,7 @@ function typeLabel(t: string) {
 }
 
 export function IssueCard({ issue, index, members, onClick }: Props) {
+  const { getStatus } = useAvailability();
   const findUser = (id: string | null | undefined) =>
     id ? (members.find((m) => m.user.id === id)?.user ?? null) : null;
 
@@ -181,12 +183,14 @@ export function IssueCard({ issue, index, members, onClick }: Props) {
 
               {/* Assignee avatar */}
               {ac && assignee && (
-                <div
-                  className="kb-card-avatar"
-                  style={{ background: ac.bg, color: ac.text }}
-                  title={`Assignee: ${assignee.name}`}
-                >
-                  {getInitials(assignee.name)}
+                <div className="kb-avatar-wrap" title={`${assignee.name} — ${getStatus(assignee.id) === 'on_leave' ? 'On leave' : 'Working today'}`}>
+                  <div
+                    className="kb-card-avatar"
+                    style={{ background: ac.bg, color: ac.text }}
+                  >
+                    {getInitials(assignee.name)}
+                  </div>
+                  <span className={`av-status-dot av-status-dot--${getStatus(assignee.id)}`} />
                 </div>
               )}
             </div>

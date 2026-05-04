@@ -9,13 +9,17 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 
 
-def chat_with_rag(message: str, project_name: str | None = None) -> dict:
+def chat_with_rag(
+    message: str,
+    project_name: str | None = None,
+    workspace_context: str | None = None,
+) -> dict:
     """
     RAG-powered read-only chatbot.
 
     1. Semantic search ChromaDB for relevant issues + wiki pages.
     2. Optionally scopes results to a specific project.
-    3. Injects retrieved context into the prompt.
+    3. Injects retrieved context + live workspace stats into the prompt.
     4. LLM answers only from context; rejects out-of-scope questions.
     """
     settings = get_settings()
@@ -47,8 +51,10 @@ def chat_with_rag(message: str, project_name: str | None = None) -> dict:
 
     logger.info(f"Chat RAG: retrieved {len(docs)} docs for query='{message[:60]}'")
 
-    # Build context block
+    # Build context block — live workspace stats first, then vector chunks
     context_parts = []
+    if workspace_context:
+        context_parts.append(workspace_context)
     for doc in docs:
         context_parts.append(doc.page_content)
     context = (

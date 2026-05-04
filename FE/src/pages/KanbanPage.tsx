@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { useProjectMembers } from '@/features/projects/useProjects';
 import { useRBAC } from '@/hooks/useRBAC';
 import { useArchivedProject } from '@/hooks/useArchivedProject';
+import { useAvailability } from '@/hooks/useAvailability';
 import { ArchivedBanner } from '@/components/common/ArchivedBanner';
 import { useActiveSprint } from '@/features/projects/useSprints';
 import { KanbanBoard } from '@/features/kanban/components/KanbanBoard';
@@ -33,6 +34,7 @@ export function KanbanPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const { can } = useRBAC();
   const { isArchived, isWriteLocked, project } = useArchivedProject(projectId);
+  const { getStatus } = useAvailability();
 
   const [searchQuery,        setSearchQuery]        = useState('');
   const [modalOpen,          setModalOpen]          = useState(false);
@@ -118,29 +120,35 @@ export function KanbanPage() {
             {members.slice(0, 5).map((m, i) => {
               const { bg, text } = memberColor(m.user.id);
               const selected = assigneeFilter.includes(m.user.id);
+              const status = getStatus(m.user.id);
               return (
                 <div
                   key={m.user.id}
-                  role="button"
-                  tabIndex={0}
-                  className="kb-t-avatar"
-                  onClick={() => toggleAssignee(m.user.id)}
-                  onKeyDown={(e) => e.key === 'Enter' && toggleAssignee(m.user.id)}
-                  title={selected ? `Remove ${m.user.name} filter` : `Filter by ${m.user.name}`}
                   style={{
-                    background: bg,
-                    color:      text,
+                    position: 'relative',
                     marginLeft: i === 0 ? 0 : -6,
-                    zIndex:     selected ? members.length + 1 : members.length - i,
-                    cursor:     'pointer',
-                    boxShadow:  selected
-                      ? `0 0 0 2px var(--bb-content-bg), 0 0 0 4px ${text}`
-                      : undefined,
-                    transform:  selected ? 'scale(1.15)' : undefined,
-                    transition: 'box-shadow 0.15s, transform 0.15s',
+                    zIndex: selected ? members.length + 1 : members.length - i,
                   }}
                 >
-                  {getInitials(m.user.name)}
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    className="kb-t-avatar"
+                    onClick={() => toggleAssignee(m.user.id)}
+                    onKeyDown={(e) => e.key === 'Enter' && toggleAssignee(m.user.id)}
+                    title={`${m.user.name} — ${status === 'on_leave' ? 'On leave' : 'Working today'}${selected ? ' (click to remove filter)' : ''}`}
+                    style={{
+                      background: selected ? `color-mix(in srgb, ${bg} 75%, #000 25%)` : bg,
+                      color:      text,
+                      cursor:     'pointer',
+                      boxShadow:  selected ? `0 2px 6px rgba(0,0,0,0.28)` : undefined,
+                      transform:  selected ? 'translateY(-1px)' : undefined,
+                      transition: 'background 0.15s, box-shadow 0.15s, transform 0.15s',
+                    }}
+                  >
+                    {getInitials(m.user.name)}
+                  </div>
+                  <span className={`av-status-dot av-status-dot--${status} kb-t-avatar-dot`} />
                 </div>
               );
             })}
@@ -152,22 +160,6 @@ export function KanbanPage() {
               >
                 +{members.length - 5}
               </div>
-            )}
-            {/* Clear filter indicator */}
-            {assigneeFilter.length > 0 && (
-              <button
-                onClick={() => setAssigneeFilter([])}
-                title="Clear assignee filter"
-                style={{
-                  marginLeft: 8, fontSize: 11, fontWeight: 600,
-                  color: '#E75026', background: '#FFF3F0',
-                  border: '1px solid #FFD9CC', borderRadius: 20,
-                  padding: '2px 8px', cursor: 'pointer', fontFamily: 'inherit',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                ✕ {assigneeFilter.length} {assigneeFilter.length === 1 ? 'user' : 'users'}
-              </button>
             )}
           </div>
 

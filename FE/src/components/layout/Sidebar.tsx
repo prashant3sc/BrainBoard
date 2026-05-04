@@ -198,8 +198,8 @@ export default function Sidebar() {
       className="flex h-full flex-col"
       style={{
         position: 'relative',
-        width: collapsed ? 44 : 196,
-        minWidth: collapsed ? 44 : 196,
+        width: collapsed ? 60 : 196,
+        minWidth: collapsed ? 60 : 196,
         background: 'var(--bb-sidebar-bg)',
         borderRight: '1px solid var(--bb-sidebar-border)',
         transition: 'width 0.2s ease, min-width 0.2s ease',
@@ -413,7 +413,7 @@ export default function Sidebar() {
             <span className="bb-nav-icon"><AnalyticsIcon /></span>
             <span style={hideText}>Analytics</span>
             <span style={{
-              marginLeft: 'auto',
+              marginLeft: collapsed ? 0 : 'auto',
               background: 'var(--bb-nav-badge-bg)',
               color: 'var(--bb-nav-badge-color)',
               fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 10,
@@ -431,7 +431,7 @@ export default function Sidebar() {
             <span className="bb-nav-icon"><AnalyticsIcon /></span>
             <span style={hideText}>Analytics</span>
             <span style={{
-              marginLeft: 'auto',
+              marginLeft: collapsed ? 0 : 'auto',
               background: 'var(--bb-nav-badge-bg)',
               color: 'var(--bb-nav-badge-color)',
               fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 10,
@@ -460,10 +460,14 @@ export default function Sidebar() {
       {user && (
         <div style={{
           borderTop: '1px solid var(--bb-footer-border)',
-          padding: '10px 10px',
-          display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+          padding: collapsed ? '8px 0' : '10px 10px',
+          display: 'flex',
+          flexDirection: collapsed ? 'column' : 'row',
+          alignItems: 'center',
+          justifyContent: collapsed ? 'center' : 'space-between',
+          gap: collapsed ? 6 : 0,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', width: collapsed ? '100%' : 'auto', gap: collapsed ? 0 : 7 }}>
             <button
               className="bb-avatar-btn"
               onClick={() => setProfileOpen(true)}
@@ -476,7 +480,7 @@ export default function Sidebar() {
               {({ admin: 'Admin', pm: 'PM', developer: 'Dev', viewer: 'Viewer' } as Record<string,string>)[user.role] ?? user.role}
             </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ display: 'flex', flexDirection: collapsed ? 'column' : 'row', alignItems: 'center', justifyContent: 'center', width: collapsed ? '100%' : 'auto', gap: 4 }}>
             <button
               onClick={toggleTheme}
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
