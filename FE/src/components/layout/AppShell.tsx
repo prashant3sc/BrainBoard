@@ -4,13 +4,34 @@ import { PageTransition } from './PageTransition';
 import { SearchBar } from '@/features/ai/components/SearchBar';
 import { ChatPanel } from '@/features/ai/components/ChatPanel';
 import { useProject } from '@/features/projects/useProjects';
+import { useActiveSprint } from '@/features/projects/useSprints';
 
 function ChatPanelWrapper() {
   const { projectId } = useParams<{ projectId: string }>();
-  const { data: project } = useProject(projectId ?? '');
   const { pathname } = useLocation();
-  const context = pathname.includes('/wiki') ? 'wiki' : 'default';
-  return <ChatPanel projectId={projectId} projectName={project?.name} context={context} />;
+  const { data: project } = useProject(projectId ?? '');
+  const { data: activeSprintData } = useActiveSprint(projectId ?? '');
+
+  const page = pathname.includes('/kanban')
+    ? 'kanban'
+    : pathname.includes('/backlog')
+      ? 'backlog'
+      : pathname.includes('/wiki')
+        ? 'wiki'
+        : pathname.includes('/analytics')
+          ? 'analytics'
+          : 'dashboard';
+
+  return (
+    <ChatPanel
+      projectId={projectId}
+      projectName={project?.name}
+      sprintId={activeSprintData?.sprint?.id}
+      sprintName={activeSprintData?.sprint?.name}
+      page={page}
+      context={page === 'wiki' ? 'wiki' : 'default'}
+    />
+  );
 }
 
 interface Props {
