@@ -82,10 +82,12 @@ function SelectionPopup({ containerRef, onExplain }: SelectionPopupProps) {
       const containerRect = container.getBoundingClientRect();
       if (!container.contains(range.commonAncestorContainer)) { setPos(null); return; }
 
+      // Account for the container's own scroll offset so the popup
+      // lands directly above the selected text even when scrolled.
       setSelText(text);
       setPos({
         x: selRect.left + selRect.width / 2 - containerRect.left,
-        y: selRect.top - containerRect.top - 8,
+        y: selRect.top - containerRect.top + container.scrollTop - 8,
       });
     }
     function handleMouseDown(e: MouseEvent) {
