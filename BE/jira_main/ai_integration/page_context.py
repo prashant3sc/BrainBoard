@@ -374,34 +374,181 @@ def _kanban_context(project_id: str | None, sprint_id: str | None) -> dict:
 def _backlog_context(project_id: str | None, sprint_id: str | None) -> dict:
     from issues.models import Issue
     from projects.models import Sprint
+    from collections import defaultdict
+    from django.db.models import Q
 
-    base_qs = Issue.objects.filter(project_id=project_id) if project_id else Issue.objects.none()
+    today = date.today()
+    stale_cutoff = today - timedelta(days=30)
+    this_week_start = today - timedelta(days=today.weekday())  # Monday
 
-    # Unassigned = no assignee AND not yet done (backlog items that need triage)
-    unassigned_count = base_qs.filter(assignee__isnull=True).exclude(status=Issue.DONE).count()
+    if not project_id:
+        return {"page": "backlog", "all_issues": [], "next_sprint": None}
 
-    # Next sprint = earliest PLANNED sprint for the project
-    next_sprint: dict | None = None
-    if project_id:
-        ns = (
-            Sprint.objects
-            .filter(project_id=project_id, status=Sprint.PLANNED)
-            .order_by("start_date", "created_at")
-            .values("id", "name", "start_date", "end_date")
-            .first()
+    # ── Fetch ALL backlog issues in ONE query ─────────────────────────────
+    # Backlog = open issues with no sprint OR in a planned (not yet started) sprint
+    base_qs = (
+        Issue.objects
+        .filter(project_id=project_id)
+        .exclude(status=Issue.DONE)
+        .filter(Q(sprint__isnull=True) | Q(sprint__status=Sprint.PLANNED))
+        .select_related("assignee", "project", "sprint")
+        .only(
+            "id", "title", "status", "priority", "issue_type",
+            "story_points", "due_date", "created_at", "updated_at", "sequence_number",
+            "assignee_id",
+            "assignee__first_name", "assignee__last_name", "assignee__email",
+            "project_id", "project__key",
+            "sprint_id", "sprint__name", "sprint__status",
         )
-        if ns:
-            next_sprint = {
-                "id": str(ns["id"]),
-                "name": ns["name"],
-                "start_date": str(ns["start_date"]) if ns["start_date"] else None,
-                "end_date": str(ns["end_date"]) if ns["end_date"] else None,
-            }
+        .order_by("-priority", "created_at")
+    )
+
+    all_issues = list(base_qs)
+
+    # ── Helpers ───────────────────────────────────────────────────────────
+    def _assignee(issue: Issue) -> str:
+        if not issue.assignee:
+            return "Unassigned"
+        return issue.assignee.get_full_name().strip() or issue.assignee.email
+
+    def _ticket_id(issue: Issue) -> str:
+        try:
+            if issue.project.key and issue.sequence_number:
+                return f"{issue.project.key}-{issue.sequence_number}"
+        except Exception:
+            pass
+        return str(issue.id)[:8]
+
+    def _rec(issue: Issue) -> dict:
+        return {
+            "ticket_id":    _ticket_id(issue),
+            "title":        issue.title,
+            "status":       issue.status,
+            "priority":     issue.priority,
+            "issue_type":   issue.issue_type,
+            "assignee":     _assignee(issue),
+            "story_points": f"{issue.story_points}sp" if issue.story_points else "?",
+            "due_date":     str(issue.due_date)          if issue.due_date    else None,
+            "created_at":   str(issue.created_at.date()) if issue.created_at  else None,
+            "updated_at":   str(issue.updated_at.date()) if issue.updated_at  else None,
+            "sprint_name":  issue.sprint.name            if issue.sprint      else None,
+        }
+
+    # ── Derive all metrics in memory ──────────────────────────────────────
+    # Priority breakdown
+    critical_items  = [i for i in all_issues if i.priority == Issue.CRITICAL]
+    high_items      = [i for i in all_issues if i.priority == Issue.HIGH]
+    medium_items    = [i for i in all_issues if i.priority == Issue.MEDIUM]
+    low_items       = [i for i in all_issues if i.priority == Issue.LOW]
+
+    # Type breakdown
+    bug_items       = [i for i in all_issues if i.issue_type == Issue.BUG]
+    task_items      = [i for i in all_issues if i.issue_type == Issue.TASK]
+    subtask_items   = [i for i in all_issues if i.issue_type == Issue.SUBTASK]
+
+    # Estimation
+    estimated       = [i for i in all_issues if i.story_points]
+    unestimated     = [i for i in all_issues if not i.story_points]
+    total_sp        = sum(i.story_points or 0 for i in all_issues)
+
+    # Ownership
+    unassigned      = [i for i in all_issues if not i.assignee]
+
+    # Readiness: "ready" = has story points estimated
+    ready           = [i for i in all_issues if i.story_points]
+    not_ready       = [i for i in all_issues if not i.story_points]
+
+    # Recency
+    stale_items     = [i for i in all_issues
+                       if i.updated_at and i.updated_at.date() <= stale_cutoff]
+    recent_items    = [i for i in all_issues
+                       if i.created_at and i.created_at.date() >= this_week_start]
+
+    # Oldest items (by created_at ascending)
+    oldest_items    = sorted(
+        [i for i in all_issues if i.created_at],
+        key=lambda i: i.created_at,
+    )[:10]
+
+    # Quick wins: HIGH or CRITICAL priority + small estimate (≤2 sp)
+    quick_wins      = [i for i in all_issues
+                       if i.priority in (Issue.CRITICAL, Issue.HIGH)
+                       and i.story_points and i.story_points <= 2]
+
+    # Items in a planned sprint (scheduled but not started)
+    in_planned_sprint = [i for i in all_issues if i.sprint_id]
+
+    # Overdue (has a due_date in the past)
+    overdue         = [i for i in all_issues if i.due_date and i.due_date < today]
+
+    # Assignee ownership map
+    ownership_map: dict = defaultdict(int)
+    for i in all_issues:
+        ownership_map[_assignee(i)] += 1
+    assignee_ownership = sorted(
+        [{"name": k, "count": v} for k, v in ownership_map.items()],
+        key=lambda x: -x["count"],
+    )
+
+    # ── Next planned sprint ───────────────────────────────────────────────
+    next_sprint: dict | None = None
+    ns = (
+        Sprint.objects
+        .filter(project_id=project_id, status=Sprint.PLANNED)
+        .order_by("start_date", "created_at")
+        .values("id", "name", "start_date", "end_date", "goal")
+        .first()
+    )
+    if ns:
+        next_sprint = {
+            "id":         str(ns["id"]),
+            "name":       ns["name"],
+            "goal":       ns.get("goal") or "",
+            "start_date": str(ns["start_date"]) if ns["start_date"] else None,
+            "end_date":   str(ns["end_date"])   if ns["end_date"]   else None,
+        }
 
     return {
         "page": "backlog",
-        "unassigned_count": unassigned_count,
-        "next_sprint": next_sprint,
+        "total_count": len(all_issues),
+        "priority_counts": {
+            "critical": len(critical_items),
+            "high":     len(high_items),
+            "medium":   len(medium_items),
+            "low":      len(low_items),
+        },
+        "type_counts": {
+            "bug":     len(bug_items),
+            "task":    len(task_items),
+            "subtask": len(subtask_items),
+        },
+        "estimation": {
+            "estimated_count":   len(estimated),
+            "unestimated_count": len(unestimated),
+            "total_story_points": total_sp,
+        },
+        "unassigned_count":     len(unassigned),
+        "ready_count":          len(ready),
+        "not_ready_count":      len(not_ready),
+        "stale_count":          len(stale_items),
+        "recent_count":         len(recent_items),
+        "overdue_count":        len(overdue),
+        "in_planned_sprint_count": len(in_planned_sprint),
+        "quick_wins_count":     len(quick_wins),
+        "next_sprint":          next_sprint,
+        "assignee_ownership":   assignee_ownership,
+        # Capped lists for detailed rendering
+        "critical_items":       [_rec(i) for i in critical_items[:15]],
+        "high_items":           [_rec(i) for i in high_items[:10]],
+        "bug_items":            [_rec(i) for i in bug_items[:10]],
+        "unassigned_items":     [_rec(i) for i in unassigned[:10]],
+        "unestimated_items":    [_rec(i) for i in unestimated[:10]],
+        "stale_items":          [_rec(i) for i in stale_items[:10]],
+        "recent_items":         [_rec(i) for i in recent_items[:10]],
+        "oldest_items":         [_rec(i) for i in oldest_items],
+        "quick_wins":           [_rec(i) for i in quick_wins[:10]],
+        "overdue_items":        [_rec(i) for i in overdue[:10]],
+        "all_issues":           [_rec(i) for i in all_issues[:150]],
     }
 
 
@@ -665,14 +812,155 @@ def _render_kanban(ctx: dict) -> str:
 
 
 def _render_backlog(ctx: dict) -> str:
-    lines = [f"Unassigned open tickets: {ctx['unassigned_count']}"]
+    lines = []
+
+    def _issue_line(t: dict) -> str:
+        due = f" | due {t['due_date']}" if t.get("due_date") else ""
+        created = f" | added {t['created_at']}" if t.get("created_at") else ""
+        sprint = f" | sprint: {t['sprint_name']}" if t.get("sprint_name") else ""
+        return (
+            f"  [{t['status']}] {t['ticket_id']} {t['title']} — "
+            f"{t['priority']} | {t['issue_type']} | {t['assignee']} | {t['story_points']}"
+            f"{due}{created}{sprint}"
+        )
+
+    # ── Backlog overview ──────────────────────────────────────────────────
+    total = ctx.get("total_count", 0)
+    tc = ctx.get("type_counts", {})
+    lines.append(
+        f"Backlog: {total} open items total "
+        f"({tc.get('task', 0)} tasks, {tc.get('bug', 0)} bugs, {tc.get('subtask', 0)} subtasks)"
+    )
+
+    pc = ctx.get("priority_counts", {})
+    lines.append(
+        f"Priority: {pc.get('critical', 0)} critical, {pc.get('high', 0)} high, "
+        f"{pc.get('medium', 0)} medium, {pc.get('low', 0)} low"
+    )
+
+    est = ctx.get("estimation", {})
+    total_sp = est.get("total_story_points", 0)
+    if total_sp:
+        lines.append(
+            f"Estimation: {est.get('estimated_count', 0)} estimated ({total_sp} total points), "
+            f"{est.get('unestimated_count', 0)} unestimated"
+        )
+    else:
+        lines.append(
+            f"Estimation: {est.get('estimated_count', 0)} estimated, "
+            f"{est.get('unestimated_count', 0)} unestimated (no story points set)"
+        )
+
+    lines.append(f"Unassigned: {ctx.get('unassigned_count', 0)} items")
+    lines.append(f"Readiness: {ctx.get('ready_count', 0)} ready (estimated), {ctx.get('not_ready_count', 0)} not ready (no estimate)")
+
+    if ctx.get("stale_count"):
+        lines.append(f"Stale (no update 30+ days): {ctx['stale_count']} items")
+    if ctx.get("recent_count"):
+        lines.append(f"Added this week: {ctx['recent_count']} items")
+    if ctx.get("overdue_count"):
+        lines.append(f"Overdue: {ctx['overdue_count']} items")
+    if ctx.get("quick_wins_count"):
+        lines.append(f"Quick wins (HIGH/CRITICAL, ≤2sp): {ctx['quick_wins_count']} items")
+    if ctx.get("in_planned_sprint_count"):
+        lines.append(f"Assigned to a planned sprint: {ctx['in_planned_sprint_count']} items")
+
+    # ── Next sprint ───────────────────────────────────────────────────────
     ns = ctx.get("next_sprint")
     if ns:
         start = ns.get("start_date") or "TBD"
         end = ns.get("end_date") or "TBD"
         lines.append(f"Next planned sprint: {ns['name']} ({start} → {end})")
+        if ns.get("goal"):
+            lines.append(f"Next sprint goal: {ns['goal']}")
     else:
         lines.append("Next planned sprint: none scheduled")
+
+    # ── Critical items ────────────────────────────────────────────────────
+    critical = ctx.get("critical_items", [])
+    if critical:
+        lines.append(f"\nCRITICAL backlog items ({len(critical)}):")
+        for t in critical:
+            lines.append(_issue_line(t))
+
+    # ── High priority items ───────────────────────────────────────────────
+    high = ctx.get("high_items", [])
+    if high:
+        lines.append(f"\nHIGH priority backlog items ({len(high)}):")
+        for t in high:
+            lines.append(_issue_line(t))
+
+    # ── Bugs ──────────────────────────────────────────────────────────────
+    bugs = ctx.get("bug_items", [])
+    if bugs:
+        lines.append(f"\nBugs in backlog ({len(bugs)}):")
+        for t in bugs:
+            lines.append(_issue_line(t))
+
+    # ── Unassigned ────────────────────────────────────────────────────────
+    unassigned = ctx.get("unassigned_items", [])
+    if unassigned:
+        lines.append(f"\nUnassigned backlog items ({len(unassigned)}):")
+        for t in unassigned:
+            lines.append(_issue_line(t))
+
+    # ── Unestimated ───────────────────────────────────────────────────────
+    unestimated = ctx.get("unestimated_items", [])
+    if unestimated:
+        lines.append(f"\nUnestimated items ({len(unestimated)}):")
+        for t in unestimated:
+            lines.append(f"  [{t['status']}] {t['ticket_id']} {t['title']} — {t['priority']} | {t['assignee']}")
+
+    # ── Stale items ───────────────────────────────────────────────────────
+    stale = ctx.get("stale_items", [])
+    if stale:
+        lines.append(f"\nStale backlog items (no update 30+ days — {len(stale)}):")
+        for t in stale:
+            lines.append(f"  {t['ticket_id']} {t['title']} — last updated {t['updated_at']} — {t['assignee']}")
+
+    # ── Recently added ────────────────────────────────────────────────────
+    recent = ctx.get("recent_items", [])
+    if recent:
+        lines.append(f"\nAdded this week ({len(recent)}):")
+        for t in recent:
+            lines.append(f"  {t['ticket_id']} {t['title']} — {t['priority']} | {t['assignee']}")
+
+    # ── Oldest items ──────────────────────────────────────────────────────
+    oldest = ctx.get("oldest_items", [])
+    if oldest:
+        lines.append(f"\nOldest backlog items (top {len(oldest)}):")
+        for t in oldest:
+            lines.append(f"  {t['ticket_id']} {t['title']} — added {t['created_at']} — {t['priority']} | {t['assignee']}")
+
+    # ── Quick wins ────────────────────────────────────────────────────────
+    qw = ctx.get("quick_wins", [])
+    if qw:
+        lines.append(f"\nQuick wins (HIGH/CRITICAL, ≤2sp — {len(qw)}):")
+        for t in qw:
+            lines.append(_issue_line(t))
+
+    # ── Overdue ───────────────────────────────────────────────────────────
+    overdue = ctx.get("overdue_items", [])
+    if overdue:
+        lines.append(f"\nOverdue backlog items ({len(overdue)}):")
+        for t in overdue:
+            lines.append(f"  {t['ticket_id']} {t['title']} — due {t['due_date']} — {t['assignee']}")
+
+    # ── Assignee ownership ────────────────────────────────────────────────
+    ownership = ctx.get("assignee_ownership", [])
+    if ownership:
+        lines.append("\nAssignee ownership:")
+        for o in ownership:
+            lines.append(f"  {o['name']}: {o['count']} items")
+
+    # ── Full backlog issue list ────────────────────────────────────────────
+    all_issues = ctx.get("all_issues", [])
+    if all_issues:
+        lines.append(f"\nALL BACKLOG ISSUES ({len(all_issues)} total):")
+        lines.append("  Format: [status] TICKET Title — priority | type | assignee | points | added | sprint")
+        for t in all_issues:
+            lines.append(_issue_line(t))
+
     return "\n".join(lines)
 
 

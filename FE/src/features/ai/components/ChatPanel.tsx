@@ -33,6 +33,15 @@ const SUGGESTIONS_SPRINT = [
   'What should I say in standup today?',
 ];
 
+const SUGGESTIONS_BACKLOG = [
+  'What are the top priority backlog items?',
+  'Which items are ready for the next sprint?',
+  'How many items are unestimated?',
+  'Show me all bugs in the backlog',
+  'What are the quick wins in the backlog?',
+  'Which items have been sitting here the longest?',
+];
+
 /* ── Typing animation ── */
 function TypingDots() {
   return (
@@ -202,9 +211,11 @@ interface WikiContext {
 export function ChatPanel({ projectId, projectName, sprintId, sprintName, page, context = 'default' }: Props) {
   const suggestions = page === 'kanban' && sprintId
     ? SUGGESTIONS_SPRINT
-    : context === 'wiki'
-      ? SUGGESTIONS_WIKI
-      : SUGGESTIONS_DEFAULT;
+    : page === 'backlog'
+      ? SUGGESTIONS_BACKLOG
+      : context === 'wiki'
+        ? SUGGESTIONS_WIKI
+        : SUGGESTIONS_DEFAULT;
   const [wikiContext, setWikiContext] = useState<WikiContext | null>(null);
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');

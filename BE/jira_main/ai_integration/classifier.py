@@ -58,6 +58,25 @@ _TICKET_KEYWORDS = frozenset({
     "unassigned", "open ticket", "open issue",
 })
 
+_BACKLOG_KEYWORDS = frozenset({
+    "backlog", "not in sprint", "no sprint", "unplanned",
+    "sprint planning", "pull into sprint", "next sprint",
+    "ready for development", "not ready", "needs refinement",
+    "grooming", "groom", "acceptance criteria",
+    "unestimated", "no estimate",
+    "quick win", "quick wins", "lowest effort",
+    "business value", "roadmap",
+    "stale backlog", "outdated", "oldest",
+    "sitting too long", "no activity",
+    "technical debt", "chore", "maintenance",
+    "what should we work on", "prioritize next",
+    "which items", "backlog items", "backlog item",
+    "feature request", "feature requests",
+    "how many bugs", "how many stories", "how many tasks",
+    "top priority", "highest priority", "top backlog",
+    "summarize the backlog", "what is in the backlog",
+})
+
 _PROJECT_KEYWORDS = frozenset({
     "project", "projects", "team", "members", "member",
     "who is on", "who works on", "project details",
@@ -119,6 +138,9 @@ def classify_query(query: str, page: str | None = None) -> dict:
         _add_unique(doc_types, "analytics")
 
     if _any_keyword(q, _TICKET_KEYWORDS):
+        _add_unique(doc_types, "ticket")
+
+    if _any_keyword(q, _BACKLOG_KEYWORDS):
         _add_unique(doc_types, "ticket")
 
     if _any_keyword(q, _PROJECT_KEYWORDS):
