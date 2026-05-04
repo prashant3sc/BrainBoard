@@ -204,17 +204,22 @@ export function ChatPanel({ projectId, projectName, context = 'default' }: Props
     }
   }, [open, messages.length]);
 
+  // Keep a ref so the explain handler always sees the latest wikiContext
+  const wikiContextRef = useRef<WikiContext | null>(null);
+  useEffect(() => { wikiContextRef.current = wikiContext; }, [wikiContext]);
+
   useEffect(() => {
     function handleExplain(e: Event) {
       const text = (e as CustomEvent<{ text: string }>).detail.text;
-      setOpen(true);
+      if (!text) return;
       const prompt = `Explain this:\n\n"${text}"`;
-      setInput(prompt);
-      setTimeout(() => inputRef.current?.focus(), 80);
+      setOpen(true);
+      // Auto-send immediately — no need to press Enter
+      sendMessage(prompt, wikiContextRef.current ?? undefined);
     }
     window.addEventListener('wiki:explain', handleExplain);
     return () => window.removeEventListener('wiki:explain', handleExplain);
-  }, []);
+  }, [sendMessage]); // sendMessage is stable (useCallback)
 
   useEffect(() => {
     function handlePageContext(e: Event) {
