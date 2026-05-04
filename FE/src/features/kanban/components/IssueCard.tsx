@@ -182,15 +182,19 @@ export function IssueCard({ issue, index, members, onClick }: Props) {
               )}
 
               {/* Assignee avatar */}
-              {ac && assignee && (
+              {ac && assignee ? (
                 <div className="kb-avatar-wrap" title={`${assignee.name} — ${getStatus(assignee.id) === 'on_leave' ? 'On leave' : 'Working today'}`}>
-                  <div
-                    className="kb-card-avatar"
-                    style={{ background: ac.bg, color: ac.text }}
-                  >
+                  <div className="kb-card-avatar" style={{ background: ac.bg, color: ac.text }}>
                     {getInitials(assignee.name)}
                   </div>
                   <span className={`av-status-dot av-status-dot--${getStatus(assignee.id)}`} />
+                </div>
+              ) : (
+                <div className="kb-card-avatar kb-card-avatar--unassigned" title="Unassigned">
+                  <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+                    <circle cx="7" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.3"/>
+                    <path d="M2 12c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                  </svg>
                 </div>
               )}
             </div>

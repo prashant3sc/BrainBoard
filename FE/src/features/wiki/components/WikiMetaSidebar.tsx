@@ -13,6 +13,7 @@ interface Props {
   projectId: string;
   linkPickerOpen?: boolean;
   onLinkPickerChange?: (open: boolean) => void;
+  activePanel?: 'history' | 'info' | null;
 }
 
 function extractToc(html: string): TocItem[] {
@@ -38,7 +39,7 @@ function issueEmoji(type: 'bug' | 'story' | 'task') {
   return '✅';
 }
 
-export function WikiMetaSidebar({ page, allPages, projectId, linkPickerOpen: externalOpen, onLinkPickerChange }: Props) {
+export function WikiMetaSidebar({ page, allPages, projectId, linkPickerOpen: externalOpen, onLinkPickerChange, activePanel }: Props) {
   const { can } = useRBAC();
   const { isWriteLocked } = useArchivedProject(projectId);
   const [activeToc,          setActiveToc]          = useState<string | null>(null);
@@ -77,66 +78,119 @@ export function WikiMetaSidebar({ page, allPages, projectId, linkPickerOpen: ext
     : '—';
   const updatedAt = new Date(page.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
+  const showAll = !activePanel;
+
   return (
     <div className="wiki-meta-sidebar">
-      {/* Table of Contents */}
-      {toc.length > 0 && (
-        <div className="ds-section">
-          <span className="ds-label">Table of contents</span>
-          <div className="toc-list">
-            {toc.map((item) => (
-              <div
-                key={item.id}
-                className={`toc-item ${item.level === 3 ? 'toc-sub' : ''} ${activeToc === item.id ? 'toc-active' : ''}`}
-                onClick={() => setActiveToc(item.id)}
-              >
-                {item.text}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* Contributors */}
-      {page.contributors && page.contributors.length > 0 && (
-        <div className="ds-section">
-          <span className="ds-label">Contributors</span>
-          <div className="ds-people">
-            {page.contributors.map((c, i) => (
-              <div className="ds-person" key={i}>
-                <div className={`ds-avatar ${c.colorClass}`}>{c.initials}</div>
-                <div>
-                  <div className="ds-name">{c.name}</div>
-                  <div className="ds-role-text">{c.role}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Version history */}
-      {history.length > 0 && (
-        <div className="ds-section">
-          <span className="ds-label">Version history</span>
-          <div className="version-list">
-            {history.map((v, i) => (
-              <div className="version-item" key={v.id}>
-                <div className={`version-dot ${i === 0 ? 'latest' : ''}`} />
-                <div className="version-info">
-                  v{v.version_number} — {v.title}
-                  <div style={{ fontSize: 10, color: 'var(--bb-text-muted)', marginTop: 1 }}>
-                    {new Date(v.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+      {/* ── HISTORY PANEL ── */}
+      {(showAll || activePanel === 'history') && (
+        <>
+          {/* Version history */}
+          {history.length > 0 ? (
+            <div className="ds-section">
+              <span className="ds-label">Version history</span>
+              <div className="version-list">
+                {history.map((v, i) => (
+                  <div className="version-item" key={v.id}>
+                    <div className={`version-dot ${i === 0 ? 'latest' : ''}`} />
+                    <div className="version-info">
+                      v{v.version_number} — {v.title}
+                      <div style={{ fontSize: 10, color: 'var(--bb-text-muted)', marginTop: 1 }}>
+                        {new Date(v.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </div>
+                      {i === 0 && <span className="version-tag">Latest</span>}
+                    </div>
                   </div>
-                  {i === 0 && <span className="version-tag">Latest</span>}
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
+          ) : activePanel === 'history' && (
+            <div className="ds-section">
+              <span className="ds-label">Version history</span>
+              <div style={{ fontSize: 12, color: 'var(--bb-text-muted)', fontStyle: 'italic' }}>No history yet.</div>
+            </div>
+          )}
+        </>
       )}
 
-      {/* Linked issues */}
+      {/* ── INFO PANEL ── */}
+      {(showAll || activePanel === 'info') && (
+        <>
+          {/* Page info */}
+          <div className="ds-section">
+            <span className="ds-label">Page info</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <div className="ds-value">Created: {createdAt}</div>
+              <div className="ds-value">Last edit: {updatedAt}</div>
+              {page.viewCount !== undefined && (
+                <div className="ds-value">Views: {page.viewCount} this week</div>
+              )}
+              {page.commentCount !== undefined && (
+                <div className="ds-value">Comments: {page.commentCount}</div>
+              )}
+            </div>
+          </div>
+
+          {/* Contributors */}
+          {page.contributors && page.contributors.length > 0 && (
+            <div className="ds-section">
+              <span className="ds-label">Contributors</span>
+              <div className="ds-people">
+                {page.contributors.map((c, i) => (
+                  <div className="ds-person" key={i}>
+                    <div className={`ds-avatar ${c.colorClass}`}>{c.initials}</div>
+                    <div>
+                      <div className="ds-name">{c.name}</div>
+                      <div className="ds-role-text">{c.role}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Related pages */}
+          {relatedPages.length > 0 && (
+            <div className="ds-section">
+              <span className="ds-label">Related pages</span>
+              <div className="ds-related">
+                {relatedPages.map((p) => (
+                  <div className="ds-link" key={p.id}>
+                    <span style={{ fontSize: 11 }}>{p.icon ?? '📄'}</span>
+                    {p.title}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── DEFAULT / ALWAYS VISIBLE ── */}
+      {showAll && (
+        <>
+          {/* Table of Contents */}
+          {toc.length > 0 && (
+            <div className="ds-section">
+              <span className="ds-label">Table of contents</span>
+              <div className="toc-list">
+                {toc.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`toc-item ${item.level === 3 ? 'toc-sub' : ''} ${activeToc === item.id ? 'toc-active' : ''}`}
+                    onClick={() => setActiveToc(item.id)}
+                  >
+                    {item.text}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Linked issues — always visible */}
       <div className="ds-section">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <span className="ds-label" style={{ margin: 0 }}>Linked issues</span>
@@ -150,7 +204,6 @@ export function WikiMetaSidebar({ page, allPages, projectId, linkPickerOpen: ext
           )}
         </div>
 
-        {/* Issue picker dropdown */}
         {linkPickerOpen && (
           <div className="wiki-link-picker">
             <input
@@ -185,7 +238,6 @@ export function WikiMetaSidebar({ page, allPages, projectId, linkPickerOpen: ext
           </div>
         )}
 
-        {/* Linked issue rows */}
         {linkedItems.length === 0 && !linkPickerOpen && (
           <div style={{ fontSize: 12, color: 'var(--bb-text-muted)', fontStyle: 'italic' }}>No linked issues yet.</div>
         )}
@@ -220,7 +272,7 @@ export function WikiMetaSidebar({ page, allPages, projectId, linkPickerOpen: ext
         </div>
       </div>
 
-      {/* Issue detail modal — opened when a linked issue is clicked */}
+      {/* Issue detail modal */}
       <IssueModal
         issue={selectedIssue}
         isOpen={modalOpen}
@@ -229,36 +281,6 @@ export function WikiMetaSidebar({ page, allPages, projectId, linkPickerOpen: ext
         onNavigate={(issue) => { setSelectedIssue(issue); setModalOpen(true); }}
         readOnly={isWriteLocked}
       />
-
-      {/* Related pages */}
-      {relatedPages.length > 0 && (
-        <div className="ds-section">
-          <span className="ds-label">Related pages</span>
-          <div className="ds-related">
-            {relatedPages.map((p) => (
-              <div className="ds-link" key={p.id}>
-                <span style={{ fontSize: 11 }}>{p.icon ?? '📄'}</span>
-                {p.title}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Page info */}
-      <div className="ds-section">
-        <span className="ds-label">Page info</span>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-          <div className="ds-value">Created: {createdAt}</div>
-          <div className="ds-value">Last edit: {updatedAt}</div>
-          {page.viewCount !== undefined && (
-            <div className="ds-value">Views: {page.viewCount} this week</div>
-          )}
-          {page.commentCount !== undefined && (
-            <div className="ds-value">Comments: {page.commentCount}</div>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

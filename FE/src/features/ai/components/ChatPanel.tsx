@@ -4,13 +4,21 @@ import { useAIChat, type ChatMessage } from '../useAIChat';
 interface Props {
   projectId?: string;
   projectName?: string;
+  context?: 'wiki' | 'default';
 }
 
-const SUGGESTIONS = [
+const SUGGESTIONS_DEFAULT = [
   'Who is working on the frontend issues?',
   'What issues are currently in progress?',
   'Summarize the active sprint',
   'What does the auth wiki page say?',
+];
+
+const SUGGESTIONS_WIKI = [
+  'Explain this page simply',
+  'What are the key decisions documented here?',
+  'Are there any related issues linked to this page?',
+  'What changed in the latest version?',
 ];
 
 /* ── Typing animation ── */
@@ -173,7 +181,8 @@ function SuggestionChip({ text, onClick }: { text: string; onClick: () => void }
 }
 
 /* ── Main chat panel ── */
-export function ChatPanel({ projectId, projectName }: Props) {
+export function ChatPanel({ projectId, projectName, context = 'default' }: Props) {
+  const SUGGESTIONS = context === 'wiki' ? SUGGESTIONS_WIKI : SUGGESTIONS_DEFAULT;
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const { messages, isLoading, sendMessage, clearMessages } = useAIChat(projectId);

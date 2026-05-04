@@ -2,9 +2,10 @@ import { useRef, useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useWikiPages, useCreateWikiPage, useUpdateWikiPage, useDeleteWikiPage, useWikiLinks } from '@/features/wiki/useWiki';
+
 import { WikiSidebar } from '@/features/wiki/components/WikiSidebar';
 import { WikiEditor, type WikiEditorHandle } from '@/features/wiki/components/WikiEditor';
-import { WikiMetaSidebar } from '@/features/wiki/components/WikiMetaSidebar';
+import { LinkedIssuesPanel, type PanelTab } from '@/features/wiki/components/LinkedIssuesPanel';
 import { LoadingSkeleton } from '@/components/common/LoadingSkeleton';
 import { useRBAC } from '@/hooks/useRBAC';
 import { useArchivedProject } from '@/hooks/useArchivedProject';
@@ -29,8 +30,8 @@ export function WikiPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem('wks_sidebar_collapsed') === 'true'
   );
-  const [favIds,          setFavIds]          = useState<string[]>(loadFavs);
-  const [linkPickerOpen,  setLinkPickerOpen]  = useState(false);
+  const [favIds,       setFavIds]       = useState<string[]>(loadFavs);
+  const [panelTab,     setPanelTab]     = useState<PanelTab | null>(null);
 
   const editorRef = useRef<WikiEditorHandle>(null);
 
@@ -223,9 +224,9 @@ export function WikiPage() {
             {/* Link issue */}
             {can('editWikiPage') && !isWriteLocked && (
               <button
-                className={`wiki-topbar-btn${linkPickerOpen ? ' wiki-topbar-btn-active' : ''}`}
-                onClick={() => setLinkPickerOpen((v) => !v)}
-                title="Link an issue"
+                className={`wiki-topbar-btn${panelTab === 'issues' ? ' wiki-topbar-btn-active' : ''}`}
+                onClick={() => setPanelTab((t) => t === 'issues' ? null : 'issues')}
+                title="Linked issues"
               >
                 <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
                   <path d="M5.5 8.5a3.5 3.5 0 0 0 5 0l1.5-1.5a3.5 3.5 0 0 0-5-5L6.5 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
@@ -234,6 +235,34 @@ export function WikiPage() {
                 Link issue
               </button>
             )}
+
+            {/* History */}
+            <button
+              className={`wiki-topbar-btn${panelTab === 'history' ? ' wiki-topbar-btn-active' : ''}`}
+              onClick={() => setPanelTab((t) => t === 'history' ? null : 'history')}
+              title="Version history"
+            >
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+                <path d="M7 1a6 6 0 1 0 6 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                <path d="M13 1v4H9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M7 4v3.5l2 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              History
+            </button>
+
+            {/* Info */}
+            <button
+              className={`wiki-topbar-btn${panelTab === 'info' ? ' wiki-topbar-btn-active' : ''}`}
+              onClick={() => setPanelTab((t) => t === 'info' ? null : 'info')}
+              title="Page info"
+            >
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+                <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.3"/>
+                <path d="M7 6.5v4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                <circle cx="7" cy="4.5" r=".8" fill="currentColor"/>
+              </svg>
+              Info
+            </button>
 
             {/* More options */}
             <button className="wiki-topbar-btn-icon" title="More options">
@@ -247,7 +276,7 @@ export function WikiPage() {
         )}
       </div>
 
-      {/* ── Three-panel wiki layout ── */}
+      {/* ── Wiki layout ── */}
       <div className="wiki-layout" style={{ flex: 1, minHeight: 0 }}>
 
         {/* Left: page tree */}
@@ -283,14 +312,14 @@ export function WikiPage() {
           linkedCount={linkedItems.length}
         />
 
-        {/* Right: meta sidebar */}
-        {selectedPage && (
-          <WikiMetaSidebar
+        {/* Details panel — slides in from right, inside layout */}
+        {panelTab && selectedPage && (
+          <LinkedIssuesPanel
             page={selectedPage}
             allPages={pages}
             projectId={projectId!}
-            linkPickerOpen={linkPickerOpen}
-            onLinkPickerChange={setLinkPickerOpen}
+            initialTab={panelTab}
+            onClose={() => setPanelTab(null)}
           />
         )}
       </div>

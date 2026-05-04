@@ -60,6 +60,8 @@
   --bb-page-subtitle:       #6B778C;
   --bb-section-label:       #B3BAC5;
   --bb-error-color:         #DE350B;
+  --bb-success-color:       #00875A;
+  --bb-info-color:          #0065FF;
 
   /* ── Filter buttons ── */
   --bb-filter-border:         #DFE1E6;
@@ -177,6 +179,8 @@
   --bb-page-subtitle:       #9A9A9A;
   --bb-section-label:       #555555;
   --bb-error-color:         #FF8B6A;
+  --bb-success-color:       #2DC48D;
+  --bb-info-color:          #589DEE;
 
   /* ── Filter buttons ── */
   --bb-filter-border:         #2A2A2A;
@@ -1153,7 +1157,7 @@
    ══════════════════════════════════════════════════ */
 :root {
   /* Wiki tree panel */
-  --bb-wiki-tree-bg:            #F2F2F2;
+  --bb-wiki-tree-bg:            #F4F5F7;
   --bb-wiki-tree-border:        #EBECF0;
   --bb-wiki-tree-title:         #253858;
   --bb-wiki-section-color:      #B3BAC5;
@@ -1982,6 +1986,205 @@
 }
 .wke-divider { height: 1px; background: var(--bb-wiki-tree-border); margin: 20px 0 24px; }
 
+/* ── LinkedIssuesPanel ── */
+@keyframes lip-slide-in {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+.lip-panel {
+  width: 300px; flex-shrink: 0;
+  background: var(--bb-wiki-doc-bg);
+  border-left: 1px solid var(--bb-wiki-tree-border);
+  display: flex; flex-direction: column;
+  animation: lip-slide-in .22s cubic-bezier(.22,.61,.36,1) both;
+  overflow: hidden;
+}
+.lip-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 16px;
+  height: 46px; flex-shrink: 0;
+  border-bottom: 1px solid var(--bb-wiki-tree-border);
+}
+.lip-title {
+  font-size: 13px; font-weight: 600; color: var(--bb-page-title);
+  display: flex; align-items: center; gap: 7px;
+}
+.lip-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  background: var(--bb-avatar-color); color: #fff;
+  border-radius: 9px; font-size: 10px; font-weight: 700;
+}
+.lip-icon-btn {
+  width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+  border: none; background: transparent; border-radius: 6px;
+  color: var(--bb-text-muted); cursor: pointer;
+}
+.lip-icon-btn:hover { background: var(--bb-hover-bg); color: var(--bb-text-primary); }
+
+.lip-action-bar {
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--bb-wiki-tree-border);
+}
+
+.lip-body {
+  flex: 1; overflow-y: auto; padding: 12px 12px 20px;
+  display: flex; flex-direction: column; gap: 10px;
+  min-height: 0;
+}
+
+.lip-empty { font-size: 12px; color: var(--bb-text-muted); font-style: italic; padding: 8px 4px; }
+
+/* Issue card */
+.lip-card {
+  position: relative;
+  border: 1px solid var(--bb-wiki-tree-border);
+  border-radius: 10px; padding: 12px 12px 10px;
+  background: #F4F5F7;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.lip-card-top {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.lip-card-id {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 700; color: var(--bb-text-primary);
+}
+.lip-avatar {
+  width: 26px; height: 26px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.lip-card-title {
+  font-size: 12.5px; font-weight: 500; color: var(--bb-page-title);
+  line-height: 1.45;
+}
+/* Card footer: status · priority · type pills in one row */
+.lip-card-footer {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px;
+}
+.lip-status {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 20px;
+  font-size: 11px; font-weight: 500; border: 1px solid transparent;
+}
+.lip-status-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+}
+.lip-status--todo     { background: #F1F3F5; color: #495057; border-color: #DEE2E6; }
+.lip-status--todo     .lip-status-dot { background: #97A0AF; }
+.lip-status--progress { background: #E8F4FD; color: #0747A6; border-color: #BEE3F8; }
+.lip-status--progress .lip-status-dot { background: #0065FF; }
+.lip-status--review   { background: #FFF3CD; color: #856404; border-color: #FFE69C; }
+.lip-status--review   .lip-status-dot { background: #FF8B00; }
+.lip-status--done     { background: #E3FCEF; color: #006644; border-color: #B2F5D4; }
+.lip-status--done     .lip-status-dot { background: #00875A; }
+
+.lip-priority-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 20px;
+  font-size: 11px; font-weight: 500;
+  background: #F4F5F7; color: #5E6C84;
+  border: 1px solid #DFE1E6;
+}
+.lip-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+.lip-type {
+  display: inline-flex; align-items: center;
+  padding: 3px 9px; border-radius: 20px;
+  font-size: 11px; font-weight: 500;
+}
+.lip-type--task    { background: #E3FCEF; color: #006644; }
+.lip-type--bug     { background: #FFEAEA; color: #C0392B; }
+.lip-type--story   { background: #EEF2FF; color: #3730A3; }
+.lip-type--subtask { background: #FFF7E6; color: #92400E; }
+
+.lip-unlink-btn {
+  position: absolute; top: 8px; right: 8px;
+  width: 18px; height: 18px; border-radius: 4px;
+  border: none; background: transparent;
+  color: var(--bb-text-muted); cursor: pointer; font-size: 10px;
+  display: flex; align-items: center; justify-content: center; opacity: 0;
+  transition: opacity .15s;
+}
+.lip-card:hover .lip-unlink-btn { opacity: 1; }
+.lip-unlink-btn:hover { background: var(--bb-hover-bg); color: var(--bb-error-color); }
+
+/* Picker */
+.lip-picker {
+  border: 1px solid var(--bb-wiki-tree-border); border-radius: 10px;
+  overflow: hidden; background: var(--bb-surface, #fafafa);
+}
+.lip-picker-input {
+  width: 100%; padding: 9px 12px; font-size: 12px;
+  border: none; border-bottom: 1px solid var(--bb-wiki-tree-border);
+  background: transparent; color: var(--bb-text-primary); outline: none;
+}
+.lip-picker-list { max-height: 180px; overflow-y: auto; }
+.lip-picker-empty { padding: 10px 12px; font-size: 12px; color: var(--bb-text-muted); font-style: italic; }
+.lip-picker-item {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; text-align: left;
+  background: transparent; border: none; cursor: pointer;
+  border-bottom: 1px solid var(--bb-wiki-tree-border);
+  font-size: 12px; color: var(--bb-text-primary);
+}
+.lip-picker-item:last-child { border-bottom: none; }
+.lip-picker-item:hover { background: var(--bb-hover-bg); }
+.lip-picker-id { font-size: 10.5px; font-weight: 700; color: var(--bb-avatar-color); flex-shrink: 0; }
+.lip-picker-title { flex: 1; }
+.lip-cancel-btn {
+  width: 100%; padding: 8px 12px; font-size: 12px;
+  border: none; border-top: 1px solid var(--bb-wiki-tree-border);
+  background: transparent; color: var(--bb-text-muted); cursor: pointer;
+}
+.lip-cancel-btn:hover { background: var(--bb-hover-bg); }
+
+/* Link issue button */
+.lip-link-btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; padding: 8px 16px; border-radius: 8px;
+  border: 1.5px solid var(--bb-avatar-color); background: transparent;
+  color: var(--bb-avatar-color); font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: background .15s;
+}
+.lip-link-btn:hover { background: rgba(231,80,38,.06); }
+
+/* History */
+.lip-history-item {
+  display: flex; gap: 10px; align-items: flex-start;
+}
+.lip-history-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 3px;
+  background: var(--bb-wiki-tree-border); border: 2px solid var(--bb-wiki-tree-border);
+}
+.lip-history-dot.latest { background: var(--bb-avatar-color); border-color: var(--bb-avatar-color); }
+.lip-history-info { display: flex; flex-direction: column; gap: 2px; }
+.lip-history-label { font-size: 12px; color: var(--bb-text-primary); display: flex; align-items: center; gap: 6px; }
+.lip-history-tag {
+  font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;
+  background: var(--bb-avatar-color); color: #fff;
+}
+.lip-history-date { font-size: 10.5px; color: var(--bb-text-muted); }
+
+/* Info tab */
+.lip-info-section { display: flex; flex-direction: column; gap: 6px; padding-bottom: 14px; border-bottom: 1px solid var(--bb-wiki-tree-border); }
+.lip-info-section:last-child { border-bottom: none; padding-bottom: 0; }
+.lip-info-label { font-size: 10.5px; font-weight: 600; color: var(--bb-text-muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; }
+.lip-info-rows { display: flex; flex-direction: column; gap: 4px; }
+.lip-info-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--bb-text-primary); }
+.lip-info-row span:first-child { color: var(--bb-text-muted); }
+.lip-contributor { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.lip-contributor-avatar { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; flex-shrink: 0; }
+.lip-contributor-name { font-size: 12px; font-weight: 500; color: var(--bb-text-primary); }
+.lip-contributor-role { font-size: 10.5px; color: var(--bb-text-muted); }
+.lip-toc-item { font-size: 12px; color: var(--bb-text-secondary); padding: 3px 0; cursor: pointer; }
+.lip-toc-item:hover { color: var(--bb-text-primary); }
+.lip-toc-sub { padding-left: 12px; font-size: 11.5px; color: var(--bb-text-muted); }
+.lip-related-page { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--bb-text-secondary); padding: 3px 0; }
+.lip-related-page:hover { color: var(--bb-text-primary); cursor: pointer; }
+
 /* Editor toolbar */
 .wke-toolbar {
   display: flex; align-items: center; gap: 2px;
@@ -2667,6 +2870,40 @@
 .dark .lv-meta-wiki { color: #4C9AFF; }
 
 /* Priority pill */
+/* Story points */
+.lv-sp-col {
+  width: 52px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.lv-sp-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600; color: var(--bb-text-muted);
+  background: var(--bb-hover-bg);
+  padding: 2px 7px; border-radius: 10px;
+  border: 1px solid var(--bb-wiki-tree-border);
+}
+
+/* Progress column */
+.lv-progress-col {
+  width: 140px; flex-shrink: 0;
+  display: flex; align-items: center; padding: 0 8px;
+}
+.lv-progress-wrap {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+}
+.lv-progress-bar {
+  flex: 1; height: 4px; border-radius: 2px;
+  background: var(--bb-border); overflow: hidden;
+}
+.lv-progress-fill {
+  height: 100%; border-radius: 2px;
+  transition: width .3s, background .3s;
+}
+.lv-progress-pct {
+  font-size: 11px; font-weight: 500; color: var(--bb-text-muted);
+  flex-shrink: 0; width: 30px; text-align: right;
+}
+
 .lv-priority-col {
   width: 120px; flex-shrink: 0;
   display: flex; align-items: center;
@@ -2920,6 +3157,10 @@
 .kb-avatar-wrap .av-status-dot {
   border-color: var(--kb-card-bg);
   width: 7px; height: 7px;
+}
+.kb-card-avatar--unassigned {
+  background: var(--bb-hover-bg); color: var(--bb-text-muted);
+  border: 1.5px dashed var(--bb-text-muted); opacity: .7;
 }
 .kb-card-avatar-reporter {
   border-style: dashed;

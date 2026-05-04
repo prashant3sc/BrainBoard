@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { PageTransition } from './PageTransition';
 import { SearchBar } from '@/features/ai/components/SearchBar';
@@ -8,7 +8,9 @@ import { useProject } from '@/features/projects/useProjects';
 function ChatPanelWrapper() {
   const { projectId } = useParams<{ projectId: string }>();
   const { data: project } = useProject(projectId ?? '');
-  return <ChatPanel projectId={projectId} projectName={project?.name} />;
+  const { pathname } = useLocation();
+  const context = pathname.includes('/wiki') ? 'wiki' : 'default';
+  return <ChatPanel projectId={projectId} projectName={project?.name} context={context} />;
 }
 
 interface Props {
