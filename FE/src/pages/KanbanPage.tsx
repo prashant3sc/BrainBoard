@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { projectsApi } from '@/api/projects';
 import { useProjectMembers } from '@/features/projects/useProjects';
 import { useRBAC } from '@/hooks/useRBAC';
 import { useArchivedProject } from '@/hooks/useArchivedProject';
@@ -35,7 +33,7 @@ function getInitials(name: string) {
 export function KanbanPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const { can } = useRBAC();
-  const { isArchived, isWriteLocked } = useArchivedProject(projectId);
+  const { isArchived, isWriteLocked, project } = useArchivedProject(projectId);
   const { getStatus } = useAvailability();
 
   const [searchQuery,        setSearchQuery]        = useState('');
@@ -67,11 +65,6 @@ export function KanbanPage() {
     }
   }, [searchParams, allIssues]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { data: project } = useQuery({
-    queryKey: ['project', projectId],
-    queryFn:  () => projectsApi.getById(projectId!),
-    enabled:  !!projectId,
-  });
 
   if (!projectId) {
     return (

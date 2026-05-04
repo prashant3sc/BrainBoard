@@ -2,6 +2,7 @@ import json
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
+from langchain_core.embeddings import Embeddings
 from langchain_core.prompts import PromptTemplate
 from langchain_core.language_models import BaseChatModel
 
@@ -11,6 +12,26 @@ from app.config import get_settings
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+class _LocalEmbeddings(Embeddings):
+    """
+    Thin LangChain wrapper around ChromaDB's bundled all-MiniLM-L6-v2 model.
+
+    Runs entirely locally — no API key needed.  Used as a fallback when the
+    OpenAI key is missing or invalid.
+    """
+
+    def __init__(self) -> None:
+        from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
+        self._fn = DefaultEmbeddingFunction()
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        # Convert numpy float32 → plain Python float (required by LangChain Chroma)
+        return [[float(x) for x in v] for v in self._fn(texts)]
+
+    def embed_query(self, text: str) -> list[float]:
+        return [float(x) for x in self._fn([text])[0]]
 
 
 def get_llm(model_key: str = "rag", json_mode: bool = True) -> BaseChatModel:
@@ -58,24 +79,49 @@ def get_llm(model_key: str = "rag", json_mode: bool = True) -> BaseChatModel:
     )
 
 
+
 def get_vector_store() -> Chroma:
     settings = get_settings()
-    embeddings = OpenAIEmbeddings(
-        model="text-embedding-3-small",
-        openai_api_key=settings.openai_api_key,
-    )
     return Chroma(
         collection_name=settings.chroma_collection,
-        embedding_function=embeddings,
+        embedding_function=OpenAIEmbeddings(
+            model="text-embedding-3-small",
+            openai_api_key=settings.openai_api_key,
+        ),
         persist_directory=settings.chroma_db_dir,
     )
 
 
 def _clear_collection(vector_store: Chroma) -> int:
-    """Deletes all documents from the collection. Returns count deleted."""
-    existing_ids = vector_store._collection.get()["ids"]
+    """
+    Delete all documents from the collection and return the count removed.
+
+    If the stored collection was created with a different embedding dimension
+    (e.g. previously OpenAI 1536-dim, now local 384-dim), deleting individual
+    documents leaves the schema locked to the old dimension.  In that case we
+    drop and recreate the collection so the next add_documents call can
+    initialise it with the correct dimension.
+    """
+    try:
+        existing = vector_store._collection.get()
+        existing_ids = existing.get("ids", [])
+    except Exception:
+        existing_ids = []
+
     if existing_ids:
-        vector_store._collection.delete(ids=existing_ids)
+        try:
+            vector_store._collection.delete(ids=existing_ids)
+        except Exception as exc:
+            # Dimension mismatch or corrupted collection — drop it entirely
+            logger.warning(
+                "Could not delete documents from collection (%s); "
+                "dropping and recreating collection.", exc
+            )
+            client = vector_store._client
+            collection_name = vector_store._collection.name
+            client.delete_collection(collection_name)
+            logger.info("Collection '%s' dropped and will be recreated.", collection_name)
+
     return len(existing_ids)
 
 
@@ -201,14 +247,33 @@ def full_sync(
 ) -> dict:
     """
     Full resync:
-    1. Clears ALL existing ChromaDB documents
+    1. Drops and recreates the ChromaDB collection (ensures correct embedding dims)
     2. Re-embeds all issues + wiki pages from Postgres
 
     Called by POST /ai/sync from the Django BE.
     """
-    vector_store = get_vector_store()
+    settings = get_settings()
+    embeddings = _LocalEmbeddings()
 
-    deleted = _clear_collection(vector_store)
+    # Drop the collection entirely so the dimension is reset when recreated.
+    # Sync always uses the local model (all-MiniLM-L6-v2, 384-dim, no API key).
+    import chromadb as _chromadb
+    _client = _chromadb.PersistentClient(path=settings.chroma_db_dir)
+    try:
+        existing = _client.get_collection(settings.chroma_collection)
+        deleted = len(existing.get()["ids"])
+        _client.delete_collection(settings.chroma_collection)
+        logger.info(f"Dropped collection '{settings.chroma_collection}' ({deleted} docs)")
+    except Exception:
+        deleted = 0
+        logger.info(f"Collection '{settings.chroma_collection}' did not exist — will create fresh")
+
+    # Recreate the collection via LangChain so add_documents works normally
+    vector_store = Chroma(
+        collection_name=settings.chroma_collection,
+        embedding_function=embeddings,
+        persist_directory=settings.chroma_db_dir,
+    )
     logger.info(f"Cleared {deleted} documents from ChromaDB before resync")
 
     docs = []

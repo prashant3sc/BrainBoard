@@ -13,7 +13,7 @@ export function useArchivedProject(projectId: string | undefined) {
   const { role } = useRBAC();
 
   const { data: project } = useQuery({
-    queryKey: ['project', projectId],
+    queryKey: ['projects', projectId],
     queryFn:  () => projectsApi.getById(projectId!),
     enabled:  !!projectId,
     staleTime: 30_000,
