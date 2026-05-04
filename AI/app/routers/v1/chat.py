@@ -16,12 +16,13 @@ async def chat(request: ChatRequest):
     then answers questions about projects, issues, sprints, team members, and wiki.
     Rejects questions outside BrainBoard's scope.
     """
-    logger.info(f"Chat request: '{request.message[:60]}' | project={request.project_name}")
+    logger.info(f"Chat request: '{request.message[:60]}' | project={request.project_name} | wiki={request.wiki_context.title if request.wiki_context else None}")
     try:
         result = chat_with_rag(
             message=request.message,
             project_name=request.project_name,
             workspace_context=request.workspace_context,
+            wiki_context=request.wiki_context,
         )
     except Exception as exc:
         logger.error(f"Chat failed: {exc}")

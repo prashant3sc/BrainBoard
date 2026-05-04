@@ -497,6 +497,9 @@ class ChatView(APIView):
             except Project.DoesNotExist:
                 pass
 
+        # Optional wiki page context sent by the frontend when user is on a wiki page
+        wiki_context = request.data.get("wiki_context") or None  # {"title": str, "text": str}
+
         workspace_context = self._build_workspace_context(request.user)
 
         try:
@@ -504,6 +507,7 @@ class ChatView(APIView):
                 message,
                 project_name=project_name,
                 workspace_context=workspace_context,
+                wiki_context=wiki_context,
             )
         except requests.RequestException as exc:
             return Response(

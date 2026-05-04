@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { aiApi, type ChatResponse } from '@/api/ai';
+import { aiApi, type ChatResponse, type WikiContext } from '@/api/ai';
 
 export interface ChatMessage {
   id: string;
@@ -14,7 +14,7 @@ export function useAIChat(projectId?: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const sendMessage = useCallback(async (text: string) => {
+  const sendMessage = useCallback(async (text: string, wikiContext?: WikiContext) => {
     const userMsg: ChatMessage = {
       id: `u-${Date.now()}`,
       role: 'user',
@@ -31,7 +31,7 @@ export function useAIChat(projectId?: string) {
     setIsLoading(true);
 
     try {
-      const res: ChatResponse = await aiApi.chat(text, projectId);
+      const res: ChatResponse = await aiApi.chat(text, projectId, wikiContext);
       setMessages((prev) =>
         prev.map((m) =>
           m.id === loadingMsg.id

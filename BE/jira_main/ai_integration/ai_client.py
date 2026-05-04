@@ -56,12 +56,15 @@ def chat(
     message: str,
     project_name: str | None = None,
     workspace_context: str | None = None,
+    wiki_context: dict | None = None,
 ) -> dict:
     payload: dict = {"message": message}
     if project_name:
         payload["project_name"] = project_name
     if workspace_context:
         payload["workspace_context"] = workspace_context
+    if wiki_context:
+        payload["wiki_context"] = wiki_context   # {"title": str, "text": str}
     return _post("/chat", payload)
 
 

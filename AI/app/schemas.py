@@ -69,11 +69,17 @@ class FullSyncRequest(BaseModel):
     sprints: List[SprintDocument] = []
 
 
+class WikiContextPayload(BaseModel):
+    title: str
+    text: str
+
+
 class ChatRequest(BaseModel):
     message: str
     project_id: Optional[str] = None
     project_name: Optional[str] = None
     workspace_context: Optional[str] = None
+    wiki_context: Optional[WikiContextPayload] = None
 
 
 class JiraTaskResponse(BaseModel):
