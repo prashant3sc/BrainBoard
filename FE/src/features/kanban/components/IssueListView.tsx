@@ -8,6 +8,10 @@ import { useAvailability } from '@/hooks/useAvailability';
 import type { Issue, IssueStatus, ProjectMember } from '@/types';
 import { KANBAN_COLUMNS } from './KanbanBoard';
 
+function hasOpenSubtasks(issue: Issue) {
+  return (issue.subtaskCount ?? 0) > 0 && (issue.progress ?? 0) < 100 && issue.status !== 'done';
+}
+
 interface Props {
   issues:         Issue[];
   members:        ProjectMember[];
@@ -183,6 +187,15 @@ export function IssueListView({
     });
   }
 
+  /* Toast */
+  const [toast, setToast] = useState<{ msg: string; visible: boolean }>({ msg: '', visible: false });
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function showToast(msg: string) {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ msg, visible: true });
+    toastTimer.current = setTimeout(() => setToast((t) => ({ ...t, visible: false })), 4000);
+  }
+
   /* Filtering */
   const q = searchQuery.trim().toLowerCase();
   const afterSearch = q
@@ -201,6 +214,14 @@ export function IssueListView({
 
     const newStatus = destination.droppableId as IssueStatus;
     const oldStatus = source.droppableId as IssueStatus;
+
+    if (newStatus === 'done' && newStatus !== oldStatus) {
+      const dragged = local.find((i) => i.id === draggableId);
+      if (dragged && hasOpenSubtasks(dragged)) {
+        showToast('Cannot move to Done — subtasks are still open');
+        return;
+      }
+    }
 
     setLocal((prev) => prev.map((i) => i.id === draggableId ? { ...i, status: newStatus } : i));
 
@@ -229,6 +250,7 @@ export function IssueListView({
   }
 
   return (
+    <>
     <DragDropContext onDragEnd={onDragEnd}>
       <div className="lv-wrap">
         {KANBAN_COLUMNS.map((col) => {
@@ -334,6 +356,36 @@ export function IssueListView({
                                   </div>
                                 </div>
 
+                                {/* Progress */}
+                                <div className="lv-progress-col">
+                                  {issue.issueType !== 'subtask' && (issue.subtaskCount ?? 0) > 0 && (
+                                    <div className="lv-progress-wrap">
+                                      <div className="lv-progress-bar">
+                                        <div
+                                          className="lv-progress-fill"
+                                          style={{
+                                            width: `${Math.min(100, issue.progress ?? 0)}%`,
+                                            background: (issue.progress ?? 0) >= 100
+                                              ? 'var(--bb-success-color)'
+                                              : 'var(--bb-avatar-color)',
+                                          }}
+                                        />
+                                      </div>
+                                      <span className="lv-progress-pct">{issue.progress ?? 0}%</span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Story points */}
+                                <div className="lv-sp-col" title="Story points">
+                                  <span className="lv-sp-badge">
+                                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                                      <polygon points="6,1 7.8,4.2 11.5,4.7 8.75,7.3 9.4,11 6,9.2 2.6,11 3.25,7.3 0.5,4.7 4.2,4.2" stroke="currentColor" strokeWidth="1" strokeLinejoin="round" fill="none"/>
+                                    </svg>
+                                    {issue.storyPoints ?? 0}
+                                  </span>
+                                </div>
+
                                 {/* Priority pill */}
                                 <div className="lv-priority-col">
                                   <span
@@ -390,5 +442,23 @@ export function IssueListView({
         })}
       </div>
     </DragDropContext>
+
+    {/* Subtask-blocked toast */}
+    <div className={toast.visible ? 'bb-toast-enter' : 'bb-toast-exit'} style={{
+      position: 'fixed', bottom: 28, right: 28,
+      background: '#FFF0EE', border: '1px solid #FFBDAD', borderRadius: 10,
+      padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 8,
+      boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 300,
+      fontSize: 13, fontWeight: 500, color: '#DE350B',
+      pointerEvents: toast.visible ? 'auto' : 'none',
+      whiteSpace: 'nowrap',
+    }}>
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <circle cx="7" cy="7" r="6" stroke="#DE350B" strokeWidth="1.4"/>
+        <path d="M7 4v3M7 9.5v.5" stroke="#DE350B" strokeWidth="1.4" strokeLinecap="round"/>
+      </svg>
+      {toast.msg}
+    </div>
+    </>
   );
 }
