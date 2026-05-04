@@ -11,6 +11,8 @@ interface Props {
   page: WikiPage;
   allPages: WikiPage[];
   projectId: string;
+  linkPickerOpen?: boolean;
+  onLinkPickerChange?: (open: boolean) => void;
 }
 
 function extractToc(html: string): TocItem[] {
@@ -36,11 +38,13 @@ function issueEmoji(type: 'bug' | 'story' | 'task') {
   return '✅';
 }
 
-export function WikiMetaSidebar({ page, allPages, projectId }: Props) {
+export function WikiMetaSidebar({ page, allPages, projectId, linkPickerOpen: externalOpen, onLinkPickerChange }: Props) {
   const { can } = useRBAC();
   const { isWriteLocked } = useArchivedProject(projectId);
-  const [activeToc,      setActiveToc]      = useState<string | null>(null);
-  const [linkPickerOpen, setLinkPickerOpen] = useState(false);
+  const [activeToc,          setActiveToc]          = useState<string | null>(null);
+  const [internalPickerOpen, setInternalPickerOpen] = useState(false);
+  const linkPickerOpen    = externalOpen ?? internalPickerOpen;
+  const setLinkPickerOpen = (v: boolean) => { setInternalPickerOpen(v); onLinkPickerChange?.(v); };
   const [linkSearch,     setLinkSearch]     = useState('');
   const [selectedIssue,  setSelectedIssue]  = useState<Issue | null>(null);
   const [modalOpen,      setModalOpen]      = useState(false);
