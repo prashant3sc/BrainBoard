@@ -449,6 +449,40 @@ class ChatView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @staticmethod
+    def _build_workspace_context(user) -> str:
+        active_projects  = Project.objects.filter(is_archived=False).count()
+        archived_projects = Project.objects.filter(is_archived=True).count()
+        total_issues     = Issue.objects.count()
+        open_issues      = Issue.objects.exclude(status=Issue.DONE).count()
+        done_issues      = Issue.objects.filter(status=Issue.DONE).count()
+        total_members    = User.objects.filter(is_active=True).count()
+
+        user_full_name = user.get_full_name().strip() or user.email
+        user_open_issues = Issue.objects.filter(assignee=user).exclude(status=Issue.DONE)
+        user_issue_lines = [
+            f"  - [{i.ticket_id or i.id}] {i.title} ({i.status})"
+            for i in user_open_issues[:10]
+        ]
+
+        lines = [
+            "[LIVE WORKSPACE STATS]",
+            f"Active projects: {active_projects}",
+            f"Archived projects: {archived_projects}",
+            f"Total projects: {active_projects + archived_projects}",
+            f"Total issues: {total_issues}",
+            f"Open issues: {open_issues}",
+            f"Done issues: {done_issues}",
+            f"Active members: {total_members}",
+            "",
+            "[CURRENT USER]",
+            f"Name: {user_full_name}",
+            f"Email: {user.email}",
+            f"My open issues ({len(user_open_issues)}): "
+            + (("\n" + "\n".join(user_issue_lines)) if user_issue_lines else "none"),
+        ]
+        return "\n".join(lines)
+
     def post(self, request):
         message = request.data.get("message", "").strip()
         if not message:
@@ -463,8 +497,14 @@ class ChatView(APIView):
             except Project.DoesNotExist:
                 pass
 
+        workspace_context = self._build_workspace_context(request.user)
+
         try:
-            result = ai_client.chat(message, project_name=project_name)
+            result = ai_client.chat(
+                message,
+                project_name=project_name,
+                workspace_context=workspace_context,
+            )
         except requests.RequestException as exc:
             return Response(
                 {"detail": f"AI layer unreachable: {exc}"},

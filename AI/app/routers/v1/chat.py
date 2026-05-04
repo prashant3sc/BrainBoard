@@ -21,6 +21,7 @@ async def chat(request: ChatRequest):
         result = chat_with_rag(
             message=request.message,
             project_name=request.project_name,
+            workspace_context=request.workspace_context,
         )
     except Exception as exc:
         logger.error(f"Chat failed: {exc}")

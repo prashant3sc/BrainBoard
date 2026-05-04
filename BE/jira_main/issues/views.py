@@ -19,10 +19,12 @@ from projects.models import Project, ProjectMember
 
 
 def annotate_issues(queryset):
-    """Attach subtask_count and done_subtask_count to each issue in a single DB pass."""
+    """Attach subtask/comment/wiki counts to each issue in a single DB pass."""
     return queryset.annotate(
-        subtask_count=Count("subtasks"),
-        done_subtask_count=Count("subtasks", filter=Q(subtasks__status=Issue.DONE)),
+        subtask_count=Count("subtasks", distinct=True),
+        done_subtask_count=Count("subtasks", filter=Q(subtasks__status=Issue.DONE), distinct=True),
+        comment_count=Count("comments", distinct=True),
+        wiki_link_count=Count("wiki_links", distinct=True),
     )
 
 

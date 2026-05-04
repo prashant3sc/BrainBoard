@@ -73,6 +73,7 @@ class ChatRequest(BaseModel):
     message: str
     project_id: Optional[str] = None
     project_name: Optional[str] = None
+    workspace_context: Optional[str] = None
 
 
 class JiraTaskResponse(BaseModel):
@@ -87,6 +88,7 @@ class ChatbotResponse(BaseModel):
     answer: str
     sources: List[str] = []
     out_of_scope: bool = False
+    suggestion: Optional[str] = None
 
 
 # Keep old name as alias so existing imports don't break
