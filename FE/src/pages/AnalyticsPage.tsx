@@ -120,21 +120,13 @@ export default function AnalyticsPage() {
         </p>
       </div>
 
-      {/* ── Chart panels — all mounted (API fires for all), only active is visible ── */}
-      {/* Animated wrapper re-keyed on tab so the enter animation reruns on switch */}
+      {/* ── Chart panels — only the active chart is mounted so ResponsiveContainer
+           gets correct dimensions immediately (display:none breaks width measurement) ── */}
       <div key={activeTab} className="bb-tab-content">
-        <div style={{ display: activeTab === 'velocity'  ? 'block' : 'none' }}>
-          <VelocityChart projectId={projectId} />
-        </div>
-        <div style={{ display: activeTab === 'burndown'  ? 'block' : 'none' }}>
-          <BurndownChart projectId={projectId} />
-        </div>
-        <div style={{ display: activeTab === 'workload'  ? 'block' : 'none' }}>
-          <WorkloadChart projectId={projectId} />
-        </div>
-        <div style={{ display: activeTab === 'kb'        ? 'block' : 'none' }}>
-          <KBAnalyticsChart projectId={projectId} />
-        </div>
+        {activeTab === 'velocity' && <VelocityChart  projectId={projectId} />}
+        {activeTab === 'burndown' && <BurndownChart  projectId={projectId} />}
+        {activeTab === 'workload' && <WorkloadChart  projectId={projectId} />}
+        {activeTab === 'kb'       && <KBAnalyticsChart projectId={projectId} />}
       </div>
     </div>
   );

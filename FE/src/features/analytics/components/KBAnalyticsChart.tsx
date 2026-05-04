@@ -12,7 +12,7 @@ interface Props {
 function StatCard({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color?: string }) {
   return (
     <div style={{
-      flex: 1, background: 'var(--bb-bg-input)',
+      flex: '1 1 140px', minWidth: 140, background: 'var(--bb-bg-input)',
       border: '1.5px solid var(--bb-border)',
       borderRadius: 12, padding: '14px 16px',
     }}>
@@ -66,7 +66,7 @@ export function KBAnalyticsChart({ projectId }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
       {/* Stat row */}
-      <div style={{ display: 'flex', gap: 12 }}>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <StatCard label="Total Pages" value={data.total_pages} sub="wiki articles" color="#3B82F6" />
         <StatCard label="Total Edits" value={data.total_edits} sub="across all pages" color="#E75026" />
         <StatCard label="Ticket Links" value={data.total_links} sub="issues linked to pages" color="#8B5CF6" />
@@ -119,11 +119,11 @@ export function KBAnalyticsChart({ projectId }: Props) {
       )}
 
       {/* Bottom row: top pages + top contributors */}
-      <div style={{ display: 'flex', gap: 16 }}>
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
 
         {/* Top pages */}
         <div style={{
-          flex: 3,
+          flex: '3 1 300px', minWidth: 280,
           background: 'var(--bb-bg-card)',
           border: '1.5px solid var(--bb-border)',
           borderRadius: 14, overflow: 'hidden',
@@ -192,7 +192,7 @@ export function KBAnalyticsChart({ projectId }: Props) {
 
         {/* Top contributors */}
         <div style={{
-          flex: 2,
+          flex: '2 1 200px', minWidth: 200,
           background: 'var(--bb-bg-card)',
           border: '1.5px solid var(--bb-border)',
           borderRadius: 14, overflow: 'hidden',
