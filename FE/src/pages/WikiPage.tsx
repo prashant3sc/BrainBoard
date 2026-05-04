@@ -1,6 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import { useWikiPages, useCreateWikiPage, useUpdateWikiPage, useDeleteWikiPage, useWikiLinks } from '@/features/wiki/useWiki';
 import { WikiSidebar } from '@/features/wiki/components/WikiSidebar';
 import { WikiEditor, type WikiEditorHandle } from '@/features/wiki/components/WikiEditor';
@@ -9,7 +8,6 @@ import { LoadingSkeleton } from '@/components/common/LoadingSkeleton';
 import { useRBAC } from '@/hooks/useRBAC';
 import { useArchivedProject } from '@/hooks/useArchivedProject';
 import { ArchivedBanner } from '@/components/common/ArchivedBanner';
-import { projectsApi } from '@/api/projects';
 import type { WikiPage as WikiPageType } from '@/types';
 
 const FAV_KEY = 'wks_fav_pages';
@@ -22,7 +20,7 @@ export function WikiPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const { can } = useRBAC();
-  const { isArchived, isWriteLocked } = useArchivedProject(projectId);
+  const { isArchived, isWriteLocked, project } = useArchivedProject(projectId);
 
   const [selectedPageId,  setSelectedPageId]  = useState<string | null>(searchParams.get('page'));
   const [isEditing,       setIsEditing]       = useState(false);
@@ -35,11 +33,7 @@ export function WikiPage() {
   const editorRef = useRef<WikiEditorHandle>(null);
 
   const { data: pages = [], isLoading } = useWikiPages(projectId!);
-  const { data: project } = useQuery({
-    queryKey: ['project', projectId],
-    queryFn: () => projectsApi.getById(projectId!),
-    enabled: !!projectId,
-  });
+
   const { mutate: createPage } = useCreateWikiPage();
   const { mutate: updatePage, isPending: isSaving } = useUpdateWikiPage();
   const { mutate: deletePage } = useDeleteWikiPage();

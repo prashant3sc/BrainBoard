@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useProjectMembers } from '@/features/projects/useProjects';
 import { useRBAC } from '@/hooks/useRBAC';
 import { useArchivedProject } from '@/hooks/useArchivedProject';
@@ -9,6 +10,7 @@ import { useActiveSprint } from '@/features/projects/useSprints';
 import { KanbanBoard } from '@/features/kanban/components/KanbanBoard';
 import { IssueListView } from '@/features/kanban/components/IssueListView';
 import { IssueModal } from '@/features/kanban/components/IssueModal';
+import { issuesApi } from '@/api/issues';
 import type { Issue } from '@/types';
 
 const PALETTE: { bg: string; text: string }[] = [
@@ -52,18 +54,23 @@ export function KanbanPage() {
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [searchParams, setSearchParams]   = useSearchParams();
 
-  // Deep-link: ?issue=<uuid> opens the modal for that issue
+  // Deep-link: ?issue=<uuid> — fetch the issue directly so it works for
+  // backlog and completed-sprint issues, not just active-sprint issues.
+  const deepLinkedIssueId = searchParams.get('issue');
+  const { data: deepLinkedIssue } = useQuery({
+    queryKey: ['issue', deepLinkedIssueId],
+    queryFn: () => issuesApi.getById(deepLinkedIssueId!),
+    enabled: !!deepLinkedIssueId,
+    staleTime: 0,
+  });
+
   useEffect(() => {
-    const issueId = searchParams.get('issue');
-    if (issueId && allIssues.length > 0) {
-      const found = allIssues.find((i) => i.id === issueId);
-      if (found) {
-        setSelectedIssue(found);
-        setModalOpen(true);
-        setSearchParams({}, { replace: true });
-      }
+    if (deepLinkedIssue) {
+      setSelectedIssue(deepLinkedIssue);
+      setModalOpen(true);
+      setSearchParams({}, { replace: true });
     }
-  }, [searchParams, allIssues]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [deepLinkedIssue]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
   if (!projectId) {

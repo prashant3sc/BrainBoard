@@ -9,6 +9,7 @@ export function useWikiPages(projectId: string) {
   return useQuery({
     queryKey: ['wiki', projectId],
     queryFn: () => wikiApi.getAll(projectId),
+    enabled: !!projectId,
   });
 }
 
