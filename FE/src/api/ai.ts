@@ -26,7 +26,15 @@ export interface AnalyzeIssueResponse {
 export interface ChatResponse {
   answer: string;
   sources: string[];
-  out_of_scope: boolean;
+  out_of_scope?: boolean;
+}
+
+export interface ChatQueryPayload {
+  query: string;
+  project_id?: string | null;
+  sprint_id?: string | null;
+  page?: string;
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>;
 }
 
 export interface WikiContext {
@@ -55,12 +63,18 @@ export const aiApi = {
   analyzeDraft: (payload: AnalyzeDraftPayload): Promise<AnalyzeIssueResponse> =>
     apiClient.post('/ai/analyze-draft', payload, { timeout: 60_000 }).then((r: { data: AnalyzeIssueResponse }) => r.data),
 
+  // Legacy endpoint — wiki context chat (passes raw wiki text inline)
   chat: (message: string, projectId?: string, wikiContext?: WikiContext): Promise<ChatResponse> =>
     apiClient.post('/ai/chat', {
       message,
       project_id: projectId,
       ...(wikiContext ? { wiki_context: { title: wikiContext.title, text: wikiContext.text } } : {}),
     }, { timeout: 60_000 }).then((r: { data: ChatResponse }) => r.data),
+
+  // Sprint/project-aware endpoint — live DB page context, history, sprint scoping
+  chatQuery: (payload: ChatQueryPayload): Promise<ChatResponse> =>
+    apiClient.post('/ai/chatbot/query', payload, { timeout: 60_000 })
+      .then((r: { data: ChatResponse }) => r.data),
 
   sync: (projectId?: string) =>
     apiClient.post('/ai/sync', projectId ? { project_id: projectId } : {}).then((r: { data: unknown }) => r.data),

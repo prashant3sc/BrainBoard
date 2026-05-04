@@ -4,6 +4,9 @@ import { useAIChat, type ChatMessage } from '../useAIChat';
 interface Props {
   projectId?: string;
   projectName?: string;
+  sprintId?: string;
+  sprintName?: string;
+  page?: string;
   context?: 'wiki' | 'default';
 }
 
@@ -19,6 +22,15 @@ const SUGGESTIONS_WIKI = [
   'What are the key decisions documented here?',
   'Are there any related issues linked to this page?',
   'What changed in the latest version?',
+];
+
+const SUGGESTIONS_SPRINT = [
+  'Give me a sprint health summary',
+  'Which tasks are blocked right now?',
+  'How many story points are completed?',
+  'What should I work on next?',
+  'Which items are at risk of spilling over?',
+  'What should I say in standup today?',
 ];
 
 /* ── Typing animation ── */
@@ -187,12 +199,16 @@ interface WikiContext {
 }
 
 /* ── Main chat panel ── */
-export function ChatPanel({ projectId, projectName, context = 'default' }: Props) {
-  const SUGGESTIONS = context === 'wiki' ? SUGGESTIONS_WIKI : SUGGESTIONS_DEFAULT;
+export function ChatPanel({ projectId, projectName, sprintId, sprintName, page, context = 'default' }: Props) {
+  const suggestions = page === 'kanban' && sprintId
+    ? SUGGESTIONS_SPRINT
+    : context === 'wiki'
+      ? SUGGESTIONS_WIKI
+      : SUGGESTIONS_DEFAULT;
   const [wikiContext, setWikiContext] = useState<WikiContext | null>(null);
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
-  const { messages, isLoading, sendMessage, clearMessages } = useAIChat(projectId);
+  const { messages, isLoading, sendMessage, clearMessages } = useAIChat({ projectId, sprintId, page });
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLInputElement>(null);
   const [btnHover, setBtnHover] = useState(false);
@@ -361,7 +377,7 @@ export function ChatPanel({ projectId, projectName, context = 'default' }: Props
                   {/* Live dot */}
                   <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />
                   <span style={{ fontSize: 10.5, color: 'var(--bb-text-muted)', fontWeight: 500 }}>
-                    {projectName ? `Scoped to ${projectName}` : 'All projects'}
+                    {sprintName ? `Sprint: ${sprintName}` : projectName ? `Scoped to ${projectName}` : 'All projects'}
                   </span>
                 </div>
               </div>
@@ -452,7 +468,7 @@ export function ChatPanel({ projectId, projectName, context = 'default' }: Props
                   Try asking
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {SUGGESTIONS.map((s) => (
+                  {suggestions.map((s) => (
                     <SuggestionChip
                       key={s}
                       text={s}
