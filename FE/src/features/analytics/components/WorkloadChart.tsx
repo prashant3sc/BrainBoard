@@ -177,7 +177,7 @@ export function WorkloadChart({ projectId }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
       {/* Summary stat row */}
-      <div style={{ display: 'flex', gap: 12 }}>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         {[
           { label: 'Total Issues',    value: data.total_issues,                                      color: undefined },
           { label: 'Team Members',    value: data.members.filter((m) => m.user_id).length,           color: undefined },
@@ -187,7 +187,7 @@ export function WorkloadChart({ projectId }: Props) {
               : 0,                                                                                     color: '#E75026' },
         ].map(({ label, value, color }) => (
           <div key={label} style={{
-            flex: 1, background: 'var(--bb-bg-input)',
+            flex: '1 1 140px', minWidth: 140, background: 'var(--bb-bg-input)',
             border: '1.5px solid var(--bb-border)',
             borderRadius: 12, padding: '14px 16px',
           }}>

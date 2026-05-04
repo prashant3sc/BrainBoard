@@ -52,7 +52,6 @@ const STATUS_CONFIG: Record<string, { label: string; dot: string }> = {
   in_progress: { label: 'In Progress', dot: '#D85A30' },
   review:      { label: 'In Review',   dot: '#378ADD' },
   done:        { label: 'Done',        dot: '#1D9E75' },
-  cancelled:   { label: 'Cancelled',   dot: '#888780' },
 };
 
 
@@ -808,14 +807,6 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
                             {STATUS_CONFIG[col.id]?.label ?? col.label}
                           </div>
                         ))}
-                        <div className="im-ddi-sep" />
-                        <div
-                          className={`im-ddi${(status as string) === 'cancelled' ? ' im-ddi-sel' : ''}`}
-                          onClick={() => { setStatus('cancelled' as IssueStatus); setOpenDD(null); }}
-                        >
-                          <StatusDot status="cancelled" />
-                          Cancelled
-                        </div>
                       </div>
                     )}
                   </div>

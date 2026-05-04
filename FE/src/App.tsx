@@ -186,6 +186,24 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+
+            {/* 404 — catch all unknown routes */}
+            <Route
+              path="*"
+              element={
+                <div style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  justifyContent: 'center', height: '100vh', gap: 12,
+                  background: 'var(--bb-bg-page)',
+                }}>
+                  <span style={{ fontSize: 48, fontWeight: 700, color: 'var(--bb-text-muted)' }}>404</span>
+                  <span style={{ fontSize: 14, color: 'var(--bb-text-muted)' }}>Page not found</span>
+                  <a href="/dashboard" style={{ fontSize: 13, color: '#E75026', textDecoration: 'underline' }}>
+                    Go to Dashboard
+                  </a>
+                </div>
+              }
+            />
           </Routes>
         </Suspense>
       </BrowserRouter>

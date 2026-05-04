@@ -78,12 +78,12 @@ function CompleteSprintModal({ sprint, unfinishedIssues, plannedSprints, onConfi
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, cursor: 'pointer', color: 'var(--bb-text-primary)' }}>
                   <input type="radio" name="action" value="backlog" checked={action === 'backlog'} onChange={() => setAction('backlog')} />
                   Move to <strong>Backlog</strong>
                 </label>
 
-                <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, cursor: 'pointer', opacity: plannedSprints.length === 0 ? 0.4 : 1 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, cursor: 'pointer', color: 'var(--bb-text-primary)', opacity: plannedSprints.length === 0 ? 0.4 : 1 }}>
                   <input
                     type="radio"
                     name="action"

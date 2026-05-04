@@ -61,6 +61,10 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
             owner = request.user
         project = Project.objects.create(owner=owner, **validated_data)
 
+        # Auto-add the owner as a ProjectMember so they appear in the members list
+        if owner:
+            ProjectMember.objects.get_or_create(project=project, user=owner)
+
         # Seed the 4 default labels for every new project
         DEFAULT_LABELS = [
             {"name": "Frontend",     "color": "#0052CC"},

@@ -41,7 +41,7 @@ function CustomTooltip({ active, payload, label }: any) {
 function StatCard({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color?: string }) {
   return (
     <div style={{
-      flex: 1, background: 'var(--bb-bg-input)',
+      flex: '1 1 140px', minWidth: 140, background: 'var(--bb-bg-input)',
       border: '1.5px solid var(--bb-border)',
       borderRadius: 12, padding: '14px 16px',
     }}>
@@ -102,7 +102,7 @@ export function VelocityChart({ projectId }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
       {/* Stat row */}
-      <div style={{ display: 'flex', gap: 12 }}>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <StatCard
           label="Avg Velocity"
           value={`${data.avg_velocity} pts`}

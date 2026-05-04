@@ -2563,6 +2563,12 @@
   --kb-input-border:        #DFE1E6;
   --kb-input-text:          #172B4D;
   --kb-input-ph:            #B3BAC5;
+  --kb-text:                #172B4D;
+
+  /* Subtask rows */
+  --bb-bl-row-bg:           #F8F9FA;
+  --bb-bl-row-border:       #EBECF0;
+  --bb-modal-text:          #172B4D;
 }
 
 .dark {
@@ -2625,6 +2631,12 @@
   --kb-input-border:        #2A2A2A;
   --kb-input-text:          #F2F2F2;
   --kb-input-ph:            #555555;
+  --kb-text:                #F2F2F2;
+
+  /* Subtask rows */
+  --bb-bl-row-bg:           #1A1A1A;
+  --bb-bl-row-border:       #2A2A2A;
+  --bb-modal-text:          #E0E0E0;
 }
 
 /* ── Kanban Page Layout ── */
@@ -3084,6 +3096,13 @@
 .dark .kb-card-list { scrollbar-color: #2A2A2A transparent; }
 .dark .kb-card-list::-webkit-scrollbar-thumb { background: #2A2A2A; }
 
+/* ── Global dark-mode scrollbars ── */
+.dark *::-webkit-scrollbar       { width: 6px; height: 6px; }
+.dark *::-webkit-scrollbar-track { background: transparent; }
+.dark *::-webkit-scrollbar-thumb { background: #2A2A2A; border-radius: 4px; }
+.dark *::-webkit-scrollbar-thumb:hover { background: #3A3A3A; }
+.dark * { scrollbar-color: #2A2A2A transparent; scrollbar-width: thin; }
+
 /* Sortable ghost / drag */
 .kb-ghost {
   opacity: .4;
@@ -3302,7 +3321,7 @@
   border-radius: 6px; cursor: pointer; font-family: inherit;
   text-align: left; transition: background .12s, border-color .12s;
 }
-.kb-subtask-row:hover { background: var(--bb-bl-row-hover, #F0F1F3); border-color: #C1C7D0; }
+.kb-subtask-row:hover { background: var(--bb-bl-row-hover, #F0F1F3); border-color: var(--bb-bl-row-border, #C1C7D0); }
 .kb-subtask-dot {
   width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
 }
@@ -3310,7 +3329,7 @@
 .kb-subtask-dot-in_progress { background: #0052CC; }
 .kb-subtask-dot-review      { background: #FF8B00; }
 .kb-subtask-dot-done        { background: #36B37E; }
-.kb-subtask-key  { font-size: 11px; font-weight: 600; color: #6B778C; flex-shrink: 0; }
+.kb-subtask-key  { font-size: 11px; font-weight: 600; color: var(--kb-modal-hint, #6B778C); flex-shrink: 0; }
 .kb-subtask-title { font-size: 12px; color: var(--bb-modal-text, #172B4D); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .kb-reporter-display {

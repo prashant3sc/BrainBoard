@@ -346,9 +346,10 @@ class VelocityView(APIView):
                 "completion_rate": rate,
             })
 
+        completed_sprints = [d for d in data if d["status"] == Sprint.COMPLETED]
         avg_velocity = (
-            round(sum(d["completed"] for d in data) / len(data), 1)
-            if data else 0
+            round(sum(d["completed"] for d in completed_sprints) / len(completed_sprints), 1)
+            if completed_sprints else 0
         )
 
         return Response({
@@ -519,13 +520,21 @@ class BurndownView(APIView):
 
         done_issues = [i for i in issues if i.status == Issue.DONE]
 
+        # Pre-compute effective completion date clamped to [start, end] so that:
+        # - issues done before sprint start count from day 0
+        # - issues done after sprint end (edge case) count at sprint end
+        done_with_date = [
+            (max(min(i.updated_at.date(), end), start), i.story_points or 0)
+            for i in done_issues
+        ]
+
         days = []
         current = start
         while current <= chart_end:
             completed_by_day = sum(
-                i.story_points or 0
-                for i in done_issues
-                if i.updated_at.date() <= current
+                pts
+                for completion_date, pts in done_with_date
+                if completion_date <= current
             )
             day_index = (current - start).days
             ideal_remaining = round(total_points * (1 - day_index / total_days), 1)
