@@ -29,6 +29,12 @@ export interface ChatResponse {
   out_of_scope: boolean;
 }
 
+export interface WikiContext {
+  id: string;
+  title: string;
+  text: string;
+}
+
 export interface AnalyzeDraftPayload {
   title: string;
   description: string;
@@ -49,9 +55,12 @@ export const aiApi = {
   analyzeDraft: (payload: AnalyzeDraftPayload): Promise<AnalyzeIssueResponse> =>
     apiClient.post('/ai/analyze-draft', payload, { timeout: 60_000 }).then((r: { data: AnalyzeIssueResponse }) => r.data),
 
-  chat: (message: string, projectId?: string): Promise<ChatResponse> =>
-    apiClient.post('/ai/chat', { message, project_id: projectId }, { timeout: 60_000 })
-      .then((r: { data: ChatResponse }) => r.data),
+  chat: (message: string, projectId?: string, wikiContext?: WikiContext): Promise<ChatResponse> =>
+    apiClient.post('/ai/chat', {
+      message,
+      project_id: projectId,
+      ...(wikiContext ? { wiki_context: { title: wikiContext.title, text: wikiContext.text } } : {}),
+    }, { timeout: 60_000 }).then((r: { data: ChatResponse }) => r.data),
 
   sync: (projectId?: string) =>
     apiClient.post('/ai/sync', projectId ? { project_id: projectId } : {}).then((r: { data: unknown }) => r.data),

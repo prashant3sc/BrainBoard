@@ -180,9 +180,16 @@ function SuggestionChip({ text, onClick }: { text: string; onClick: () => void }
   );
 }
 
+interface WikiContext {
+  id: string;
+  title: string;
+  text: string;
+}
+
 /* ── Main chat panel ── */
 export function ChatPanel({ projectId, projectName, context = 'default' }: Props) {
   const SUGGESTIONS = context === 'wiki' ? SUGGESTIONS_WIKI : SUGGESTIONS_DEFAULT;
+  const [wikiContext, setWikiContext] = useState<WikiContext | null>(null);
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const { messages, isLoading, sendMessage, clearMessages } = useAIChat(projectId);
@@ -209,11 +216,20 @@ export function ChatPanel({ projectId, projectName, context = 'default' }: Props
     return () => window.removeEventListener('wiki:explain', handleExplain);
   }, []);
 
+  useEffect(() => {
+    function handlePageContext(e: Event) {
+      const detail = (e as CustomEvent<WikiContext | null>).detail;
+      setWikiContext(detail ?? null);
+    }
+    window.addEventListener('wiki:page-context', handlePageContext);
+    return () => window.removeEventListener('wiki:page-context', handlePageContext);
+  }, []);
+
   function handleSend() {
     const text = input.trim();
     if (!text || isLoading) return;
     setInput('');
-    sendMessage(text);
+    sendMessage(text, wikiContext ?? undefined);
   }
 
   function handleKey(e: React.KeyboardEvent) {
@@ -419,7 +435,10 @@ export function ChatPanel({ projectId, projectName, context = 'default' }: Props
                     Hey, I'm BrainBoard AI
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--bb-text-muted)', lineHeight: 1.6 }}>
-                    Ask me anything about your issues, sprints,<br/>wiki pages, or team members.
+                    {wikiContext
+                      ? <>Ask me anything about<br/><strong style={{ color: 'var(--bb-text-primary)' }}>"{wikiContext.title}"</strong></>
+                      : <>Ask me anything about your issues, sprints,<br/>wiki pages, or team members.</>
+                    }
                   </div>
                 </div>
 
@@ -457,7 +476,7 @@ export function ChatPanel({ projectId, projectName, context = 'default' }: Props
             }}
           >
             {/* Scope badge */}
-            {projectName && (
+            {(wikiContext || projectName) && (
               <div style={{ marginBottom: 7, display: 'flex', alignItems: 'center', gap: 5 }}>
                 <span
                   style={{
@@ -466,11 +485,18 @@ export function ChatPanel({ projectId, projectName, context = 'default' }: Props
                     background: 'var(--bb-nav-active-bg)',
                     color: '#E75026',
                     border: '1px solid rgba(231,80,38,0.2)',
+                    maxWidth: 160, overflow: 'hidden',
+                    textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   }}
+                  title={wikiContext ? wikiContext.title : projectName}
                 >
-                  {projectName}
+                  {wikiContext ? (
+                    <>📄 {wikiContext.title}</>
+                  ) : projectName}
                 </span>
-                <span style={{ fontSize: 10, color: 'var(--bb-text-muted)' }}>scoped</span>
+                <span style={{ fontSize: 10, color: 'var(--bb-text-muted)' }}>
+                  {wikiContext ? 'wiki context' : 'scoped'}
+                </span>
               </div>
             )}
 

@@ -49,6 +49,22 @@ export function WikiPage() {
   }, [pages]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedPage = pages.find((p) => p.id === selectedPageId) ?? null;
+
+  /* ── Broadcast current wiki page to the AI chatbot ── */
+  useEffect(() => {
+    if (selectedPage) {
+      // Strip HTML tags to get plain text for the AI
+      const tmp = document.createElement('div');
+      tmp.innerHTML = selectedPage.content ?? '';
+      const plainText = tmp.textContent ?? tmp.innerText ?? '';
+      window.dispatchEvent(new CustomEvent('wiki:page-context', {
+        detail: { id: selectedPage.id, title: selectedPage.title, text: plainText.trim() },
+      }));
+    } else {
+      // Navigated away from any page — clear context
+      window.dispatchEvent(new CustomEvent('wiki:page-context', { detail: null }));
+    }
+  }, [selectedPage?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const parentPage   = selectedPage?.parentId
     ? (pages.find((p) => p.id === selectedPage.parentId) ?? null)
     : null;
@@ -95,6 +111,12 @@ export function WikiPage() {
   function handleExplain(text: string) {
     window.dispatchEvent(new CustomEvent('wiki:explain', { detail: { text } }));
   }
+
+  useEffect(() => {
+    return () => {
+      window.dispatchEvent(new CustomEvent('wiki:page-context', { detail: null }));
+    };
+  }, []);
 
   if (!projectId) {
     return <p className="p-8 text-sm" style={{ color: 'var(--bb-error-color)' }}>No project selected.</p>;
