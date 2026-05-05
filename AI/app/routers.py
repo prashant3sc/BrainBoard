@@ -37,7 +37,7 @@ async def analyze_task(request: JiraTaskRequest):
         if not os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY") == "your_openai_api_key_here":
             raise HTTPException(status_code=500, detail="OpenAI API Key not configured in .env file.")
             
-        result_data = analyze_task_with_rag(request.heading, request.description)
+        result_data = analyze_task_with_rag(request.heading, request.description, request.labels)
         return result_data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

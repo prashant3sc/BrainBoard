@@ -248,15 +248,13 @@ def full_sync(
     """
     Full resync:
     1. Drops and recreates the ChromaDB collection (ensures correct embedding dims)
-    2. Re-embeds all issues + wiki pages from Postgres
+    2. Re-embeds all issues + wiki pages from Postgres using OpenAI text-embedding-3-small
 
     Called by POST /ai/sync from the Django BE.
     """
     settings = get_settings()
-    embeddings = _LocalEmbeddings()
 
     # Drop the collection entirely so the dimension is reset when recreated.
-    # Sync always uses the local model (all-MiniLM-L6-v2, 384-dim, no API key).
     import chromadb as _chromadb
     _client = _chromadb.PersistentClient(path=settings.chroma_db_dir)
     try:
@@ -268,12 +266,9 @@ def full_sync(
         deleted = 0
         logger.info(f"Collection '{settings.chroma_collection}' did not exist — will create fresh")
 
-    # Recreate the collection via LangChain so add_documents works normally
-    vector_store = Chroma(
-        collection_name=settings.chroma_collection,
-        embedding_function=embeddings,
-        persist_directory=settings.chroma_db_dir,
-    )
+    # Recreate via get_vector_store() so sync and query always use the same
+    # OpenAI text-embedding-3-small (1536-dim) embeddings — no dimension mismatch.
+    vector_store = get_vector_store()
     logger.info(f"Cleared {deleted} documents from ChromaDB before resync")
 
     docs = []
