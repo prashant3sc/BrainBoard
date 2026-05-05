@@ -35,7 +35,9 @@ function CheckRow({
   onUpdate: (checkId: string, status: ComplianceCheckStatus, note: string) => void;
   canAct: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(
+    check.status === 'pending' || check.status === 'blocked'
+  );
   const [note, setNote] = useState(check.note ?? '');
   const cfg = STATUS_CONFIG[check.status];
   const blocks = check.blocksOn ? check.blocksOn.split(',').map((s) => s.trim()) : [];
@@ -125,7 +127,7 @@ export function ComplianceSection({ issueId, projectId, readOnly = false }: Prop
   const user = useAuthStore((s) => s.user);
   const qc = useQueryClient();
 
-  const { data: checks = [], isLoading } = useQuery<ComplianceCheck[]>({
+  const { data: checks = [], isLoading, isError, refetch } = useQuery<ComplianceCheck[]>({
     queryKey: ['compliance-checks', issueId],
     queryFn: () => complianceApi.listChecks(issueId),
   });
@@ -145,15 +147,20 @@ export function ComplianceSection({ issueId, projectId, readOnly = false }: Prop
     return <div className="cs-loading">Loading compliance checks…</div>;
   }
 
-  if (checks.length === 0) {
+  if (isError) {
     return (
-      <div className="cs-empty">
-        <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-          <path d="M10 2a8 8 0 1 0 0 16A8 8 0 0 0 10 2zm0 4v4m0 2.5v1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <div className="cs-error">
+        <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+          <path d="M10 2a8 8 0 1 0 0 16A8 8 0 0 0 10 2zm0 4v4m0 2.5v1" stroke="#EF4444" strokeWidth="1.5" strokeLinecap="round"/>
         </svg>
-        No compliance checks configured for this project.
+        <span>Failed to load compliance checks.</span>
+        <button className="cs-retry-btn" onClick={() => refetch()}>Retry</button>
       </div>
     );
+  }
+
+  if (checks.length === 0) {
+    return null;
   }
 
   const completeCount = checks.filter((c) => c.status === 'complete' || c.status === 'not_required').length;
@@ -162,10 +169,9 @@ export function ComplianceSection({ issueId, projectId, readOnly = false }: Prop
 
   return (
     <div className="cs-root">
-      <div className="cs-header">
-        <span className="cs-title">Compliance</span>
+      <div className="cs-progress">
         <span className="cs-summary">
-          {completeCount}/{totalCount}
+          {completeCount}/{totalCount} complete
           <span className="cs-bar-wrap">
             <span className="cs-bar-fill" style={{ width: `${pct}%` }} />
           </span>

@@ -17,7 +17,7 @@ import { useTemplates } from '@/features/templates/useTemplates';
 import type { Issue, IssueStatus, Priority, IssueType, IssueTemplateConfig, TriggerContext } from '@/types';
 import { KANBAN_COLUMNS } from './KanbanBoard';
 
-type Destination = 'backlog' | 'sprint';
+type Destination = 'backlog' | 'sprint' | 'next_sprint';
 
 interface Props {
   issue: Issue | null;   // null → create mode
@@ -137,6 +137,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
   const { data: activeSprintData } = useActiveSprint(projectId);
   const activeSprintId = activeSprintData?.sprint?.id ?? null;
   const { data: sprints = [] } = useSprints(projectId);
+  const nextSprintId = sprints.find((s) => s.status === 'planned')?.id ?? null;
   const isInPlannedSprint = isEdit && !!issue?.sprintId &&
     sprints.some((s) => s.id === issue.sprintId && s.status === 'planned');
   const isInCompletedSprint = isEdit && !!issue?.sprintId &&
@@ -323,8 +324,12 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
     setOpenDD(null);
     setSaveError(null);
     setActiveTemplateId(null);
-    if (issue?.sprintId) setDestination('sprint');
-    else setDestination('backlog');
+    if (issue?.sprintId) {
+      const inNext = sprints.some((s) => s.id === issue.sprintId && s.status === 'planned');
+      setDestination(inNext ? 'next_sprint' : 'sprint');
+    } else {
+      setDestination('backlog');
+    }
   }, [issue, isOpen]);
 
   function close() { onClose(); }
@@ -349,7 +354,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
         projectId,
         issueType,
         due: due || null,
-        sprintId: destination === 'sprint' ? activeSprintId : null,
+        sprintId: destination === 'sprint' ? activeSprintId : destination === 'next_sprint' ? nextSprintId : null,
         labelIds,
       }),
     onSuccess: invalidateAndClose,
@@ -368,7 +373,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
         parentId:    issueType === 'subtask' ? (parentId || null) : null,
         issueType,
         due: due || null,
-        sprintId: destination === 'sprint' ? activeSprintId : null,
+        sprintId: destination === 'sprint' ? activeSprintId : destination === 'next_sprint' ? nextSprintId : null,
         labelIds,
       }),
     onSuccess: () => { setSaveError(null); invalidateAndClose(); },
@@ -394,7 +399,9 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
 
   const isDirty = isEdit ? (() => {
     if (!issue) return false;
-    const origDestination = issue.sprintId ? 'sprint' : 'backlog';
+    const origDestination: Destination = issue.sprintId
+      ? sprints.some((s) => s.id === issue.sprintId && s.status === 'planned') ? 'next_sprint' : 'sprint'
+      : 'backlog';
     const origLabels = [...(issue.labelIds ?? [])].sort().join(',');
     const currLabels  = [...labelIds].sort().join(',');
     return (
@@ -819,26 +826,24 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
               {/* Location / Destination */}
               {(!isEdit || (isEdit && !isReadOnly)) && (
                 <div className="im-section">
-                  <span className="im-fl">{isEdit ? 'Location' : 'Add to'}</span>
                   <div className="im-dest-row">
                     <label className={`im-dest-pill${destination === 'backlog' ? ' im-dest-active' : ''}`}>
                       <input type="radio" name="destination" value="backlog" checked={destination === 'backlog'} disabled={isReadOnly} onChange={() => setDestination('backlog')} />
-                      <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
-                        <rect x="1" y="3" width="12" height="2" rx="1" fill="currentColor"/>
-                        <rect x="1" y="7" width="12" height="2" rx="1" fill="currentColor"/>
-                        <rect x="1" y="11" width="7" height="2" rx="1" fill="currentColor"/>
-                      </svg>
+                      {destination === 'backlog' && (
+                        <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                          <path d="M2 6l3 3 5-5" stroke="#E75026" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
                       Backlog
                     </label>
                     <label className={`im-dest-pill${destination === 'sprint' ? ' im-dest-active' : ''}${!activeSprintId ? ' im-dest-disabled' : ''}`}>
                       <input type="radio" name="destination" value="sprint" checked={destination === 'sprint'} disabled={!activeSprintId || isReadOnly} onChange={() => setDestination('sprint')} />
-                      <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
-                        <path d="M2 7a5 5 0 0 1 9.5-2.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                        <path d="M12 7a5 5 0 0 1-9.5 2.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                        <path d="M11.5 2.5l.5 2.3-2.3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
+                      {destination === 'sprint' && (
+                        <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                          <path d="M2 6l3 3 5-5" stroke="#E75026" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
                       Current Sprint
-                      {!activeSprintId && <span className="im-dest-note">(none active)</span>}
                     </label>
                   </div>
                 </div>
@@ -846,7 +851,10 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
 
               {/* ── Compliance — left col, below Location ── */}
               {isEdit && issue?.id && (
-                <ComplianceSection issueId={issue.id} projectId={projectId} readOnly={isReadOnly || !canEdit} />
+                <div className="im-section">
+                  <span className="im-fl">Compliance</span>
+                  <ComplianceSection issueId={issue.id} projectId={projectId} readOnly={isReadOnly || !canEdit} />
+                </div>
               )}
 
               {/* ── Process Definitions — surface relevant process docs inline ── */}
