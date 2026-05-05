@@ -9,4 +9,6 @@ urlpatterns = [
     path("", include("wiki.urls")),
     path("", include("search.urls")),
     path("", include("ai_integration.urls")),
+    path("", include("compliance.urls")),
+    path("", include("templates_app.urls")),
 ]

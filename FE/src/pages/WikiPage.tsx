@@ -5,6 +5,7 @@ import { useWikiPages, useCreateWikiPage, useUpdateWikiPage, useDeleteWikiPage, 
 import { WikiSidebar } from '@/features/wiki/components/WikiSidebar';
 import { WikiEditor, type WikiEditorHandle } from '@/features/wiki/components/WikiEditor';
 import { LinkedIssuesPanel, type PanelTab } from '@/features/wiki/components/LinkedIssuesPanel';
+import { WikiTemplateModal } from '@/features/templates/WikiTemplateModal';
 import { LoadingSkeleton } from '@/components/common/LoadingSkeleton';
 import { useRBAC } from '@/hooks/useRBAC';
 import { useArchivedProject } from '@/hooks/useArchivedProject';
@@ -28,8 +29,10 @@ export function WikiPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem('wks_sidebar_collapsed') === 'true'
   );
-  const [favIds,       setFavIds]       = useState<string[]>(loadFavs);
-  const [panelTab,     setPanelTab]     = useState<PanelTab | null>(null);
+  const [favIds,           setFavIds]           = useState<string[]>(loadFavs);
+  const [panelTab,         setPanelTab]         = useState<PanelTab | null>(null);
+  const [tplModalOpen,     setTplModalOpen]     = useState(false);
+  const [pendingParentId,  setPendingParentId]  = useState<string | null>(null);
 
   const editorRef = useRef<WikiEditorHandle>(null);
 
@@ -94,9 +97,14 @@ export function WikiPage() {
       onSuccess: () => { if (selectedPageId === id) { setSelectedPageId(null); setIsEditing(false); } },
     });
   }
-  function handleCreatePage(parentId: string | null) {
+  function handleRequestCreate(parentId: string | null) {
+    setPendingParentId(parentId);
+    setTplModalOpen(true);
+  }
+
+  function handleCreatePage(parentId: string | null, title = 'New Page', content = '') {
     createPage(
-      { title: 'New Page', content: '', parentId, projectId: projectId! },
+      { title, content, parentId, projectId: projectId! },
       { onSuccess: (newPage) => { setSelectedPageId(newPage.id); setIsEditing(true); } },
     );
   }
@@ -305,7 +313,7 @@ export function WikiPage() {
             pages={pages}
             selectedPageId={selectedPageId}
             onSelect={handleSelectPage}
-            onCreatePage={handleCreatePage}
+            onCreatePage={handleRequestCreate}
             onDeletePage={handleDeletePage}
             canCreate={can('createWikiPage') && !isWriteLocked}
             canDelete={can('editWikiPage') && !isWriteLocked}
@@ -339,6 +347,15 @@ export function WikiPage() {
           />
         )}
       </div>
+
+      {tplModalOpen && (
+        <WikiTemplateModal
+          projectId={projectId!}
+          onSelect={(title, content) => handleCreatePage(pendingParentId, title, content)}
+          onBlank={() => handleCreatePage(pendingParentId)}
+          onClose={() => setTplModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

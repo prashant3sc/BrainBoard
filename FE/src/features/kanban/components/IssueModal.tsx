@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { AxiosError } from 'axios';
 import { issuesApi } from '@/api/issues';
 import { useRBAC } from '@/hooks/useRBAC';
 import { useProjectMembers } from '@/features/projects/useProjects';
@@ -9,8 +10,10 @@ import { useLabels } from '@/features/projects/useLabels';
 import useAuthStore from '@/store/useAuthStore';
 import { CommentsSection } from '@/features/comments/CommentsSection';
 import { useAIAnalysis } from '@/features/ai/useAIAnalysis';
+import { ComplianceSection } from '@/features/compliance/ComplianceSection';
 import { useIssueWikiLinks, useLinkWikiToIssue, useUnlinkTicket, useWikiPages } from '@/features/wiki/useWiki';
-import type { Issue, IssueStatus, Priority, IssueType } from '@/types';
+import { useTemplates } from '@/features/templates/useTemplates';
+import type { Issue, IssueStatus, Priority, IssueType, IssueTemplateConfig } from '@/types';
 import { KANBAN_COLUMNS } from './KanbanBoard';
 
 type Destination = 'backlog' | 'sprint';
@@ -172,16 +175,19 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
   const [due,         setDue]         = useState('');
   const [points,      setPoints]      = useState(3);
   const [labelIds,    setLabelIds]    = useState<string[]>([]);
-  const [titleErr,    setTitleErr]    = useState(false);
-  const [parentErr,   setParentErr]   = useState(false);
-  const [destination, setDestination] = useState<Destination>('backlog');
+  const [titleErr,          setTitleErr]          = useState(false);
+  const [parentErr,         setParentErr]         = useState(false);
+  const [destination,       setDestination]       = useState<Destination>('backlog');
+  const [activeTemplateId,  setActiveTemplateId]  = useState<string | null>(null);
   const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [parentSearch, setParentSearch] = useState('');
   const [openDD,       setOpenDD]       = useState<string | null>(null);
+  const [saveError,    setSaveError]    = useState<string | null>(null);
   const [wikiPickerOpen, setWikiPickerOpen] = useState(false);
   const [wikiSearch,     setWikiSearch]     = useState('');
   const assigneeRef = useRef<HTMLDivElement>(null);
   const { data: projectLabels = [] } = useLabels(projectId);
+  const { data: issueTemplates = [] } = useTemplates('issue', projectId);
 
   /* ── Wiki links (edit mode only) ── */
   const { data: issueWikiLinks = [] } = useIssueWikiLinks(isEdit ? issue?.id ?? null : null);
@@ -314,6 +320,8 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
     setParentErr(false);
     setParentSearch('');
     setOpenDD(null);
+    setSaveError(null);
+    setActiveTemplateId(null);
     if (issue?.sprintId) setDestination('sprint');
     else setDestination('backlog');
   }, [issue, isOpen]);
@@ -362,7 +370,18 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
         sprintId: destination === 'sprint' ? activeSprintId : null,
         labelIds,
       }),
-    onSuccess: invalidateAndClose,
+    onSuccess: () => { setSaveError(null); invalidateAndClose(); },
+    onError: (err) => {
+      const ax = err as AxiosError<Record<string, string | string[]>>;
+      const data = ax?.response?.data;
+      let msg = 'Failed to save. Please try again.';
+      if (data && typeof data === 'object') {
+        const raw = (data as any).status ?? (data as any).detail ?? Object.values(data)[0];
+        if (Array.isArray(raw)) msg = String(raw[0] ?? msg);
+        else if (typeof raw === 'string') msg = raw;
+      }
+      setSaveError(msg);
+    },
   });
 
   const deleteMut = useMutation({
@@ -391,6 +410,25 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
       currLabels  !== origLabels
     );
   })() : true;
+
+  function applyIssueTemplate(tplId: string) {
+    const tpl = issueTemplates.find((t) => t.id === tplId);
+    if (!tpl) return;
+    const cfg = tpl.config as IssueTemplateConfig;
+    if (cfg.title)       setTitle(cfg.title);
+    if (cfg.description) setDesc(cfg.description);
+    if (cfg.issue_type)  setIssueType(cfg.issue_type as IssueType);
+    if (cfg.priority)    setPriority(cfg.priority as Priority);
+    if (cfg.story_points != null) setPoints(cfg.story_points);
+    if (cfg.label_names?.length) {
+      const matched = projectLabels
+        .filter((l) => cfg.label_names.some((n) => n.toLowerCase() === l.name.toLowerCase()))
+        .map((l) => l.id);
+      setLabelIds(matched);
+    }
+    setActiveTemplateId(tplId);
+    setTitleErr(false);
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -523,6 +561,38 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
 
             {/* ═══ LEFT — content ═══ */}
             <div className="im-col-main">
+
+              {/* Template strip — create mode only */}
+              {!isEdit && issueTemplates.length > 0 && (
+                <div className="im-tpl-strip">
+                  <span className="im-tpl-label">Template</span>
+                  <div className="im-tpl-chips">
+                    <button
+                      type="button"
+                      className={`im-tpl-chip${activeTemplateId === null ? ' im-tpl-chip-active' : ''}`}
+                      onClick={() => {
+                        setActiveTemplateId(null);
+                        setTitle(''); setDesc('');
+                        setIssueType('task'); setPriority('medium');
+                        setPoints(3); setLabelIds([]);
+                      }}
+                    >
+                      📄 Blank
+                    </button>
+                    {issueTemplates.map((tpl) => (
+                      <button
+                        key={tpl.id}
+                        type="button"
+                        className={`im-tpl-chip${activeTemplateId === tpl.id ? ' im-tpl-chip-active' : ''}`}
+                        onClick={() => applyIssueTemplate(tpl.id)}
+                        title={tpl.description}
+                      >
+                        {tpl.icon || '📋'} {tpl.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Title */}
               <div className="im-section">
@@ -773,7 +843,12 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
                 </div>
               )}
 
-              {/* ── Comments — left col, below Location ── */}
+              {/* ── Compliance — left col, below Location ── */}
+              {isEdit && issue?.id && (
+                <ComplianceSection issueId={issue.id} projectId={projectId} readOnly={isReadOnly || !canEdit} />
+              )}
+
+              {/* ── Comments — left col, below Compliance ── */}
               {isEdit && issue?.id && (
                 <CommentsSection issueId={issue.id} />
               )}
@@ -801,7 +876,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
                           <div
                             key={col.id}
                             className={`im-ddi${status === col.id ? ' im-ddi-sel' : ''}`}
-                            onClick={() => { setStatus(col.id as IssueStatus); setOpenDD(null); }}
+                            onClick={() => { setStatus(col.id as IssueStatus); setOpenDD(null); setSaveError(null); }}
                           >
                             <StatusDot status={col.id} />
                             {STATUS_CONFIG[col.id]?.label ?? col.label}
@@ -1293,6 +1368,22 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
 
             </div>
           </div>
+
+          {/* ── Save error banner ── */}
+          {saveError && (
+            <div className="im-save-err-banner">
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
+                <circle cx="7" cy="7" r="6" stroke="#DE350B" strokeWidth="1.4"/>
+                <path d="M7 4v3M7 9.5v.5" stroke="#DE350B" strokeWidth="1.4" strokeLinecap="round"/>
+              </svg>
+              <span>
+                {saveError}
+                {/compliance/i.test(saveError) && (
+                  <span className="im-save-err-hint"> See the Compliance section above.</span>
+                )}
+              </span>
+            </div>
+          )}
 
           {/* ── Footer ── */}
           <div className="im-footer">

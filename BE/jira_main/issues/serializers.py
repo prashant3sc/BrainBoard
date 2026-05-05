@@ -16,11 +16,12 @@ class IssueSerializer(serializers.ModelSerializer):
     sprintId     = serializers.PrimaryKeyRelatedField(source="sprint", read_only=True)
     parentId     = serializers.PrimaryKeyRelatedField(source="parent", read_only=True)
     labelIds     = serializers.PrimaryKeyRelatedField(source="labels", many=True, read_only=True)
-    subtaskCount  = serializers.SerializerMethodField()
-    commentCount  = serializers.SerializerMethodField()
-    wikiLinked    = serializers.SerializerMethodField()
-    progress      = serializers.SerializerMethodField()
-    ticketId      = serializers.SerializerMethodField()
+    subtaskCount        = serializers.SerializerMethodField()
+    commentCount        = serializers.SerializerMethodField()
+    wikiLinked          = serializers.SerializerMethodField()
+    progress            = serializers.SerializerMethodField()
+    ticketId            = serializers.SerializerMethodField()
+    openComplianceCount = serializers.SerializerMethodField()
 
     class Meta:
         model = Issue
@@ -45,6 +46,7 @@ class IssueSerializer(serializers.ModelSerializer):
             "commentCount",
             "wikiLinked",
             "progress",
+            "openComplianceCount",
             "created_at",
             "updated_at",
         ]
@@ -79,6 +81,15 @@ class IssueSerializer(serializers.ModelSerializer):
                 return 0
             done = instance.subtasks.filter(status=Issue.DONE).count()
         return round((done / total) * 100)
+
+    def get_openComplianceCount(self, instance):
+        if hasattr(instance, "open_compliance_count"):
+            return instance.open_compliance_count
+        from compliance.models import ComplianceCheck
+        return instance.compliance_checks.filter(
+            template__is_active=True,
+            template__blocks_on__gt="",
+        ).exclude(status__in=[ComplianceCheck.COMPLETE, ComplianceCheck.NOT_REQUIRED]).count()
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
@@ -225,6 +236,26 @@ class IssueUpdateSerializer(serializers.ModelSerializer):
             if incomplete:
                 raise serializers.ValidationError({
                     "status": f"Cannot mark as Done — {incomplete} subtask{'s' if incomplete > 1 else ''} still open."
+                })
+
+        # Block status transition if compliance checks are required and incomplete
+        if new_status:
+            from compliance.models import ComplianceCheck
+            blocking_checks = instance.compliance_checks.filter(
+                template__is_active=True,
+                template__blocks_on__icontains=new_status,
+            ).exclude(status__in=[ComplianceCheck.COMPLETE, ComplianceCheck.NOT_REQUIRED])
+            if blocking_checks.exists():
+                names = list(blocking_checks.values_list("template__name", flat=True))
+                label = ", ".join(names[:3])
+                if len(names) > 3:
+                    label += f" and {len(names) - 3} more"
+                raise serializers.ValidationError({
+                    "status": (
+                        f"Cannot move to '{new_status}'. "
+                        f"Pending compliance checks: {label}. "
+                        f"Complete them in the Compliance section of this issue."
+                    )
                 })
 
         # Handle assignee change — distinguish "not sent" from "sent as null"

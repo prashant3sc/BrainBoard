@@ -49,9 +49,10 @@ export interface Issue {
   due?:          string | null;
   issueType?:    IssueType;
   progress?:     number;
-  subtaskCount?: number;
-  commentCount?: number;
-  wikiLinked?:   boolean;
+  subtaskCount?:        number;
+  commentCount?:        number;
+  wikiLinked?:          boolean;
+  openComplianceCount?: number;
 }
 
 export interface WikiContributor {
@@ -150,6 +151,96 @@ export type SprintRetroEdit = Pick<SprintRetro,
   'summary' | 'wins' | 'bottlenecks' | 'repeated_blockers' |
   'scope_changes' | 'workload_notes' | 'patterns' | 'action_items'
 >;
+
+// ─── Workflow Templates ───────────────────────────────────────────────────────
+
+export type TemplateType = 'project' | 'issue' | 'wiki';
+
+export interface ProjectTemplateConfig {
+  labels:               { name: string; color: string }[];
+  wiki_pages:           { title: string; content: string; children?: ProjectTemplateConfig['wiki_pages'] }[];
+  sprint_defaults:      { duration_weeks: number };
+  compliance_templates: { name: string; applies_to: string; blocks_on: string; required_role: string }[];
+}
+
+export interface IssueTemplateConfig {
+  title:        string;
+  description:  string;
+  issue_type:   string;
+  priority:     string;
+  label_names:  string[];
+  story_points: number | null;
+}
+
+export interface WikiTemplateConfig {
+  title:   string;
+  content: string;
+}
+
+export interface WorkflowTemplate {
+  id:           string;
+  projectId:    string | null;
+  templateType: TemplateType;
+  name:         string;
+  description:  string;
+  icon:         string;
+  category:     string;
+  isActive:     boolean;
+  isSystem:     boolean;
+  config:       ProjectTemplateConfig | IssueTemplateConfig | WikiTemplateConfig;
+  order:        number;
+  createdAt:    string;
+  updatedAt:    string;
+}
+
+// ─── Compliance ──────────────────────────────────────────────────────────────
+
+export type ComplianceCheckStatus = 'pending' | 'complete' | 'blocked' | 'not_required';
+
+export interface ComplianceTemplate {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string;
+  appliesTo: 'task' | 'subtask' | 'bug' | 'all';
+  blocksOn: string;          // comma-separated statuses, e.g. "done" or "review,done"
+  requiredRole: 'admin' | 'pm' | 'developer' | 'viewer';
+  isActive: boolean;
+  order: number;
+  createdAt: string;
+}
+
+export interface ComplianceCheck {
+  id: string;
+  templateId: string;
+  templateName: string;
+  description: string;
+  appliesTo: string;
+  blocksOn: string;
+  requiredRole: string;
+  status: ComplianceCheckStatus;
+  note: string;
+  completedBy: { id: string; name: string } | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ComplianceAnalytics {
+  perTemplate: {
+    templateId: string;
+    templateName: string;
+    total: number;
+    complete: number;
+    pending: number;
+    blocked: number;
+    notRequired: number;
+    rate: number;
+  }[];
+  totalIssues: number;
+  fullyCompliant: number;
+  hasBlockers: number;
+}
 
 /** A member entry returned by GET /projects/:id/members */
 export interface ProjectMember {

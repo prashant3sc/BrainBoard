@@ -4,9 +4,10 @@ import { VelocityChart } from '@/features/analytics/components/VelocityChart';
 import { WorkloadChart } from '@/features/analytics/components/WorkloadChart';
 import { BurndownChart } from '@/features/analytics/components/BurndownChart';
 import { KBAnalyticsChart } from '@/features/analytics/components/KBAnalyticsChart';
+import { ComplianceChart } from '@/features/analytics/components/ComplianceChart';
 
 /* ── Tab config ──────────────────────────────────────────────────────────── */
-type TabId = 'velocity' | 'burndown' | 'workload' | 'kb';
+type TabId = 'velocity' | 'burndown' | 'workload' | 'kb' | 'compliance';
 
 interface Tab {
   id: TabId;
@@ -39,6 +40,12 @@ const TABS: Tab[] = [
     label: 'KB Usage',
     description: 'Knowledge base activity and coverage metrics',
     icon: <KBIcon />,
+  },
+  {
+    id: 'compliance',
+    label: 'Compliance',
+    description: 'Sign-off completion rates and blocking checks across issues',
+    icon: <ComplianceIcon />,
   },
 ];
 
@@ -123,10 +130,11 @@ export default function AnalyticsPage() {
       {/* ── Chart panels — only the active chart is mounted so ResponsiveContainer
            gets correct dimensions immediately (display:none breaks width measurement) ── */}
       <div key={activeTab} className="bb-tab-content">
-        {activeTab === 'velocity' && <VelocityChart  projectId={projectId} />}
-        {activeTab === 'burndown' && <BurndownChart  projectId={projectId} />}
-        {activeTab === 'workload' && <WorkloadChart  projectId={projectId} />}
-        {activeTab === 'kb'       && <KBAnalyticsChart projectId={projectId} />}
+        {activeTab === 'velocity'   && <VelocityChart    projectId={projectId} />}
+        {activeTab === 'burndown'   && <BurndownChart    projectId={projectId} />}
+        {activeTab === 'workload'   && <WorkloadChart    projectId={projectId} />}
+        {activeTab === 'kb'         && <KBAnalyticsChart projectId={projectId} />}
+        {activeTab === 'compliance' && <ComplianceChart  projectId={projectId} />}
       </div>
     </div>
   );
@@ -166,6 +174,15 @@ function KBIcon() {
     <svg viewBox="0 0 16 16" fill="none" width="14" height="14" aria-hidden="true">
       <rect x="2" y="1" width="12" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/>
       <path d="M5 5h6M5 8h6M5 11h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+function ComplianceIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" width="14" height="14" aria-hidden="true">
+      <path d="M8 1L2 4v4c0 3.31 2.5 6.41 6 7 3.5-.59 6-3.69 6-7V4L8 1z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+      <polyline points="5,8 7,10.5 11,6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 }
