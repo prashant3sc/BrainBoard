@@ -1,6 +1,9 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import type { DropResult } from '@hello-pangea/dnd';
 import { issuesApi } from '@/api/issues';
 import { useSprints, useStartSprint, useCompleteSprint, useCreateSprint } from '@/features/projects/useSprints';
 import { useProjectMembers } from '@/features/projects/useProjects';
@@ -296,22 +299,51 @@ const PRIORITY_CLASS: Record<string, string> = {
 
 function IssueRow({
   issue, onClick, selectable, selected, onSelect,
+  innerRef, draggableProps, dragHandleProps, isDragging,
 }: {
   issue: Issue;
   onClick?: () => void;
   selectable?: boolean;
   selected?: boolean;
   onSelect?: (id: string, checked: boolean) => void;
+  innerRef?: (el: HTMLElement | null) => void;
+  draggableProps?: Record<string, unknown>;
+  dragHandleProps?: Record<string, unknown> | null;
+  isDragging?: boolean;
 }) {
   const subtaskTotal = issue.subtaskCount ?? 0;
   const subtaskDone  = subtaskTotal > 0 ? Math.round((issue.progress ?? 0) / 100 * subtaskTotal) : 0;
 
   return (
     <div
+      ref={innerRef}
+      {...(draggableProps as object)}
       className="bb-issue-row"
       onClick={selectable ? undefined : onClick}
-      style={{ cursor: selectable ? 'default' : onClick ? 'pointer' : undefined, background: selected ? 'var(--bb-bg-input)' : undefined }}
+      style={{
+        cursor: selectable ? 'default' : onClick ? 'pointer' : undefined,
+        background: isDragging ? 'var(--bb-bg-input)' : selected ? 'var(--bb-bg-input)' : undefined,
+        boxShadow: isDragging ? '0 4px 16px rgba(0,0,0,0.15)' : undefined,
+        borderRadius: isDragging ? 8 : undefined,
+        opacity: isDragging ? 0.95 : undefined,
+        zIndex: isDragging ? 9999 : undefined,
+        ...(draggableProps as any)?.style,
+      }}
     >
+      {dragHandleProps && !selectable && (
+        <span
+          {...(dragHandleProps as object)}
+          title="Drag to move"
+          style={{ cursor: 'grab', padding: '0 4px 0 0', color: 'var(--bb-text-muted)', flexShrink: 0, display: 'flex', alignItems: 'center', opacity: 0.45 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
+            <circle cx="3" cy="3" r="1.2"/><circle cx="7" cy="3" r="1.2"/>
+            <circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/>
+            <circle cx="3" cy="11" r="1.2"/><circle cx="7" cy="11" r="1.2"/>
+          </svg>
+        </span>
+      )}
       {selectable && (
         <input
           type="checkbox"
@@ -443,6 +475,7 @@ interface SprintBlockProps {
   collapsed: boolean;
   onToggle: () => void;
   canManage: boolean;
+  canMoveIssue: boolean;
   plannedSprints: Sprint[];
   onStart: () => void;
   onComplete: (sprint: Sprint, unfinished: Issue[]) => void;
@@ -451,7 +484,7 @@ interface SprintBlockProps {
   onViewRetro: (sprint: Sprint, issues: Issue[]) => void;
 }
 
-function SprintBlock({ sprint, issues, search, collapsed, onToggle, canManage, onStart, onComplete, onIssueClick, onViewSummary, onViewRetro }: SprintBlockProps) {
+function SprintBlock({ sprint, issues, search, collapsed, onToggle, canManage, canMoveIssue, onStart, onComplete, onIssueClick, onViewSummary, onViewRetro }: SprintBlockProps) {
   const q = search.toLowerCase();
   const filtered = search.trim()
     ? issues.filter((i) => i.title.toLowerCase().includes(q))
@@ -501,11 +534,10 @@ function SprintBlock({ sprint, issues, search, collapsed, onToggle, canManage, o
         {isCompleted && (
           <>
             <button className="bb-sprint-action" onClick={(e) => { e.stopPropagation(); onViewSummary(sprint, issues); }}>
-              View Summary
+              Summary
             </button>
             <button
               className="bb-sprint-action"
-              style={{ color: '#0052CC', borderColor: '#0052CC' }}
               onClick={(e) => { e.stopPropagation(); onViewRetro(sprint, issues); }}
             >
               AI Retro
@@ -533,13 +565,63 @@ function SprintBlock({ sprint, issues, search, collapsed, onToggle, canManage, o
               </div>
             </>
           )}
-          <div className="bb-issue-list">
-            {filtered.length === 0
-              ? <div style={{ padding: '16px 14px', fontSize: 12, color: 'var(--bb-bl-count)', fontStyle: 'italic' }}>No issues.</div>
-              : filtered.map((i) => <IssueRow key={i.id} issue={i} onClick={() => onIssueClick(i)} />)
-            }
-          </div>
+          <Droppable droppableId={sprint.id} isDropDisabled={!canMoveIssue || isCompleted}>
+            {(provided, snapshot) => (
+              <div
+                ref={provided.innerRef}
+                {...provided.droppableProps}
+                className="bb-issue-list"
+                style={{ minHeight: 40 }}
+              >
+                {filtered.length === 0
+                  ? <div style={{ padding: '16px 14px', fontSize: 12, color: 'var(--bb-bl-count)', fontStyle: 'italic' }}>No issues.</div>
+                  : filtered.map((i, index) => (
+                    <Draggable key={i.id} draggableId={i.id} index={index} isDragDisabled={!canMoveIssue}>
+                      {(dragProvided, dragSnapshot) => {
+                        const row = (
+                          <IssueRow
+                            issue={i}
+                            onClick={() => onIssueClick(i)}
+                            innerRef={dragProvided.innerRef}
+                            draggableProps={dragProvided.draggableProps as Record<string, unknown>}
+                            dragHandleProps={dragProvided.dragHandleProps as Record<string, unknown>}
+                            isDragging={dragSnapshot.isDragging}
+                          />
+                        );
+                        return dragSnapshot.isDragging
+                          ? createPortal(row, document.body)
+                          : row;
+                      }}
+                    </Draggable>
+                  ))
+                }
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
         </div>
+      )}
+      {collapsed && canMoveIssue && !isCompleted && (
+        <Droppable droppableId={sprint.id} isDropDisabled={false}>
+          {(provided, snapshot) => (
+            <div
+              ref={provided.innerRef}
+              {...provided.droppableProps}
+              style={{
+                height: snapshot.isDraggingOver ? 48 : 0,
+                overflow: 'hidden',
+                background: 'var(--bb-dnd-over-bg, rgba(231,80,38,0.08))',
+                borderRadius: '0 0 8px 8px',
+                transition: 'height 0.15s',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 12, color: '#E75026', fontWeight: 500,
+              }}
+            >
+              {snapshot.isDraggingOver && 'Drop here to add to sprint'}
+              {provided.placeholder}
+            </div>
+          )}
+        </Droppable>
       )}
     </div>
   );
@@ -549,12 +631,13 @@ function SprintBlock({ sprint, issues, search, collapsed, onToggle, canManage, o
    Backlog Block
 ───────────────────────────────────────────── */
 function BacklogBlock({
-  issues, search, collapsed, onToggle, canManage,
+  issues, search, collapsed, onToggle, canManage, canMoveIssue,
   onIssueClick,
   selectionMode, selectedIds, onToggleSelect, onSelectAll, onEnterSelection,
 }: {
   issues: Issue[]; search: string; collapsed: boolean; onToggle: () => void;
   canManage: boolean;
+  canMoveIssue: boolean;
   onIssueClick: (issue: Issue) => void;
   selectionMode: boolean; selectedIds: Set<string>;
   onToggleSelect: (id: string, checked: boolean) => void;
@@ -593,21 +676,53 @@ function BacklogBlock({
         )}
       </div>
       {!collapsed && (
-        <div className="bb-issue-list bb-sprint-issues-animate">
-          {filtered.length === 0
-            ? <div style={{ padding: '16px 14px', fontSize: 12, color: 'var(--bb-bl-count)', fontStyle: 'italic' }}>No backlog issues.</div>
-            : filtered.map((i) => (
-              <IssueRow
-                key={i.id}
-                issue={i}
-                onClick={() => onIssueClick(i)}
-                selectable={selectionMode}
-                selected={selectedIds.has(i.id)}
-                onSelect={onToggleSelect}
-              />
-            ))
-          }
-        </div>
+        <Droppable droppableId="__backlog__" isDropDisabled={!canMoveIssue}>
+          {(provided, snapshot) => (
+            <div
+              ref={provided.innerRef}
+              {...provided.droppableProps}
+              className="bb-issue-list bb-sprint-issues-animate"
+              style={{ minHeight: 40 }}
+            >
+              {filtered.length === 0
+                ? <div style={{ padding: '16px 14px', fontSize: 12, color: 'var(--bb-bl-count)', fontStyle: 'italic' }}>No backlog issues.</div>
+                : filtered.map((i, index) => (
+                  selectionMode
+                    ? (
+                      <IssueRow
+                        key={i.id}
+                        issue={i}
+                        onClick={() => onIssueClick(i)}
+                        selectable
+                        selected={selectedIds.has(i.id)}
+                        onSelect={onToggleSelect}
+                      />
+                    )
+                    : (
+                      <Draggable key={i.id} draggableId={i.id} index={index} isDragDisabled={!canMoveIssue}>
+                        {(dragProvided, dragSnapshot) => {
+                          const row = (
+                            <IssueRow
+                              issue={i}
+                              onClick={() => onIssueClick(i)}
+                              innerRef={dragProvided.innerRef}
+                              draggableProps={dragProvided.draggableProps as Record<string, unknown>}
+                              dragHandleProps={dragProvided.dragHandleProps as Record<string, unknown>}
+                              isDragging={dragSnapshot.isDragging}
+                            />
+                          );
+                          return dragSnapshot.isDragging
+                            ? createPortal(row, document.body)
+                            : row;
+                        }}
+                      </Draggable>
+                    )
+                ))
+              }
+              {provided.placeholder}
+            </div>
+          )}
+        </Droppable>
       )}
     </div>
   );
@@ -767,6 +882,32 @@ export default function BacklogPage() {
     }
   }
 
+  function handleDragEnd(result: DropResult) {
+    const { source, destination, draggableId } = result;
+    if (!destination || source.droppableId === destination.droppableId) return;
+
+    const newSprintId = destination.droppableId === '__backlog__' ? null : destination.droppableId;
+    const targetSprint = newSprintId ? sprints.find((s) => s.id === newSprintId) : null;
+
+    // Optimistic update
+    qc.setQueryData(['issues', projectId], (old: Issue[] = []) =>
+      old.map((issue) => issue.id === draggableId ? { ...issue, sprintId: newSprintId } : issue)
+    );
+
+    // Auto-expand destination sprint if collapsed
+    if (newSprintId && collapsed[newSprintId]) {
+      setCollapsed((p) => ({ ...p, [newSprintId]: false }));
+    }
+
+    issuesApi.bulkUpdate([draggableId], { sprintId: newSprintId } as any).then(() => {
+      const label = targetSprint ? targetSprint.name : 'Backlog';
+      showToast(`Moved to ${label}`);
+    }).catch(() => {
+      qc.invalidateQueries({ queryKey: ['issues', projectId] });
+      showToast('Failed to move issue', true);
+    });
+  }
+
   if (sprintsLoading || issuesLoading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--bb-bl-count)', fontSize: 13 }}>
@@ -812,58 +953,62 @@ export default function BacklogPage() {
       </div>
 
       {/* Scrollable content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px 80px' }}>
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px 80px' }}>
 
-        {/* Toolbar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-          <div className="bb-bl-search-box">
-            <span style={{ color: 'var(--bb-bl-count)', fontSize: 13 }}>🔍</span>
-            <input
-              className="bb-bl-search-input"
-              placeholder="Search issues…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          {/* Toolbar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+            <div className="bb-bl-search-box">
+              <span style={{ color: 'var(--bb-bl-count)', fontSize: 13 }}>🔍</span>
+              <input
+                className="bb-bl-search-input"
+                placeholder="Search issues…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--bb-bl-count)' }}>
+              {totalIssues} issues total
+            </span>
           </div>
-          <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--bb-bl-count)' }}>
-            {totalIssues} issues total
-          </span>
-        </div>
 
-        {/* Sprint blocks */}
-        {visibleSprints.map((sprint) => (
-          <SprintBlock
-            key={sprint.id}
-            sprint={sprint}
-            issues={issuesBySprint[sprint.id] ?? []}
+          {/* Sprint blocks */}
+          {visibleSprints.map((sprint) => (
+            <SprintBlock
+              key={sprint.id}
+              sprint={sprint}
+              issues={issuesBySprint[sprint.id] ?? []}
+              search={search}
+              collapsed={sprint.id in collapsed ? !!collapsed[sprint.id] : sprint.status === 'completed'}
+              onToggle={() => setCollapsed((p) => ({ ...p, [sprint.id]: !p[sprint.id] }))}
+              canManage={canManageSprints}
+              canMoveIssue={canMoveIssue}
+              plannedSprints={plannedSprints}
+              onStart={() => handleStartSprint(sprint)}
+              onComplete={handleOpenCompleteModal}
+              onIssueClick={(issue) => { setSelectedIssue(issue); setIssueModalOpen(true); }}
+              onViewSummary={(s, issues) => setSummaryModal({ sprint: s, issues })}
+              onViewRetro={(s, issues) => setRetroPanel({ sprint: s, issues })}
+            />
+          ))}
+
+          {/* Backlog block */}
+          <BacklogBlock
+            issues={backlogIssues}
             search={search}
-            collapsed={sprint.id in collapsed ? !!collapsed[sprint.id] : sprint.status === 'completed'}
-            onToggle={() => setCollapsed((p) => ({ ...p, [sprint.id]: !p[sprint.id] }))}
-            canManage={canManageSprints}
-            plannedSprints={plannedSprints}
-            onStart={() => handleStartSprint(sprint)}
-            onComplete={handleOpenCompleteModal}
+            collapsed={!!collapsed['__backlog__']}
+            onToggle={() => setCollapsed((p) => ({ ...p, __backlog__: !p.__backlog__ }))}
+            canManage={canMoveIssue}
+            canMoveIssue={canMoveIssue}
             onIssueClick={(issue) => { setSelectedIssue(issue); setIssueModalOpen(true); }}
-            onViewSummary={(s, issues) => setSummaryModal({ sprint: s, issues })}
-            onViewRetro={(s, issues) => setRetroPanel({ sprint: s, issues })}
+            selectionMode={selectionMode}
+            selectedIds={selectedIds}
+            onToggleSelect={handleToggleSelect}
+            onSelectAll={handleSelectAll}
+            onEnterSelection={() => setSelectionMode(true)}
           />
-        ))}
-
-        {/* Backlog block */}
-        <BacklogBlock
-          issues={backlogIssues}
-          search={search}
-          collapsed={!!collapsed['__backlog__']}
-          onToggle={() => setCollapsed((p) => ({ ...p, __backlog__: !p.__backlog__ }))}
-          canManage={canMoveIssue}
-          onIssueClick={(issue) => { setSelectedIssue(issue); setIssueModalOpen(true); }}
-          selectionMode={selectionMode}
-          selectedIds={selectedIds}
-          onToggleSelect={handleToggleSelect}
-          onSelectAll={handleSelectAll}
-          onEnterSelection={() => setSelectionMode(true)}
-        />
-      </div>
+        </div>
+      </DragDropContext>
 
       {/* Bulk action bar */}
       {selectionMode && (
