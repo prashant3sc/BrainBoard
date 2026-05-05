@@ -152,6 +152,47 @@ export type SprintRetroEdit = Pick<SprintRetro,
   'scope_changes' | 'workload_notes' | 'patterns' | 'action_items'
 >;
 
+// ─── Workflow Templates ───────────────────────────────────────────────────────
+
+export type TemplateType = 'project' | 'issue' | 'wiki';
+
+export interface ProjectTemplateConfig {
+  labels:               { name: string; color: string }[];
+  wiki_pages:           { title: string; content: string; children?: ProjectTemplateConfig['wiki_pages'] }[];
+  sprint_defaults:      { duration_weeks: number };
+  compliance_templates: { name: string; applies_to: string; blocks_on: string; required_role: string }[];
+}
+
+export interface IssueTemplateConfig {
+  title:        string;
+  description:  string;
+  issue_type:   string;
+  priority:     string;
+  label_names:  string[];
+  story_points: number | null;
+}
+
+export interface WikiTemplateConfig {
+  title:   string;
+  content: string;
+}
+
+export interface WorkflowTemplate {
+  id:           string;
+  projectId:    string | null;
+  templateType: TemplateType;
+  name:         string;
+  description:  string;
+  icon:         string;
+  category:     string;
+  isActive:     boolean;
+  isSystem:     boolean;
+  config:       ProjectTemplateConfig | IssueTemplateConfig | WikiTemplateConfig;
+  order:        number;
+  createdAt:    string;
+  updatedAt:    string;
+}
+
 // ─── Compliance ──────────────────────────────────────────────────────────────
 
 export type ComplianceCheckStatus = 'pending' | 'complete' | 'blocked' | 'not_required';

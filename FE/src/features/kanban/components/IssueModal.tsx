@@ -11,7 +11,8 @@ import { CommentsSection } from '@/features/comments/CommentsSection';
 import { useAIAnalysis } from '@/features/ai/useAIAnalysis';
 import { ComplianceSection } from '@/features/compliance/ComplianceSection';
 import { useIssueWikiLinks, useLinkWikiToIssue, useUnlinkTicket, useWikiPages } from '@/features/wiki/useWiki';
-import type { Issue, IssueStatus, Priority, IssueType } from '@/types';
+import { useTemplates } from '@/features/templates/useTemplates';
+import type { Issue, IssueStatus, Priority, IssueType, IssueTemplateConfig } from '@/types';
 import { KANBAN_COLUMNS } from './KanbanBoard';
 
 type Destination = 'backlog' | 'sprint';
@@ -173,9 +174,10 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
   const [due,         setDue]         = useState('');
   const [points,      setPoints]      = useState(3);
   const [labelIds,    setLabelIds]    = useState<string[]>([]);
-  const [titleErr,    setTitleErr]    = useState(false);
-  const [parentErr,   setParentErr]   = useState(false);
-  const [destination, setDestination] = useState<Destination>('backlog');
+  const [titleErr,          setTitleErr]          = useState(false);
+  const [parentErr,         setParentErr]         = useState(false);
+  const [destination,       setDestination]       = useState<Destination>('backlog');
+  const [activeTemplateId,  setActiveTemplateId]  = useState<string | null>(null);
   const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [parentSearch, setParentSearch] = useState('');
   const [openDD,       setOpenDD]       = useState<string | null>(null);
@@ -183,6 +185,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
   const [wikiSearch,     setWikiSearch]     = useState('');
   const assigneeRef = useRef<HTMLDivElement>(null);
   const { data: projectLabels = [] } = useLabels(projectId);
+  const { data: issueTemplates = [] } = useTemplates('issue', projectId);
 
   /* ── Wiki links (edit mode only) ── */
   const { data: issueWikiLinks = [] } = useIssueWikiLinks(isEdit ? issue?.id ?? null : null);
@@ -315,6 +318,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
     setParentErr(false);
     setParentSearch('');
     setOpenDD(null);
+    setActiveTemplateId(null);
     if (issue?.sprintId) setDestination('sprint');
     else setDestination('backlog');
   }, [issue, isOpen]);
@@ -392,6 +396,25 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
       currLabels  !== origLabels
     );
   })() : true;
+
+  function applyIssueTemplate(tplId: string) {
+    const tpl = issueTemplates.find((t) => t.id === tplId);
+    if (!tpl) return;
+    const cfg = tpl.config as IssueTemplateConfig;
+    if (cfg.title)       setTitle(cfg.title);
+    if (cfg.description) setDesc(cfg.description);
+    if (cfg.issue_type)  setIssueType(cfg.issue_type as IssueType);
+    if (cfg.priority)    setPriority(cfg.priority as Priority);
+    if (cfg.story_points != null) setPoints(cfg.story_points);
+    if (cfg.label_names?.length) {
+      const matched = projectLabels
+        .filter((l) => cfg.label_names.some((n) => n.toLowerCase() === l.name.toLowerCase()))
+        .map((l) => l.id);
+      setLabelIds(matched);
+    }
+    setActiveTemplateId(tplId);
+    setTitleErr(false);
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -524,6 +547,38 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
 
             {/* ═══ LEFT — content ═══ */}
             <div className="im-col-main">
+
+              {/* Template strip — create mode only */}
+              {!isEdit && issueTemplates.length > 0 && (
+                <div className="im-tpl-strip">
+                  <span className="im-tpl-label">Template</span>
+                  <div className="im-tpl-chips">
+                    <button
+                      type="button"
+                      className={`im-tpl-chip${activeTemplateId === null ? ' im-tpl-chip-active' : ''}`}
+                      onClick={() => {
+                        setActiveTemplateId(null);
+                        setTitle(''); setDesc('');
+                        setIssueType('task'); setPriority('medium');
+                        setPoints(3); setLabelIds([]);
+                      }}
+                    >
+                      📄 Blank
+                    </button>
+                    {issueTemplates.map((tpl) => (
+                      <button
+                        key={tpl.id}
+                        type="button"
+                        className={`im-tpl-chip${activeTemplateId === tpl.id ? ' im-tpl-chip-active' : ''}`}
+                        onClick={() => applyIssueTemplate(tpl.id)}
+                        title={tpl.description}
+                      >
+                        {tpl.icon || '📋'} {tpl.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Title */}
               <div className="im-section">

@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "search",
     "ai_integration",
     "compliance",
+    "templates_app",
 ]
 
 MIDDLEWARE = [
