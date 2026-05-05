@@ -74,3 +74,41 @@ class Sprint(models.Model):
 
     def __str__(self):
         return f"{self.project.name} / {self.name}"
+
+
+class SprintRetro(models.Model):
+    """Stores AI-generated (and optionally user-edited) sprint retrospectives."""
+
+    CONFIDENCE_CHOICES = [
+        ("high",   "High"),
+        ("medium", "Medium"),
+        ("low",    "Low"),
+    ]
+
+    id               = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    sprint           = models.OneToOneField(Sprint, on_delete=models.CASCADE, related_name="retro")
+    sprint_name      = models.CharField(max_length=255)
+    summary          = models.TextField(blank=True, default="")
+    wins             = models.JSONField(default=list)
+    bottlenecks      = models.JSONField(default=list)
+    repeated_blockers = models.JSONField(default=list)
+    scope_changes    = models.JSONField(default=list)
+    workload_notes   = models.JSONField(default=list)
+    patterns         = models.JSONField(default=list)
+    action_items     = models.JSONField(default=list)
+    confidence       = models.CharField(max_length=10, choices=CONFIDENCE_CHOICES, default="medium")
+    confidence_reason = models.TextField(blank=True, default="")
+    created_by       = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="sprint_retros",
+    )
+    created_at       = models.DateTimeField(auto_now_add=True)
+    updated_at       = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "sprint_retros"
+
+    def __str__(self):
+        return f"Retro: {self.sprint_name}"

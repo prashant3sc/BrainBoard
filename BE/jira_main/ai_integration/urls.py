@@ -10,4 +10,7 @@ urlpatterns = [
     path("ai/chat",                                         views.ChatView.as_view()),
     path("projects/<uuid:project_id>/ai-pulse",             views.SprintPulseView.as_view()),
     path("ai/chatbot/query",                                views.ChatbotQueryView.as_view()),
+    # Sprint Retro
+    path("sprints/<uuid:sprint_id>/retro/generate",         views.SprintRetroGenerateView.as_view()),
+    path("sprints/<uuid:sprint_id>/retro",                  views.SprintRetroView.as_view()),
 ]

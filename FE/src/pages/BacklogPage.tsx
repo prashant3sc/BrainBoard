@@ -9,6 +9,7 @@ import { useArchivedProject } from '@/hooks/useArchivedProject';
 import { ArchivedBanner } from '@/components/common/ArchivedBanner';
 import { IssueModal } from '@/features/kanban/components/IssueModal';
 import { SprintSummaryModal } from '@/features/sprints/SprintSummaryModal';
+import { SprintRetroPanel } from '@/features/sprints/SprintRetroPanel';
 import { SprintDatePicker } from '@/components/SprintDatePicker';
 import { CustomSelect } from '@/components/common/CustomSelect';
 import type { Sprint, Issue, SprintStatus } from '@/types';
@@ -439,9 +440,10 @@ interface SprintBlockProps {
   onComplete: (sprint: Sprint, unfinished: Issue[]) => void;
   onIssueClick: (issue: Issue) => void;
   onViewSummary: (sprint: Sprint, issues: Issue[]) => void;
+  onViewRetro: (sprint: Sprint, issues: Issue[]) => void;
 }
 
-function SprintBlock({ sprint, issues, search, collapsed, onToggle, canManage, onStart, onComplete, onIssueClick, onViewSummary }: SprintBlockProps) {
+function SprintBlock({ sprint, issues, search, collapsed, onToggle, canManage, onStart, onComplete, onIssueClick, onViewSummary, onViewRetro }: SprintBlockProps) {
   const q = search.toLowerCase();
   const filtered = search.trim()
     ? issues.filter((i) => i.title.toLowerCase().includes(q))
@@ -489,9 +491,18 @@ function SprintBlock({ sprint, issues, search, collapsed, onToggle, canManage, o
           </button>
         )}
         {isCompleted && (
-          <button className="bb-sprint-action" onClick={(e) => { e.stopPropagation(); onViewSummary(sprint, issues); }}>
-            View Summary
-          </button>
+          <>
+            <button className="bb-sprint-action" onClick={(e) => { e.stopPropagation(); onViewSummary(sprint, issues); }}>
+              View Summary
+            </button>
+            <button
+              className="bb-sprint-action"
+              style={{ color: '#0052CC', borderColor: '#0052CC' }}
+              onClick={(e) => { e.stopPropagation(); onViewRetro(sprint, issues); }}
+            >
+              AI Retro
+            </button>
+          </>
         )}
       </div>
 
@@ -630,6 +641,7 @@ export default function BacklogPage() {
   const [search,          setSearch]          = useState('');
   const [completeModal,   setCompleteModal]   = useState<{ sprint: Sprint; unfinished: Issue[] } | null>(null);
   const [summaryModal,    setSummaryModal]    = useState<{ sprint: Sprint; issues: Issue[]; movedInfo?: { action: 'backlog' | 'next_sprint'; nextSprintName?: string; count: number } } | null>(null);
+  const [retroPanel,      setRetroPanel]      = useState<{ sprint: Sprint; issues: Issue[] } | null>(null);
   const [showCreateModal,    setShowCreateModal]    = useState(false);
   const [createSprintError,  setCreateSprintError]  = useState<string | null>(null);
   const [issueModalOpen,  setIssueModalOpen]  = useState(false);
@@ -825,6 +837,7 @@ export default function BacklogPage() {
             onComplete={handleOpenCompleteModal}
             onIssueClick={(issue) => { setSelectedIssue(issue); setIssueModalOpen(true); }}
             onViewSummary={(s, issues) => setSummaryModal({ sprint: s, issues })}
+            onViewRetro={(s, issues) => setRetroPanel({ sprint: s, issues })}
           />
         ))}
 
@@ -873,6 +886,22 @@ export default function BacklogPage() {
           movedInfo={summaryModal.movedInfo}
           memberNames={memberNames}
           onClose={() => setSummaryModal(null)}
+          onGenerateRetro={() => {
+            const { sprint, issues } = summaryModal;
+            setSummaryModal(null);
+            setRetroPanel({ sprint, issues });
+          }}
+        />
+      )}
+
+      {/* AI Sprint Retro Panel */}
+      {retroPanel && (
+        <SprintRetroPanel
+          sprint={retroPanel.sprint}
+          issues={retroPanel.issues}
+          projectId={projectId}
+          memberNames={memberNames}
+          onClose={() => setRetroPanel(null)}
         />
       )}
 

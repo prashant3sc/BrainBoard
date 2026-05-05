@@ -223,3 +223,40 @@ class LlmGenerateRequest(BaseModel):
 class LlmGenerateResponse(BaseModel):
     """Plain-text response from the LLM."""
     text: str
+
+
+# ---------------------------------------------------------------------------
+# Sprint Retro (POST /sprint-retro)
+# ---------------------------------------------------------------------------
+
+class SprintRetroIssueItem(BaseModel):
+    title: str
+    status: str
+    priority: str
+    assignee: str = ""
+    story_points: Optional[float] = None
+    ticket_id: Optional[str] = None
+    issue_type: str = "task"
+
+
+class SprintRetroRequest(BaseModel):
+    sprint_id: str
+    sprint_name: str
+    goal: str = ""
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    issues: List[SprintRetroIssueItem]
+
+
+class SprintRetroResponse(BaseModel):
+    sprint_name: str
+    summary: str
+    wins: List[str]
+    bottlenecks: List[str]
+    repeated_blockers: List[str]
+    scope_changes: List[str]
+    workload_notes: List[str]
+    patterns: List[str]
+    action_items: List[str]
+    confidence: str          # "high" | "medium" | "low"
+    confidence_reason: str

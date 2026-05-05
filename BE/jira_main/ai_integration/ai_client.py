@@ -145,5 +145,24 @@ def llm_generate(messages: list[dict], json_mode: bool = False) -> str:
     return result.get("text", "")
 
 
+def sprint_retro(
+    sprint_id: str,
+    sprint_name: str,
+    goal: str,
+    start_date: str | None,
+    end_date: str | None,
+    issues: list[dict],
+) -> dict:
+    """Generate a structured AI sprint retrospective for a completed sprint."""
+    return _post("/sprint-retro", {
+        "sprint_id":   sprint_id,
+        "sprint_name": sprint_name,
+        "goal":        goal,
+        "start_date":  start_date,
+        "end_date":    end_date,
+        "issues":      issues,
+    }, timeout=_TIMEOUT_LONG)
+
+
 def health_check() -> dict:
     return _get("/health", timeout=_TIMEOUT_SHORT)
