@@ -13,7 +13,7 @@ from django.contrib.auth import get_user_model
 logger = logging.getLogger(__name__)
 
 from issues.models import Issue
-from projects.models import Project, ProjectMember, Sprint
+from projects.models import Project, ProjectMember, Sprint, SprintRetro
 from wiki.models import WikiPage
 
 User = get_user_model()
@@ -777,6 +777,146 @@ class ChatbotQueryView(APIView):
         # ── 9. Build sources + return ─────────────────────────────────────
         sources = _build_sources_from_chromadb(chromadb_results, answer_text)
         return Response({"answer": answer_text, "sources": sources})
+
+
+def _serialize_retro(retro: SprintRetro) -> dict:
+    return {
+        "id":               str(retro.id),
+        "sprint_id":        str(retro.sprint_id),
+        "sprint_name":      retro.sprint_name,
+        "summary":          retro.summary,
+        "wins":             retro.wins,
+        "bottlenecks":      retro.bottlenecks,
+        "repeated_blockers": retro.repeated_blockers,
+        "scope_changes":    retro.scope_changes,
+        "workload_notes":   retro.workload_notes,
+        "patterns":         retro.patterns,
+        "action_items":     retro.action_items,
+        "confidence":       retro.confidence,
+        "confidence_reason": retro.confidence_reason,
+        "created_at":       retro.created_at.isoformat(),
+        "updated_at":       retro.updated_at.isoformat(),
+    }
+
+
+class SprintRetroGenerateView(APIView):
+    """
+    POST /sprints/<sprint_id>/retro/generate
+
+    Fetches sprint + issue data from Postgres, calls the AI service to generate
+    a structured retrospective, persists it as a SprintRetro record, and returns it.
+
+    Idempotent — calling again regenerates and overwrites the existing retro.
+    Only allowed for completed sprints.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, sprint_id):
+        try:
+            sprint = (
+                Sprint.objects
+                .select_related("project")
+                .get(pk=sprint_id)
+            )
+        except Sprint.DoesNotExist:
+            return Response({"detail": "Sprint not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if sprint.status != Sprint.COMPLETED:
+            return Response(
+                {"detail": "Retrospectives can only be generated for completed sprints."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        issues = (
+            Issue.objects
+            .filter(sprint=sprint)
+            .select_related("assignee")
+            .prefetch_related("labels")
+        )
+
+        issues_payload = [
+            {
+                "title":       i.title,
+                "status":      i.status,
+                "priority":    i.priority,
+                "assignee":    (i.assignee.get_full_name().strip() or i.assignee.email) if i.assignee else "Unassigned",
+                "story_points": float(i.story_points) if i.story_points else None,
+                "ticket_id":   i.ticket_id,
+                "issue_type":  i.issue_type,
+            }
+            for i in issues
+        ]
+
+        try:
+            ai_result = ai_client.sprint_retro(
+                sprint_id=str(sprint.id),
+                sprint_name=sprint.name,
+                goal=sprint.goal or "",
+                start_date=str(sprint.start_date) if sprint.start_date else None,
+                end_date=str(sprint.end_date) if sprint.end_date else None,
+                issues=issues_payload,
+            )
+        except requests.RequestException as exc:
+            return Response(
+                {"detail": f"AI layer unreachable: {exc}"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        retro, _ = SprintRetro.objects.update_or_create(
+            sprint=sprint,
+            defaults={
+                "sprint_name":      ai_result.get("sprint_name", sprint.name),
+                "summary":          ai_result.get("summary", ""),
+                "wins":             ai_result.get("wins", []),
+                "bottlenecks":      ai_result.get("bottlenecks", []),
+                "repeated_blockers": ai_result.get("repeated_blockers", []),
+                "scope_changes":    ai_result.get("scope_changes", []),
+                "workload_notes":   ai_result.get("workload_notes", []),
+                "patterns":         ai_result.get("patterns", []),
+                "action_items":     ai_result.get("action_items", []),
+                "confidence":       ai_result.get("confidence", "medium"),
+                "confidence_reason": ai_result.get("confidence_reason", ""),
+                "created_by":       request.user,
+            },
+        )
+        return Response(_serialize_retro(retro), status=status.HTTP_200_OK)
+
+
+class SprintRetroView(APIView):
+    """
+    GET   /sprints/<sprint_id>/retro  — retrieve a saved retro (404 if none yet)
+    PATCH /sprints/<sprint_id>/retro  — update (user-edited content before saving)
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def _get_retro(self, sprint_id):
+        try:
+            return SprintRetro.objects.get(sprint_id=sprint_id)
+        except SprintRetro.DoesNotExist:
+            return None
+
+    def get(self, request, sprint_id):
+        retro = self._get_retro(sprint_id)
+        if not retro:
+            return Response({"detail": "No retro found for this sprint."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(_serialize_retro(retro))
+
+    def patch(self, request, sprint_id):
+        retro = self._get_retro(sprint_id)
+        if not retro:
+            return Response({"detail": "No retro found for this sprint."}, status=status.HTTP_404_NOT_FOUND)
+
+        editable_fields = [
+            "summary", "wins", "bottlenecks", "repeated_blockers",
+            "scope_changes", "workload_notes", "patterns", "action_items",
+        ]
+        for field in editable_fields:
+            if field in request.data:
+                setattr(retro, field, request.data[field])
+        retro.save()
+        return Response(_serialize_retro(retro))
 
 
 class AIHealthView(APIView):

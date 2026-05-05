@@ -126,6 +126,31 @@ export interface Sprint {
   createdAt: string;
 }
 
+/** AI-generated sprint retrospective, optionally edited and saved by the user. */
+export interface SprintRetro {
+  id: string;
+  sprint_id: string;
+  sprint_name: string;
+  summary: string;
+  wins: string[];
+  bottlenecks: string[];
+  repeated_blockers: string[];
+  scope_changes: string[];
+  workload_notes: string[];
+  patterns: string[];
+  action_items: string[];
+  confidence: 'high' | 'medium' | 'low';
+  confidence_reason: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Editable form of a sprint retro (all sections are strings/arrays the user can change). */
+export type SprintRetroEdit = Pick<SprintRetro,
+  'summary' | 'wins' | 'bottlenecks' | 'repeated_blockers' |
+  'scope_changes' | 'workload_notes' | 'patterns' | 'action_items'
+>;
+
 /** A member entry returned by GET /projects/:id/members */
 export interface ProjectMember {
   id: string;

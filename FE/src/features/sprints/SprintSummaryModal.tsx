@@ -12,6 +12,7 @@ interface Props {
   movedInfo?: MovedInfo;     // only available right after completion
   memberNames: Record<string, string>; // assigneeId → name
   onClose: () => void;
+  onGenerateRetro?: () => void;   // open the AI retro panel
 }
 
 const PRIORITY_COLOR: Record<string, string> = {
@@ -27,7 +28,7 @@ const PRIORITY_BG: Record<string, string> = {
   low:      '#E3FCEF',
 };
 
-export function SprintSummaryModal({ sprint, issues, movedInfo, memberNames, onClose }: Props) {
+export function SprintSummaryModal({ sprint, issues, movedInfo, memberNames, onClose, onGenerateRetro }: Props) {
   const total      = issues.length;
   const done       = issues.filter((i) => i.status === 'done');
   const notDone    = issues.filter((i) => i.status !== 'done');
@@ -333,6 +334,32 @@ export function SprintSummaryModal({ sprint, issues, movedInfo, memberNames, onC
                     )}
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── AI Retro CTA ── */}
+          {onGenerateRetro && (
+            <div style={{
+              paddingTop: 8,
+              borderTop: '1px solid var(--bb-tbl-wrap-border)',
+              display: 'flex', flexDirection: 'column', gap: 6,
+            }}>
+              <button
+                onClick={() => { onClose(); onGenerateRetro(); }}
+                style={{
+                  width: '100%', padding: '11px 20px',
+                  background: '#0052CC', color: '#fff', border: 'none',
+                  borderRadius: 8, fontSize: 14, fontWeight: 600,
+                  cursor: 'pointer', letterSpacing: '-0.1px',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = '#0747A6')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = '#0052CC')}
+              >
+                Generate AI Retro
+              </button>
+              <div style={{ fontSize: 11, color: 'var(--bb-text-muted)', textAlign: 'center' }}>
+                AI will analyse this sprint and generate wins, bottlenecks, and action items
               </div>
             </div>
           )}

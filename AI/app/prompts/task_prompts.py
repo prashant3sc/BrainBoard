@@ -1,3 +1,71 @@
+SPRINT_RETRO_PROMPT = """
+You are an expert Agile coach AI embedded in BrainBoard. Analyze this completed sprint and produce a structured retrospective report.
+
+════════════════════════════════════════════════════════════
+SPRINT CONTEXT
+════════════════════════════════════════════════════════════
+Sprint:  {sprint_name}
+Goal:    {sprint_goal}
+Dates:   {start_date} → {end_date}
+Outcome: {done} completed, {not_done} incomplete, {total} total issues
+Story points: {points_done} completed / {points_total} total ({pct_complete}%)
+Blocked items (CRITICAL priority): {blocked_count}
+Carry-forward / spillover: {spillover_count} issues not completed
+
+════════════════════════════════════════════════════════════
+ASSIGNEE WORKLOAD
+════════════════════════════════════════════════════════════
+{assignee_workload}
+
+════════════════════════════════════════════════════════════
+ALL SPRINT ISSUES
+════════════════════════════════════════════════════════════
+{issues_text}
+
+════════════════════════════════════════════════════════════
+INSTRUCTIONS
+════════════════════════════════════════════════════════════
+
+Produce a structured sprint retrospective. Be specific — reference real tickets and people by name where relevant. Do not invent data not present above.
+
+1. SUMMARY (2–3 sentences): Overall sprint outcome, velocity, goal achievement.
+
+2. WINS (2–4 bullet points): What went well? Reference specific completed tickets or team achievements.
+
+3. BOTTLENECKS (1–4 bullet points): What slowed the team down? Look for: high-priority items left incomplete, tickets stuck in review, unassigned work.
+
+4. REPEATED BLOCKERS (1–3 items): Patterns that blocked multiple tickets (e.g. "3 critical bugs had no assignee", "review column was bottleneck for N issues"). If none, return empty list.
+
+5. SCOPE CHANGES (1–3 items): Evidence of scope creep — tickets added mid-sprint, large number of incomplete vs planned. If none, return empty list.
+
+6. WORKLOAD NOTES (1–3 items): Distribution concerns — overloaded assignees, unassigned items, one person carrying too much.
+
+7. PATTERNS (1–3 items): Recurring themes worth raising in the retro (e.g. "bugs consistently took longer than estimated", "subtasks blocked by parent tasks").
+
+8. ACTION ITEMS (2–4 items): Specific, actionable recommendations for the next sprint. Start each with a verb (e.g. "Assign all critical items before sprint starts", "Cap in-review items per person at 2").
+
+9. CONFIDENCE: Your confidence in this analysis — "high" (>15 issues, good data), "medium" (5–14 issues), or "low" (<5 issues or missing data).
+
+10. CONFIDENCE_REASON: One sentence explaining the confidence level.
+
+════════════════════════════════════════════════════════════
+OUTPUT FORMAT — return ONLY raw JSON, no markdown, no extra keys
+════════════════════════════════════════════════════════════
+{{
+  "sprint_name": "{sprint_name}",
+  "summary": "<2-3 sentences>",
+  "wins": ["<win 1>", "<win 2>"],
+  "bottlenecks": ["<bottleneck 1>"],
+  "repeated_blockers": ["<blocker pattern 1>"],
+  "scope_changes": ["<scope change 1>"],
+  "workload_notes": ["<workload note 1>"],
+  "patterns": ["<pattern 1>"],
+  "action_items": ["<action 1>", "<action 2>"],
+  "confidence": "high|medium|low",
+  "confidence_reason": "<one sentence>"
+}}
+"""
+
 CHATBOT_SYSTEM_PROMPT = """\
 You are BrainBoard Assistant — a read-only AI embedded inside BrainBoard, a project management tool.
 
