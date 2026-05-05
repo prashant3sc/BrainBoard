@@ -1,4 +1,4 @@
-from django.db.models import Count, Q
+from django.db.models import Count, Q, OuterRef, Subquery, IntegerField
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -19,12 +19,23 @@ from projects.models import Project, ProjectMember
 
 
 def annotate_issues(queryset):
-    """Attach subtask/comment/wiki counts to each issue in a single DB pass."""
+    """Attach subtask/comment/wiki/compliance counts to each issue in a single DB pass."""
+    from compliance.models import ComplianceCheck
     return queryset.annotate(
         subtask_count=Count("subtasks", distinct=True),
         done_subtask_count=Count("subtasks", filter=Q(subtasks__status=Issue.DONE), distinct=True),
         comment_count=Count("comments", distinct=True),
         wiki_link_count=Count("wiki_links", distinct=True),
+        open_compliance_count=Count(
+            "compliance_checks",
+            filter=Q(
+                compliance_checks__template__is_active=True,
+                compliance_checks__template__blocks_on__gt="",
+            ) & ~Q(
+                compliance_checks__status__in=[ComplianceCheck.COMPLETE, ComplianceCheck.NOT_REQUIRED]
+            ),
+            distinct=True,
+        ),
     )
 
 

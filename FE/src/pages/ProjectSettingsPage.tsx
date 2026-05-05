@@ -8,6 +8,7 @@ import useAppStore from '@/store/useAppStore';
 import { useRBAC } from '@/hooks/useRBAC';
 import { useArchivedProject } from '@/hooks/useArchivedProject';
 import { ArchivedBanner } from '@/components/common/ArchivedBanner';
+import { ComplianceConfig } from '@/features/compliance/ComplianceConfig';
 import type { User, Role } from '@/types';
 
 /* ─── helpers ─── */
@@ -62,7 +63,7 @@ function useToast() {
    PAGE
 ═══════════════════════════════════════════════ */
 
-type SettingsTab = 'members' | 'labels';
+type SettingsTab = 'members' | 'labels' | 'compliance';
 
 export default function ProjectSettingsPage() {
   const { projectId = '' } = useParams<{ projectId: string }>();
@@ -220,7 +221,7 @@ export default function ProjectSettingsPage() {
 
         {/* ── Tab bar ── */}
         <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid var(--bb-tbl-wrap-border)', marginBottom: 24 }}>
-          {(['members', 'labels'] as SettingsTab[]).map((tab) => (
+          {(['members', 'labels', 'compliance'] as SettingsTab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -467,6 +468,10 @@ export default function ProjectSettingsPage() {
           )}
         </div>
         )} {/* end activeTab === 'members' */}
+
+        {activeTab === 'compliance' && (
+          <ComplianceConfig projectId={projectId} />
+        )}
       </div>
 
       {/* ══ Add Member Modal ══ */}

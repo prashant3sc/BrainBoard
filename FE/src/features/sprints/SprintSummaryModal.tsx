@@ -67,6 +67,11 @@ export function SprintSummaryModal({ sprint, issues, movedInfo, memberNames, onC
     bg:    t === 'bug' ? '#FFEBE6' : t === 'subtask' ? '#EAE6FF' : '#DEEBFF',
   })).filter((t) => t.count > 0);
 
+  // Compliance summary — issues with open blocking checks
+  const issuesWithBlockers   = issues.filter((i) => (i.openComplianceCount ?? 0) > 0 && i.status !== 'done').length;
+  const issuesFullyCompliant = issues.filter((i) => (i.openComplianceCount ?? 0) === 0).length;
+  const hasComplianceData    = issues.some((i) => i.openComplianceCount !== undefined);
+
   // By assignee
   const assigneeMap: Record<string, { name: string; total: number; done: number; pts: number }> = {};
   for (const issue of issues) {
@@ -334,6 +339,41 @@ export function SprintSummaryModal({ sprint, issues, movedInfo, memberNames, onC
                     )}
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Compliance summary ── */}
+          {hasComplianceData && (
+            <div style={{
+              paddingTop: 12,
+              borderTop: '1px solid var(--bb-tbl-wrap-border)',
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--bb-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                Compliance
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <div style={{
+                  flex: 1, padding: '10px 14px', borderRadius: 8,
+                  background: '#F0FDF4', border: '1px solid #BBF7D0',
+                  textAlign: 'center',
+                }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: '#15803D' }}>{issuesFullyCompliant}</div>
+                  <div style={{ fontSize: 11, color: '#166534', marginTop: 2 }}>Fully Compliant</div>
+                </div>
+                <div style={{
+                  flex: 1, padding: '10px 14px', borderRadius: 8,
+                  background: issuesWithBlockers > 0 ? '#FFF7ED' : '#F9FAFB',
+                  border: `1px solid ${issuesWithBlockers > 0 ? '#FED7AA' : '#E5E7EB'}`,
+                  textAlign: 'center',
+                }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: issuesWithBlockers > 0 ? '#C2410C' : '#374151' }}>
+                    {issuesWithBlockers}
+                  </div>
+                  <div style={{ fontSize: 11, color: issuesWithBlockers > 0 ? '#9A3412' : '#6B7280', marginTop: 2 }}>
+                    Pending Checks
+                  </div>
+                </div>
               </div>
             </div>
           )}

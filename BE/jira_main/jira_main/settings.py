@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "wiki",
     "search",
     "ai_integration",
+    "compliance",
 ]
 
 MIDDLEWARE = [

@@ -9,6 +9,7 @@ import { useLabels } from '@/features/projects/useLabels';
 import useAuthStore from '@/store/useAuthStore';
 import { CommentsSection } from '@/features/comments/CommentsSection';
 import { useAIAnalysis } from '@/features/ai/useAIAnalysis';
+import { ComplianceSection } from '@/features/compliance/ComplianceSection';
 import { useIssueWikiLinks, useLinkWikiToIssue, useUnlinkTicket, useWikiPages } from '@/features/wiki/useWiki';
 import type { Issue, IssueStatus, Priority, IssueType } from '@/types';
 import { KANBAN_COLUMNS } from './KanbanBoard';
@@ -773,7 +774,12 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
                 </div>
               )}
 
-              {/* ── Comments — left col, below Location ── */}
+              {/* ── Compliance — left col, below Location ── */}
+              {isEdit && issue?.id && (
+                <ComplianceSection issueId={issue.id} readOnly={isReadOnly || !canEdit} />
+              )}
+
+              {/* ── Comments — left col, below Compliance ── */}
               {isEdit && issue?.id && (
                 <CommentsSection issueId={issue.id} />
               )}
