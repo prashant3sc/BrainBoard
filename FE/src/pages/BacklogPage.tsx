@@ -12,6 +12,7 @@ import { SprintSummaryModal } from '@/features/sprints/SprintSummaryModal';
 import { SprintRetroPanel } from '@/features/sprints/SprintRetroPanel';
 import { SprintDatePicker } from '@/components/SprintDatePicker';
 import { CustomSelect } from '@/components/common/CustomSelect';
+import { ProcessDefinitionPanel } from '@/features/process-definitions/ProcessDefinitionPanel';
 import type { Sprint, Issue, SprintStatus } from '@/types';
 import type { AxiosError } from 'axios';
 
@@ -41,12 +42,13 @@ interface CompleteModalProps {
   sprint: Sprint;
   unfinishedIssues: Issue[];
   plannedSprints: Sprint[];
+  projectId: string;
   onConfirm: (action: 'backlog' | 'next_sprint', nextSprintId?: string) => void;
   onClose: () => void;
   isPending: boolean;
 }
 
-function CompleteSprintModal({ sprint, unfinishedIssues, plannedSprints, onConfirm, onClose, isPending }: CompleteModalProps) {
+function CompleteSprintModal({ sprint, unfinishedIssues, plannedSprints, projectId, onConfirm, onClose, isPending }: CompleteModalProps) {
   const [action, setAction] = useState<'backlog' | 'next_sprint'>('backlog');
   const [nextSprintId, setNextSprintId] = useState(plannedSprints[0]?.id ?? '');
 
@@ -110,6 +112,12 @@ function CompleteSprintModal({ sprint, unfinishedIssues, plannedSprints, onConfi
             </>
           )}
         </div>
+
+        <ProcessDefinitionPanel
+          projectId={projectId}
+          context="sprint_completion"
+          compact={false}
+        />
 
         <div className="kb-modal-footer">
           <div />
@@ -911,6 +919,7 @@ export default function BacklogPage() {
           sprint={completeModal.sprint}
           unfinishedIssues={completeModal.unfinished}
           plannedSprints={plannedSprints}
+          projectId={projectId}
           onConfirm={handleConfirmComplete}
           onClose={() => setCompleteModal(null)}
           isPending={completeSprint.isPending}

@@ -11,9 +11,10 @@ import useAuthStore from '@/store/useAuthStore';
 import { CommentsSection } from '@/features/comments/CommentsSection';
 import { useAIAnalysis } from '@/features/ai/useAIAnalysis';
 import { ComplianceSection } from '@/features/compliance/ComplianceSection';
+import { ProcessDefinitionPanel } from '@/features/process-definitions/ProcessDefinitionPanel';
 import { useIssueWikiLinks, useLinkWikiToIssue, useUnlinkTicket, useWikiPages } from '@/features/wiki/useWiki';
 import { useTemplates } from '@/features/templates/useTemplates';
-import type { Issue, IssueStatus, Priority, IssueType, IssueTemplateConfig } from '@/types';
+import type { Issue, IssueStatus, Priority, IssueType, IssueTemplateConfig, TriggerContext } from '@/types';
 import { KANBAN_COLUMNS } from './KanbanBoard';
 
 type Destination = 'backlog' | 'sprint';
@@ -847,6 +848,13 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
               {isEdit && issue?.id && (
                 <ComplianceSection issueId={issue.id} projectId={projectId} readOnly={isReadOnly || !canEdit} />
               )}
+
+              {/* ── Process Definitions — surface relevant process docs inline ── */}
+              <ProcessDefinitionPanel
+                projectId={projectId}
+                context={isEdit ? 'issue_view' : 'issue_creation'}
+                issueType={issueType ?? undefined}
+              />
 
               {/* ── Comments — left col, below Compliance ── */}
               {isEdit && issue?.id && (

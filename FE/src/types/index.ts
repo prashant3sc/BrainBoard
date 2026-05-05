@@ -293,3 +293,46 @@ export interface Comment {
   createdAt: string;
   updatedAt: string;
 }
+
+// ─── Process Definitions ─────────────────────────────────────────────────────
+
+export type ProcessCategory = 'process' | 'standard' | 'runbook' | 'checklist';
+
+export type TriggerContext =
+  | 'issue_creation'
+  | 'issue_view'
+  | 'sprint_completion'
+  | 'release_task'
+  | 'incident'
+  | 'bug'
+  | 'pr_review'
+  | 'definition_of_done';
+
+export type IssueTypeScope = 'task' | 'subtask' | 'bug' | 'all';
+
+export interface ProcessDefinition {
+  id: string;
+  projectId: string;
+  wikiPageId: string;
+  wikiPageTitle: string;
+  category: ProcessCategory;
+  triggerContexts: TriggerContext[];
+  issueTypeScope: IssueTypeScope[];
+  shortDescription: string;
+  isActive: boolean;
+  priority: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CreateProcessDefinitionDto = {
+  wikiPageId: string;
+  category: ProcessCategory;
+  trigger_contexts: TriggerContext[];
+  issue_type_scope: IssueTypeScope[];
+  short_description?: string;
+  is_active?: boolean;
+  priority?: number;
+};
+
+export type UpdateProcessDefinitionDto = Partial<Omit<CreateProcessDefinitionDto, 'wikiPageId'>>;

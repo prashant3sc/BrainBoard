@@ -7,6 +7,32 @@ from issues.models import Issue
 from projects.models import Project
 
 
+PROCESS_CATEGORY_CHOICES = [
+    ("process",   "Process"),
+    ("standard",  "Standard"),
+    ("runbook",   "Runbook"),
+    ("checklist", "Checklist"),
+]
+
+TRIGGER_CONTEXT_CHOICES = [
+    ("issue_creation",    "Issue Creation"),
+    ("issue_view",        "Issue View"),
+    ("sprint_completion", "Sprint Completion"),
+    ("release_task",      "Release Task"),
+    ("incident",          "Incident"),
+    ("bug",               "Bug"),
+    ("pr_review",         "PR Review"),
+    ("definition_of_done","Definition of Done"),
+]
+
+ISSUE_TYPE_SCOPE_CHOICES = [
+    ("task",    "Task"),
+    ("subtask", "Subtask"),
+    ("bug",     "Bug"),
+    ("all",     "All"),
+]
+
+
 class WikiSpace(models.Model):
     """Top-level namespace within a project (Spaces → Pages → Sub-pages)."""
 
@@ -118,3 +144,65 @@ class TicketPageLink(models.Model):
 
     def __str__(self):
         return f"Issue#{self.issue_id} ↔ WikiPage#{self.wiki_page_id}"
+
+
+class ProcessDefinition(models.Model):
+    """
+    Marks a WikiPage as a process definition and attaches workflow metadata.
+    The wiki page remains the source of truth; this model stores routing/context
+    info so BrainBoard can surface the right process at the right moment.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    wiki_page = models.OneToOneField(
+        WikiPage,
+        on_delete=models.CASCADE,
+        related_name="process_definition",
+    )
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="process_definitions",
+    )
+    category = models.CharField(
+        max_length=20,
+        choices=PROCESS_CATEGORY_CHOICES,
+        default="process",
+    )
+    # JSON arrays stored as lists
+    trigger_contexts = models.JSONField(
+        default=list,
+        help_text="List of trigger context keys, e.g. ['issue_view', 'bug']",
+    )
+    issue_type_scope = models.JSONField(
+        default=list,
+        help_text="Issue types this applies to. Empty list = all types.",
+    )
+    short_description = models.TextField(blank=True, default="")
+    is_active = models.BooleanField(default=True)
+    priority = models.PositiveSmallIntegerField(default=0)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="created_process_definitions",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "process_definitions"
+        ordering = ["priority", "created_at"]
+
+    def __str__(self):
+        return f"[{self.get_category_display()}] {self.wiki_page.title}"
+
+    def matches_context(self, context: str, issue_type: str | None = None) -> bool:
+        """Return True if this definition should surface in the given context."""
+        if not self.is_active:
+            return False
+        if context not in (self.trigger_contexts or []):
+            return False
+        if self.issue_type_scope and issue_type:
+            return issue_type in self.issue_type_scope or "all" in self.issue_type_scope
+        return True

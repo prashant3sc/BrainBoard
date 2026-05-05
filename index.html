@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project Labels Wireframe</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --line: #d9e1ec;
+      --line-strong: #b7c4d6;
+      --text: #17324d;
+      --muted: #5f7692;
+      --accent: #e85d2a;
+      --accent-soft: #fff1eb;
+      --chip: #eef3f8;
+      --system: #dfe9ff;
+      --custom: #e8f7eb;
+      --warning: #fff6dd;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at top left, #ffffff 0, #f5f7fb 35%, #edf2f9 100%);
+      color: var(--text);
+      font-family: "Segoe UI", Arial, sans-serif;
+    }
+
+    .page {
+      max-width: 1480px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 22px;
+    }
+
+    .eyebrow {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 32px;
+      line-height: 1.1;
+    }
+
+    .subtext {
+      margin-top: 10px;
+      max-width: 720px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .primary-btn {
+      border: 0;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-weight: 600;
+      box-shadow: 0 8px 20px rgba(232, 93, 42, 0.18);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 18px;
+      padding: 0;
+      margin: 0 0 22px 0;
+      list-style: none;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .tabs li {
+      padding: 14px 0;
+      color: var(--muted);
+      position: relative;
+    }
+
+    .tabs .active {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .tabs .active::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -1px;
+      height: 3px;
+      border-radius: 99px;
+      background: var(--accent);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(880px, 1fr) 360px;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 12px 30px rgba(17, 40, 72, 0.06);
+    }
+
+    .panel-section {
+      padding: 20px 22px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-section:last-child {
+      border-bottom: 0;
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: 1.3fr auto auto auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .search,
+    .select,
+    .input,
+    .textarea {
+      border: 1px solid var(--line-strong);
+      background: #fff;
+      color: var(--text);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 14px;
+    }
+
+    .chips {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      border-radius: 999px;
+      padding: 9px 12px;
+      background: var(--chip);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .chip.active {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .section-meta {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 14px 8px;
+      border-top: 1px solid var(--line);
+      font-size: 14px;
+      vertical-align: middle;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    .label-cell {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .swatch {
+      width: 16px;
+      height: 16px;
+      border-radius: 5px;
+      flex: 0 0 auto;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .tag.system {
+      background: var(--system);
+      color: #3d5ea8;
+    }
+
+    .tag.custom {
+      background: var(--custom);
+      color: #256640;
+    }
+
+    .usage {
+      font-weight: 700;
+    }
+
+    .linkish {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .empty-card {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 18px;
+      padding: 18px;
+      border: 1px dashed var(--line-strong);
+      border-radius: 16px;
+      background: linear-gradient(180deg, #fbfcfe, #f5f8fc);
+    }
+
+    .empty-title {
+      margin: 0 0 8px 0;
+      font-size: 17px;
+    }
+
+    .empty-copy {
+      margin: 0 0 14px 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .suggestion {
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .callout {
+      background: var(--warning);
+      border: 1px solid #f0d98c;
+      border-radius: 14px;
+      padding: 14px;
+      color: #735b16;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .drawer {
+      background: #fcfdff;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: 0 12px 30px rgba(17, 40, 72, 0.08);
+      position: sticky;
+      top: 24px;
+    }
+
+    .drawer h2 {
+      margin: 0 0 6px 0;
+      font-size: 22px;
+    }
+
+    .drawer-copy {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+      margin-bottom: 18px;
+    }
+
+    .field {
+      margin-bottom: 16px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 7px;
+    }
+
+    .textarea {
+      min-height: 88px;
+      resize: none;
+      width: 100%;
+    }
+
+    .palette {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .palette .swatch {
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      border: 2px solid transparent;
+    }
+
+    .palette .selected {
+      border-color: #142f48;
+      box-shadow: 0 0 0 2px #fff inset;
+    }
+
+    .preview {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+      background: #fff;
+    }
+
+    .preview-label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .preview-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .tiny {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+      margin-top: 8px;
+    }
+
+    .drawer-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .secondary-btn {
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--line-strong);
+      background: #fff;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .helper-list {
+      margin: 18px 0 0 0;
+      padding-left: 18px;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 13px;
+    }
+
+    @media (max-width: 1180px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .drawer {
+        position: static;
+      }
+    }
+
+    @media (max-width: 860px) {
+      .toolbar,
+      .empty-card {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar {
+        flex-direction: column;
+        gap: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Project Settings / MediConnect</div>
+        <h1>Project Labels</h1>
+        <div class="subtext">
+          Labels help teams organize work consistently. The page separates default system labels from team-created labels, shows usage, and keeps custom label creation fast.
+        </div>
+      </div>
+      <button class="primary-btn">+ Create label</button>
+    </div>
+
+    <ul class="tabs">
+      <li>Members</li>
+      <li class="active">Labels</li>
+      <li>Compliance</li>
+      <li>Templates</li>
+      <li>Processes</li>
+    </ul>
+
+    <div class="layout">
+      <div class="panel">
+        <div class="panel-section">
+          <div class="toolbar">
+            <input class="search" value="Search labels by name or description" aria-label="Search labels">
+            <div class="chips">
+              <div class="chip active">All</div>
+              <div class="chip">System</div>
+              <div class="chip">Custom</div>
+              <div class="chip">Archived</div>
+            </div>
+            <div class="select">Sort: Most used</div>
+            <div class="select">Status: Active</div>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <div class="section-head">
+            <div>
+              <div class="section-title">System labels</div>
+              <div class="section-meta">Created automatically for every project. Editable with restrictions.</div>
+            </div>
+            <div class="section-meta">4 labels</div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Label</th>
+                <th>Type</th>
+                <th>Description</th>
+                <th>Usage</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <div class="label-cell">
+                    <div class="swatch" style="background:#dc4c3e"></div>
+                    <strong>bug</strong>
+                  </div>
+                </td>
+                <td><span class="tag system">System</span></td>
+                <td>Issue representing broken or incorrect behavior.</td>
+                <td class="usage">182</td>
+                <td><span class="linkish">Edit</span> · Archive</td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="label-cell">
+                    <div class="swatch" style="background:#4b7bec"></div>
+                    <strong>feature</strong>
+                  </div>
+                </td>
+                <td><span class="tag system">System</span></td>
+                <td>New functionality or enhancement request.</td>
+                <td class="usage">126</td>
+                <td><span class="linkish">Edit</span> · Archive</td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="label-cell">
+                    <div class="swatch" style="background:#f0a202"></div>
+                    <strong>blocked</strong>
+                  </div>
+                </td>
+                <td><span class="tag system">System</span></td>
+                <td>Work that cannot proceed until dependency clears.</td>
+                <td class="usage">31</td>
+                <td><span class="linkish">Edit</span> · Archive</td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="label-cell">
+                    <div class="swatch" style="background:#7b61ff"></div>
+                    <strong>urgent</strong>
+                  </div>
+                </td>
+                <td><span class="tag system">System</span></td>
+                <td>High-priority work requiring quick attention.</td>
+                <td class="usage">18</td>
+                <td><span class="linkish">Edit</span> · Archive</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="panel-section">
+          <div class="section-head">
+            <div>
+              <div class="section-title">Custom labels</div>
+              <div class="section-meta">Team-specific labels for workflows, modules, or internal conventions.</div>
+            </div>
+            <div class="section-meta">12 active, 3 archived</div>
+          </div>
+
+          <div class="empty-card">
+            <div>
+              <h3 class="empty-title">Suggested starter labels</h3>
+              <p class="empty-copy">
+                Help teams avoid a blank-state setup. Recommended labels should be one-click add-ons based on the project template or domain.
+              </p>
+              <div class="suggestions">
+                <div class="suggestion">+ frontend</div>
+                <div class="suggestion">+ backend</div>
+                <div class="suggestion">+ api</div>
+                <div class="suggestion">+ qa</div>
+                <div class="suggestion">+ design</div>
+                <div class="suggestion">+ security-review</div>
+              </div>
+            </div>
+            <div class="callout">
+              Teams usually struggle when labels start as free-form inputs. This area nudges them toward a cleaner naming system before duplicate or low-value labels spread across tickets.
+            </div>
+          </div>
+
+          <table style="margin-top: 18px;">
+            <thead>
+              <tr>
+                <th>Label</th>
+                <th>Type</th>
+                <th>Description</th>
+                <th>Usage</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <div class="label-cell">
+                    <div class="swatch" style="background:#16a085"></div>
+                    <strong>frontend</strong>
+                  </div>
+                </td>
+                <td><span class="tag custom">Custom</span></td>
+                <td>UI-facing work across patient and admin portals.</td>
+                <td class="usage">44</td>
+                <td><span class="linkish">Edit</span> · Merge · Archive</td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="label-cell">
+                    <div class="swatch" style="background:#2d98da"></div>
+                    <strong>partner-api</strong>
+                  </div>
+                </td>
+                <td><span class="tag custom">Custom</span></td>
+                <td>External integration work with partner services.</td>
+                <td class="usage">21</td>
+                <td><span class="linkish">Edit</span> · Merge · Archive</td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="label-cell">
+                    <div class="swatch" style="background:#8e44ad"></div>
+                    <strong>needs-legal-review</strong>
+                  </div>
+                </td>
+                <td><span class="tag custom">Custom</span></td>
+                <td>Tickets that require legal or policy confirmation.</td>
+                <td class="usage">7</td>
+                <td><span class="linkish">Edit</span> · Merge · Archive</td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="label-cell">
+                    <div class="swatch" style="background:#95a5a6"></div>
+                    <strong>legacy-flow</strong>
+                  </div>
+                </td>
+                <td><span class="tag custom">Custom</span></td>
+                <td>Legacy workflow tasks still pending migration.</td>
+                <td class="usage">0</td>
+                <td><span class="linkish">Edit</span> · Delete</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <aside class="drawer">
+        <h2>Create label</h2>
+        <div class="drawer-copy">
+          Keep creation quick, but add enough guidance to prevent duplicates and low-quality labels.
+        </div>
+
+        <div class="field">
+          <label>Label name</label>
+          <input class="input" value="needs-legal-review" aria-label="Label name">
+          <div class="tiny">Naming suggestion: use short nouns or states. Duplicate check should ignore case and punctuation variations.</div>
+        </div>
+
+        <div class="field">
+          <label>Description</label>
+          <textarea class="textarea" aria-label="Description">Use this for work items that need legal, regulatory, or policy validation before release.</textarea>
+        </div>
+
+        <div class="field">
+          <label>Color</label>
+          <div class="palette">
+            <div class="swatch" style="background:#dc4c3e"></div>
+            <div class="swatch" style="background:#f0a202"></div>
+            <div class="swatch" style="background:#16a085"></div>
+            <div class="swatch" style="background:#2d98da"></div>
+            <div class="swatch selected" style="background:#8e44ad"></div>
+            <div class="swatch" style="background:#6c5ce7"></div>
+            <div class="swatch" style="background:#34495e"></div>
+            <div class="swatch" style="background:#95a5a6"></div>
+          </div>
+        </div>
+
+        <div class="preview">
+          <div class="preview-label">Preview</div>
+          <div class="preview-row">
+            <div class="tag custom" style="background:#f0e6f8; color:#6d2f8e;">
+              <span class="swatch" style="width:10px;height:10px;border-radius:99px;background:#8e44ad;"></span>
+              needs-legal-review
+            </div>
+            <span class="section-meta">Visible on tickets, filters, and reports</span>
+          </div>
+        </div>
+
+        <div class="drawer-actions">
+          <button class="primary-btn" style="padding:12px 16px;">Create label</button>
+          <button class="secondary-btn">Cancel</button>
+        </div>
+
+        <ul class="helper-list">
+          <li>Show similar labels before save, for example `legal-review` or `regulatory-review`.</li>
+          <li>Allow `Create and add another` for power users managing setup in bulk.</li>
+          <li>Default to archive over delete once a label is already used in tickets.</li>
+        </ul>
+      </aside>
+    </div>
+  </div>
+</body>
+</html>
