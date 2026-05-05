@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from wiki.models import TicketPageLink, WikiPage, WikiPageVersion, WikiSpace
+from wiki.models import ProcessDefinition, TicketPageLink, WikiPage, WikiPageVersion, WikiSpace
 
 
 @admin.register(WikiSpace)
@@ -24,3 +24,11 @@ class WikiPageVersionAdmin(admin.ModelAdmin):
 @admin.register(TicketPageLink)
 class TicketPageLinkAdmin(admin.ModelAdmin):
     list_display = ["issue", "wiki_page", "linked_by", "created_at"]
+
+
+@admin.register(ProcessDefinition)
+class ProcessDefinitionAdmin(admin.ModelAdmin):
+    list_display  = ["wiki_page", "project", "category", "is_active", "priority", "created_at"]
+    list_filter   = ["category", "is_active", "project"]
+    search_fields = ["wiki_page__title"]
+    readonly_fields = ["created_at", "updated_at"]

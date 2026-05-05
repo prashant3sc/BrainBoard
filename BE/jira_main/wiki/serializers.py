@@ -1,6 +1,15 @@
 from rest_framework import serializers
 
-from wiki.models import TicketPageLink, WikiPage, WikiPageVersion, WikiSpace
+from wiki.models import (
+    ProcessDefinition,
+    PROCESS_CATEGORY_CHOICES,
+    TRIGGER_CONTEXT_CHOICES,
+    ISSUE_TYPE_SCOPE_CHOICES,
+    TicketPageLink,
+    WikiPage,
+    WikiPageVersion,
+    WikiSpace,
+)
 
 
 class WikiSpaceSerializer(serializers.ModelSerializer):
@@ -148,6 +157,88 @@ class LinkedWikiPageSerializer(serializers.Serializer):
     id    = serializers.UUIDField()
     title = serializers.CharField()
     icon  = serializers.CharField(allow_null=True, default=None)
+
+
+class ProcessDefinitionSerializer(serializers.ModelSerializer):
+    """Read serializer — includes wiki page title so clients don't need a second request."""
+    projectId     = serializers.PrimaryKeyRelatedField(source="project", read_only=True)
+    wikiPageId    = serializers.PrimaryKeyRelatedField(source="wiki_page", read_only=True)
+    wikiPageTitle = serializers.CharField(source="wiki_page.title", read_only=True)
+
+    class Meta:
+        model = ProcessDefinition
+        fields = [
+            "id",
+            "projectId",
+            "wikiPageId",
+            "wikiPageTitle",
+            "category",
+            "trigger_contexts",
+            "issue_type_scope",
+            "short_description",
+            "is_active",
+            "priority",
+            "created_at",
+            "updated_at",
+        ]
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        rep["triggerContexts"]  = rep.pop("trigger_contexts")
+        rep["issueTypeScope"]   = rep.pop("issue_type_scope")
+        rep["shortDescription"] = rep.pop("short_description")
+        rep["isActive"]         = rep.pop("is_active")
+        rep["createdAt"]        = rep.pop("created_at")
+        rep["updatedAt"]        = rep.pop("updated_at")
+        rep["wikiPageId"]       = str(rep["wikiPageId"])
+        rep["projectId"]        = str(rep["projectId"])
+        rep["id"]               = str(rep["id"])
+        return rep
+
+
+_VALID_CONTEXTS = {c[0] for c in TRIGGER_CONTEXT_CHOICES}
+_VALID_TYPES    = {t[0] for t in ISSUE_TYPE_SCOPE_CHOICES}
+
+
+class ProcessDefinitionWriteSerializer(serializers.ModelSerializer):
+    wikiPageId = serializers.UUIDField(write_only=True)
+
+    class Meta:
+        model = ProcessDefinition
+        fields = [
+            "wikiPageId",
+            "category",
+            "trigger_contexts",
+            "issue_type_scope",
+            "short_description",
+            "is_active",
+            "priority",
+        ]
+
+    def validate_trigger_contexts(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Must be a list.")
+        bad = [v for v in value if v not in _VALID_CONTEXTS]
+        if bad:
+            raise serializers.ValidationError(f"Invalid context(s): {bad}")
+        return value
+
+    def validate_issue_type_scope(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Must be a list.")
+        bad = [v for v in value if v not in _VALID_TYPES]
+        if bad:
+            raise serializers.ValidationError(f"Invalid issue type(s): {bad}")
+        return value
+
+    def validate(self, attrs):
+        wiki_page_id = attrs.pop("wikiPageId", None)
+        if wiki_page_id:
+            try:
+                attrs["wiki_page"] = WikiPage.objects.get(pk=wiki_page_id)
+            except WikiPage.DoesNotExist:
+                raise serializers.ValidationError({"wikiPageId": "Wiki page not found."})
+        return attrs
 
 
 class IssueWikiLinkSerializer(serializers.ModelSerializer):

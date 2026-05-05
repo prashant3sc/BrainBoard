@@ -7,9 +7,11 @@ from rest_framework.views import APIView
 
 from projects.models import Project
 from wiki.filters import WikiPageFilter
-from wiki.models import TicketPageLink, WikiPage, WikiPageVersion, WikiSpace
+from wiki.models import ProcessDefinition, TicketPageLink, WikiPage, WikiPageVersion, WikiSpace
 from wiki.serializers import (
     IssueWikiLinkSerializer,
+    ProcessDefinitionSerializer,
+    ProcessDefinitionWriteSerializer,
     TicketPageLinkSerializer,
     WikiPageCreateSerializer,
     WikiPageSerializer,
@@ -320,3 +322,135 @@ class KBAnalyticsView(APIView):
             "top_contributors": top_contributors,
             "recent_activity": recent_activity,
         })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Process Definitions
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ProjectProcessDefinitionListView(APIView):
+    """
+    GET  /projects/:projectId/process-definitions
+         — list all (or ?active_only=true) for admins/PMs; active-only for others
+    POST /projects/:projectId/process-definitions
+         — mark a wiki page as a process definition (admin/pm only)
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def _get_project(self, project_id):
+        try:
+            return Project.objects.get(pk=project_id)
+        except Project.DoesNotExist:
+            return None
+
+    def get(self, request, project_id):
+        project = self._get_project(project_id)
+        if not project:
+            return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        qs = ProcessDefinition.objects.filter(project=project).select_related("wiki_page")
+        active_only = request.query_params.get("active_only", "").lower() == "true"
+        if active_only or not request.user.can_manage_projects:
+            qs = qs.filter(is_active=True)
+
+        return Response(ProcessDefinitionSerializer(qs, many=True).data)
+
+    def post(self, request, project_id):
+        if not request.user.can_manage_projects:
+            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
+        project = self._get_project(project_id)
+        if not project:
+            return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = ProcessDefinitionWriteSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        wiki_page = serializer.validated_data.get("wiki_page")
+        if wiki_page and wiki_page.project_id != project.id:
+            return Response(
+                {"detail": "Wiki page does not belong to this project."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        pd = serializer.save(project=project, created_by=request.user)
+        return Response(ProcessDefinitionSerializer(pd).data, status=status.HTTP_201_CREATED)
+
+
+class ProcessDefinitionDetailView(APIView):
+    """
+    GET    /process-definitions/:pk
+    PATCH  /process-definitions/:pk  (admin/pm only)
+    DELETE /process-definitions/:pk  (admin/pm only)
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def _get_pd(self, pk):
+        try:
+            return ProcessDefinition.objects.select_related("wiki_page", "project").get(pk=pk)
+        except ProcessDefinition.DoesNotExist:
+            return None
+
+    def get(self, request, pk):
+        pd = self._get_pd(pk)
+        if not pd:
+            return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(ProcessDefinitionSerializer(pd).data)
+
+    def patch(self, request, pk):
+        if not request.user.can_manage_projects:
+            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
+        pd = self._get_pd(pk)
+        if not pd:
+            return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        serializer = ProcessDefinitionWriteSerializer(pd, data=request.data, partial=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        pd = serializer.save()
+        return Response(ProcessDefinitionSerializer(pd).data)
+
+    def delete(self, request, pk):
+        if not request.user.can_manage_projects:
+            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
+        pd = self._get_pd(pk)
+        if not pd:
+            return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        pd.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ProcessDefinitionMatchView(APIView):
+    """
+    GET /projects/:projectId/process-definitions/match
+        ?context=<trigger_context>
+        &issue_type=<task|subtask|bug>   (optional)
+
+    Returns active process definitions that apply to the given context.
+    Used by the frontend to surface relevant processes inline.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, project_id):
+        try:
+            project = Project.objects.get(pk=project_id)
+        except Project.DoesNotExist:
+            return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        context    = request.query_params.get("context", "")
+        issue_type = request.query_params.get("issue_type", "")
+
+        if not context:
+            return Response({"detail": "?context= is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        qs = ProcessDefinition.objects.filter(
+            project=project,
+            is_active=True,
+        ).select_related("wiki_page")
+
+        matched = [pd for pd in qs if pd.matches_context(context, issue_type or None)]
+        matched.sort(key=lambda x: (x.priority, str(x.created_at)))
+
+        return Response(ProcessDefinitionSerializer(matched, many=True).data)

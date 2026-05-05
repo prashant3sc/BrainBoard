@@ -4442,3 +4442,150 @@
 .dark .im-tpl-chip { background: var(--bb-surface-raised, #1E2028); }
 .dark .im-tpl-chip:hover { background: rgba(231,80,38,.12); }
 
+/* ════════════════════════════════════════════════
+   Process Definition Panel  (inline surfacing)
+════════════════════════════════════════════════ */
+
+.pd-panel {
+  border: 1px solid var(--bb-border);
+  border-radius: 8px;
+  background: var(--bb-surface-raised, var(--bb-tbl-wrap-bg));
+  margin: 12px 0 4px;
+  overflow: hidden;
+}
+
+.pd-panel-toggle {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: 9px 13px; background: none; border: none;
+  cursor: pointer; font-family: inherit;
+}
+
+.pd-panel-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--bb-text-muted);
+}
+
+.pd-chevron { transition: transform .15s; }
+.pd-chevron--open { transform: rotate(180deg); }
+
+.pd-panel-body { padding: 6px 10px 10px; display: flex; flex-direction: column; gap: 7px; }
+
+.pd-card {
+  border: 1px solid var(--bb-border); border-radius: 7px;
+  background: var(--bb-card-bg, #fff); padding: 9px 12px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.dark .pd-card { background: var(--bb-surface-raised, #1E2028); }
+
+.pd-card-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+.pd-category-badge {
+  font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 20px;
+  background: #EAF0FB; color: #3D6CC0; letter-spacing: .02em;
+}
+.dark .pd-category-badge { background: rgba(61,108,192,.18); color: #8BAAE8; }
+
+.pd-open-btn {
+  display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 500;
+  padding: 3px 9px; border-radius: 5px; border: 1px solid var(--bb-border);
+  background: none; color: var(--bb-text-secondary); cursor: pointer;
+  font-family: inherit; transition: border-color .1s, color .1s;
+  flex-shrink: 0;
+}
+.pd-open-btn:hover { border-color: #E75026; color: #E75026; }
+
+.pd-card-title { font-size: 13px; font-weight: 600; color: var(--bb-text-primary); }
+.pd-card-desc  { font-size: 12px; color: var(--bb-text-muted); line-height: 1.45; }
+
+/* compact variant */
+.pd-panel--compact { border-radius: 6px; margin: 8px 0 2px; }
+.pd-compact-header { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 7px 10px; }
+.pd-compact-label {
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--bb-text-muted); white-space: nowrap;
+}
+.pd-compact-list { display: flex; flex-wrap: wrap; gap: 5px; }
+.pd-compact-link {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 500; padding: 3px 9px; border-radius: 14px;
+  border: 1px solid var(--bb-border); background: none;
+  color: var(--bb-text-secondary); cursor: pointer; font-family: inherit;
+  transition: border-color .1s, color .1s;
+}
+.pd-compact-link:hover { border-color: #E75026; color: #E75026; }
+.pd-compact-icon { font-size: 11px; }
+
+/* ── ProcessDefinitionConfig (project settings) ── */
+
+.pd-check-wrap { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+
+.pd-category-pill {
+  display: inline-block; font-size: 10.5px; font-weight: 600;
+  padding: 2px 8px; border-radius: 12px;
+  background: #EAF0FB; color: #3D6CC0; flex-shrink: 0;
+}
+.dark .pd-category-pill { background: rgba(61,108,192,.18); color: #8BAAE8; }
+
+.pd-context-chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 16px 6px; }
+
+.pd-context-chip {
+  font-size: 10.5px; padding: 2px 7px; border-radius: 10px;
+  background: var(--bb-surface-raised, #F4F5F7); color: var(--bb-text-muted);
+  border: 1px solid var(--bb-border); white-space: nowrap;
+}
+
+.cc-row--inactive { opacity: .55; }
+.cc-row-inactive-badge {
+  font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 8px;
+  background: #F4F5F7; color: var(--bb-text-muted); margin-left: auto;
+}
+.dark .cc-row-inactive-badge { background: rgba(255,255,255,.07); }
+
+.cc-section { /* used by ProcessDefinitionConfig as root wrapper */ }
+
+/* extra button + error variants used by ProcessDefinitionConfig */
+.cc-btn-primary {
+  padding: 7px 14px; background: #E75026; color: #fff; border: none;
+  border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer;
+  font-family: inherit; transition: background .12s; white-space: nowrap;
+}
+.cc-btn-primary:hover:not(:disabled) { background: #C73D16; }
+.cc-btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+.cc-btn-secondary {
+  padding: 6px 12px; background: none; border: 1px solid var(--bb-border);
+  border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer;
+  font-family: inherit; color: var(--bb-text-secondary); transition: background .12s;
+}
+.cc-btn-secondary:hover { background: var(--bb-tbl-row-hover); }
+
+.cc-btn-ghost {
+  padding: 4px 10px; background: none; border: none; border-radius: 5px;
+  font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit;
+  color: var(--bb-text-secondary); transition: background .1s, color .1s;
+}
+.cc-btn-ghost:hover { background: var(--bb-tbl-row-hover); color: var(--bb-text-primary); }
+.cc-btn-ghost--danger:hover { color: #E24B4A; background: rgba(226,75,74,.08); }
+
+.cc-btn-danger {
+  padding: 4px 10px; background: #E24B4A; color: #fff; border: none;
+  border-radius: 5px; font-size: 12px; font-weight: 500; cursor: pointer;
+  font-family: inherit; transition: background .1s;
+}
+.cc-btn-danger:hover:not(:disabled) { background: #C73D16; }
+.cc-btn-danger:disabled { opacity: .6; cursor: not-allowed; }
+
+.cc-error {
+  font-size: 12.5px; color: #E24B4A; padding: 8px 12px;
+  background: rgba(226,75,74,.07); border-radius: 6px; margin-bottom: 10px;
+}
+
+.cc-confirm-text { font-size: 12.5px; color: var(--bb-text-secondary); padding: 0 4px; }
+
+.cc-section-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; margin-bottom: 18px;
+}
+.cc-section-title { font-size: 15px; font-weight: 600; color: var(--bb-page-title); margin: 0 0 4px; }
+.cc-section-desc  { font-size: 13px; color: var(--bb-page-subtitle); margin: 0; line-height: 1.55; }
+
