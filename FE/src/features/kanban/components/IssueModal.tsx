@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { AxiosError } from 'axios';
 import { issuesApi } from '@/api/issues';
 import { useRBAC } from '@/hooks/useRBAC';
 import { useProjectMembers } from '@/features/projects/useProjects';
@@ -181,6 +182,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
   const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [parentSearch, setParentSearch] = useState('');
   const [openDD,       setOpenDD]       = useState<string | null>(null);
+  const [saveError,    setSaveError]    = useState<string | null>(null);
   const [wikiPickerOpen, setWikiPickerOpen] = useState(false);
   const [wikiSearch,     setWikiSearch]     = useState('');
   const assigneeRef = useRef<HTMLDivElement>(null);
@@ -318,6 +320,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
     setParentErr(false);
     setParentSearch('');
     setOpenDD(null);
+    setSaveError(null);
     setActiveTemplateId(null);
     if (issue?.sprintId) setDestination('sprint');
     else setDestination('backlog');
@@ -367,7 +370,18 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
         sprintId: destination === 'sprint' ? activeSprintId : null,
         labelIds,
       }),
-    onSuccess: invalidateAndClose,
+    onSuccess: () => { setSaveError(null); invalidateAndClose(); },
+    onError: (err) => {
+      const ax = err as AxiosError<Record<string, string | string[]>>;
+      const data = ax?.response?.data;
+      let msg = 'Failed to save. Please try again.';
+      if (data && typeof data === 'object') {
+        const raw = (data as any).status ?? (data as any).detail ?? Object.values(data)[0];
+        if (Array.isArray(raw)) msg = String(raw[0] ?? msg);
+        else if (typeof raw === 'string') msg = raw;
+      }
+      setSaveError(msg);
+    },
   });
 
   const deleteMut = useMutation({
@@ -831,7 +845,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
 
               {/* ── Compliance — left col, below Location ── */}
               {isEdit && issue?.id && (
-                <ComplianceSection issueId={issue.id} readOnly={isReadOnly || !canEdit} />
+                <ComplianceSection issueId={issue.id} projectId={projectId} readOnly={isReadOnly || !canEdit} />
               )}
 
               {/* ── Comments — left col, below Compliance ── */}
@@ -862,7 +876,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
                           <div
                             key={col.id}
                             className={`im-ddi${status === col.id ? ' im-ddi-sel' : ''}`}
-                            onClick={() => { setStatus(col.id as IssueStatus); setOpenDD(null); }}
+                            onClick={() => { setStatus(col.id as IssueStatus); setOpenDD(null); setSaveError(null); }}
                           >
                             <StatusDot status={col.id} />
                             {STATUS_CONFIG[col.id]?.label ?? col.label}
@@ -1354,6 +1368,22 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
 
             </div>
           </div>
+
+          {/* ── Save error banner ── */}
+          {saveError && (
+            <div className="im-save-err-banner">
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
+                <circle cx="7" cy="7" r="6" stroke="#DE350B" strokeWidth="1.4"/>
+                <path d="M7 4v3M7 9.5v.5" stroke="#DE350B" strokeWidth="1.4" strokeLinecap="round"/>
+              </svg>
+              <span>
+                {saveError}
+                {/compliance/i.test(saveError) && (
+                  <span className="im-save-err-hint"> See the Compliance section above.</span>
+                )}
+              </span>
+            </div>
+          )}
 
           {/* ── Footer ── */}
           <div className="im-footer">

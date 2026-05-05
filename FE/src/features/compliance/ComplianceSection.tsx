@@ -6,6 +6,7 @@ import useAuthStore from '@/store/useAuthStore';
 
 interface Props {
   issueId: string;
+  projectId?: string;
   readOnly?: boolean;
 }
 
@@ -120,7 +121,7 @@ function CheckRow({
   );
 }
 
-export function ComplianceSection({ issueId, readOnly = false }: Props) {
+export function ComplianceSection({ issueId, projectId, readOnly = false }: Props) {
   const user = useAuthStore((s) => s.user);
   const qc = useQueryClient();
 
@@ -132,7 +133,12 @@ export function ComplianceSection({ issueId, readOnly = false }: Props) {
   const { mutate: updateCheck } = useMutation({
     mutationFn: ({ checkId, status, note }: { checkId: string; status: string; note: string }) =>
       complianceApi.updateCheck(issueId, checkId, { status, note }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['compliance-checks', issueId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['compliance-checks', issueId] });
+      if (projectId) {
+        qc.invalidateQueries({ queryKey: ['issues', projectId] });
+      }
+    },
   });
 
   if (isLoading) {

@@ -251,7 +251,11 @@ class IssueUpdateSerializer(serializers.ModelSerializer):
                 if len(names) > 3:
                     label += f" and {len(names) - 3} more"
                 raise serializers.ValidationError({
-                    "status": f"Cannot move to '{new_status}' — compliance checks pending: {label}."
+                    "status": (
+                        f"Cannot move to '{new_status}'. "
+                        f"Pending compliance checks: {label}. "
+                        f"Complete them in the Compliance section of this issue."
+                    )
                 })
 
         # Handle assignee change — distinguish "not sent" from "sent as null"

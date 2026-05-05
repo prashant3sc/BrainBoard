@@ -163,7 +163,7 @@ export function ComplianceConfig({ projectId }: Props) {
     mutationFn: (data: typeof EMPTY_FORM) =>
       complianceApi.createTemplate(projectId, {
         ...data,
-        blocksOn: data.blocks_on.join(','),
+        blocks_on: data.blocks_on.join(','),
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['compliance-templates', projectId] });
@@ -175,7 +175,7 @@ export function ComplianceConfig({ projectId }: Props) {
     mutationFn: ({ id, data }: { id: string; data: typeof EMPTY_FORM }) =>
       complianceApi.updateTemplate(projectId, id, {
         ...data,
-        blocksOn: data.blocks_on.join(','),
+        blocks_on: data.blocks_on.join(','),
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['compliance-templates', projectId] });
