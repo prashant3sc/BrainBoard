@@ -226,6 +226,87 @@ class LlmGenerateResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Context-aware issue analysis v2 (POST /analyze-issue-v2)
+# ---------------------------------------------------------------------------
+
+class TeamMemberContext(BaseModel):
+    name: str
+    email: str = ""
+    role: str = ""
+    active_issues: int = 0
+    sprint_issues: int = 0
+
+
+class SprintContext(BaseModel):
+    name: str = ""
+    goal: str = ""
+    status: str = "active"
+    todo: int = 0
+    in_progress: int = 0
+    review: int = 0
+    done: int = 0
+
+
+class SimilarIssueContext(BaseModel):
+    ticket_id: str = ""
+    title: str
+    issue_type: str = "task"
+    labels: List[str] = []
+    assignee: str = ""
+    status: str = ""
+    story_points: Optional[float] = None
+
+
+class AnalyzeIssueV2Request(BaseModel):
+    heading: str
+    description: str
+    project_labels: List[str] = []
+    supported_issue_types: List[str] = ["task", "subtask", "bug"]
+    team_members: List[TeamMemberContext] = []
+    sprint_summary: Optional[SprintContext] = None
+    similar_issues: List[SimilarIssueContext] = []
+
+
+class StoryPointSuggestion(BaseModel):
+    value: float
+    confidence: str
+    reason: str
+
+
+class IssueTypeSuggestion(BaseModel):
+    value: str
+    confidence: str
+    reason: str
+
+
+class LabelsSuggestion(BaseModel):
+    values: List[str]
+    confidence: str
+    reason: str
+
+
+class AssigneeSuggestion(BaseModel):
+    name: str
+    confidence: str
+    reason: str
+
+
+class DuplicateSuggestion(BaseModel):
+    status: str  # "yes" | "maybe" | "no"
+    matching_ticket_ids: List[str] = []
+    confidence: str
+    reason: str
+
+
+class AnalyzeIssueV2Response(BaseModel):
+    story_points: StoryPointSuggestion
+    issue_type: IssueTypeSuggestion
+    labels: LabelsSuggestion
+    assignee: AssigneeSuggestion
+    duplicate: DuplicateSuggestion
+
+
+# ---------------------------------------------------------------------------
 # Sprint Retro (POST /sprint-retro)
 # ---------------------------------------------------------------------------
 

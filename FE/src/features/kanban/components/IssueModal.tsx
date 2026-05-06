@@ -199,21 +199,24 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
   const unlinkWikiMut = useUnlinkTicket();
   const linkedPageIds = new Set(issueWikiLinks.map((l) => l.wikiPage.id));
 
-  /* ── Mock AI state ── */
-  // ── Real AI analysis ──────────────────────────────────────────────────────
+  // ── AI analysis ──────────────────────────────────────────────────────────
   const { analysis, isLoading: aiLoading, error: aiError, analyze, analyzeDraft, clear: clearAI } = useAIAnalysis();
   const [expandedCards,  setExpandedCards]  = useState<Set<number>>(new Set());
   const [appliedCards,   setAppliedCards]   = useState<Set<number>>(new Set());
   const [dismissedCards, setDismissedCards] = useState<Set<number>>(new Set());
 
-  // Cards: 0=StoryPoints, 1=Labels, 2=Assignee (only rendered if API returns them)
+  // Cards: 0=StoryPoints, 1=IssueType, 2=Labels, 3=Assignee, 4=Duplicate (warning only)
   const aiCards = analysis ? [
     { id: 0, available: true },
-    { id: 1, available: (analysis.labels?.length ?? 0) > 0 },
-    { id: 2, available: analysis.recommended_user !== null },
+    { id: 1, available: !!analysis.issue_type?.value },
+    { id: 2, available: (analysis.labels?.values?.length ?? 0) > 0 },
+    { id: 3, available: analysis.assignee?.user !== null && analysis.assignee?.user !== undefined },
+    { id: 4, available: analysis.duplicate?.status !== 'no' },
   ].filter(c => c.available) : [];
 
-  const activeCardCount = aiCards.filter(c => !appliedCards.has(c.id) && !dismissedCards.has(c.id)).length;
+  // Duplicate card (4) is informational — not counted in "apply all"
+  const applyableCards = aiCards.filter(c => c.id !== 4);
+  const activeCardCount = applyableCards.filter(c => !appliedCards.has(c.id) && !dismissedCards.has(c.id)).length;
 
   function resetAI() {
     clearAI();
@@ -228,10 +231,9 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
       await analyze(issue.id);
     } else {
       await analyzeDraft({
-        title:      title.trim(),
+        title:       title.trim(),
         description: desc.trim(),
-        labels:     projectLabels.filter(l => labelIds.includes(l.id)).map(l => l.name),
-        project_id: projectId,
+        project_id:  projectId,
       });
     }
   }
@@ -247,13 +249,16 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
 
   function applyCard(idx: number) {
     if (!analysis) return;
-    if (idx === 0) setPoints(analysis.analysis.story_points);
-    if (idx === 1) {
-      const suggested = projectLabels.filter(l => analysis.labels.some(n => l.name.toLowerCase() === n.toLowerCase())).map(l => l.id);
+    if (idx === 0) setPoints(analysis.story_points.value);
+    if (idx === 1) setIssueType(analysis.issue_type.value as IssueType);
+    if (idx === 2) {
+      const suggested = projectLabels
+        .filter(l => analysis.labels.values.some(n => l.name.toLowerCase() === n.toLowerCase()))
+        .map(l => l.id);
       setLabelIds(suggested);
     }
-    if (idx === 2 && analysis.recommended_user) {
-      setAssigneeId(analysis.recommended_user.id);
+    if (idx === 3 && analysis.assignee?.user) {
+      setAssigneeId(analysis.assignee.user.id);
     }
     setAppliedCards(prev => new Set([...prev, idx]));
     setExpandedCards(prev => { const n = new Set(prev); n.delete(idx); return n; });
@@ -266,16 +271,19 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
 
   function applyAllCards() {
     if (!analysis) return;
-    const remaining = aiCards.map(c => c.id).filter(i => !appliedCards.has(i) && !dismissedCards.has(i));
-    if (remaining.includes(0)) setPoints(analysis.analysis.story_points);
-    if (remaining.includes(1)) {
-      const suggested = projectLabels.filter(l => analysis.labels.some(n => l.name.toLowerCase() === n.toLowerCase())).map(l => l.id);
+    const remaining = applyableCards.map(c => c.id).filter(i => !appliedCards.has(i) && !dismissedCards.has(i));
+    if (remaining.includes(0)) setPoints(analysis.story_points.value);
+    if (remaining.includes(1)) setIssueType(analysis.issue_type.value as IssueType);
+    if (remaining.includes(2)) {
+      const suggested = projectLabels
+        .filter(l => analysis.labels.values.some(n => l.name.toLowerCase() === n.toLowerCase()))
+        .map(l => l.id);
       setLabelIds(suggested);
     }
-    if (remaining.includes(2) && analysis.recommended_user) {
-      setAssigneeId(analysis.recommended_user.id);
+    if (remaining.includes(3) && analysis.assignee?.user) {
+      setAssigneeId(analysis.assignee.user.id);
     }
-    setAppliedCards(new Set(aiCards.map(c => c.id).filter(i => !dismissedCards.has(i))));
+    setAppliedCards(new Set(applyableCards.map(c => c.id).filter(i => !dismissedCards.has(i))));
     setExpandedCards(new Set());
   }
 
@@ -517,6 +525,25 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
     );
   }
 
+  /* ── Confidence pill ── */
+  function ConfidencePill({ level }: { level: string }) {
+    const colors: Record<string, { bg: string; text: string }> = {
+      high:   { bg: '#E3FCEF', text: '#006644' },
+      medium: { bg: '#FFF8EC', text: '#B7650B' },
+      low:    { bg: '#F4F5F7', text: '#6B778C' },
+    };
+    const c = colors[level] ?? colors.low;
+    return (
+      <span style={{
+        fontSize: 10, fontWeight: 600, letterSpacing: '0.04em',
+        padding: '1px 6px', borderRadius: 10,
+        background: c.bg, color: c.text, textTransform: 'uppercase',
+      }}>
+        {level}
+      </span>
+    );
+  }
+
   /* ── Suggestion card helper ── */
   function SuggCard({
     idx, iconBg, icon, cardTitle, preview, body, applyLabel, dismissLabel,
@@ -704,13 +731,13 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
                         <div className="im-sugg-cards">
 
                           {/* Card 0 — Story Points */}
-                          {!dismissedCards.has(0) && (
+                          {!dismissedCards.has(0) && analysis.story_points && (
                             <SuggCard
                               idx={0}
                               iconBg="#FAEEDA"
                               cardTitle="Story points"
-                              preview={`${analysis.analysis.story_points} pt${analysis.analysis.story_points !== 1 ? 's' : ''} — ${analysis.analysis.justification}`}
-                              applyLabel={`Set ${analysis.analysis.story_points} pts`}
+                              preview={`${analysis.story_points.value} pt${analysis.story_points.value !== 1 ? 's' : ''} · ${analysis.story_points.confidence} confidence`}
+                              applyLabel={`Set ${analysis.story_points.value} pts`}
                               dismissLabel="Dismiss"
                               icon={
                                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
@@ -721,14 +748,45 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
                               body={
                                 <div className="im-sugg-diff">
                                   <div className="im-diff-row im-diff-now" style={{ flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
-                                    <span style={{ fontSize: 20, fontWeight: 700, color: '#854F0B' }}>{analysis.analysis.story_points} <span style={{ fontSize: 13, fontWeight: 400 }}>points</span></span>
-                                    <span style={{ fontSize: 12, color: 'var(--kb-field-label)', lineHeight: 1.5 }}>{analysis.analysis.justification}</span>
-                                    {analysis.analysis.required_roles.length > 0 && (
-                                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 2 }}>
-                                        {analysis.analysis.required_roles.map(r => (
-                                          <span key={r} className="im-diff-chip">{r}</span>
-                                        ))}
-                                      </div>
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                                      <span style={{ fontSize: 20, fontWeight: 700, color: '#854F0B' }}>{analysis.story_points.value}</span>
+                                      <span style={{ fontSize: 13, color: 'var(--kb-field-label)' }}>points</span>
+                                      <ConfidencePill level={analysis.story_points.confidence} />
+                                    </div>
+                                    <span style={{ fontSize: 12, color: 'var(--kb-field-label)', lineHeight: 1.5 }}>{analysis.story_points.reason}</span>
+                                  </div>
+                                </div>
+                              }
+                            />
+                          )}
+
+                          {/* Card 1 — Issue Type */}
+                          {analysis.issue_type?.value && !dismissedCards.has(1) && (
+                            <SuggCard
+                              idx={1}
+                              iconBg="#EAE6FF"
+                              cardTitle="Issue type"
+                              preview={`${analysis.issue_type.value} · ${analysis.issue_type.confidence} confidence`}
+                              applyLabel={`Set as ${analysis.issue_type.value}`}
+                              dismissLabel="Dismiss"
+                              icon={
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                                  <rect x="3" y="3" width="18" height="18" rx="3" stroke="#6554C0" strokeWidth="2"/>
+                                  <path d="M8 12h8M12 8v8" stroke="#6554C0" strokeWidth="2" strokeLinecap="round"/>
+                                </svg>
+                              }
+                              body={
+                                <div className="im-sugg-diff">
+                                  <div className="im-diff-row im-diff-now" style={{ flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                      <span style={{ fontSize: 14, fontWeight: 600, color: '#6554C0', textTransform: 'capitalize' }}>{analysis.issue_type.value}</span>
+                                      <ConfidencePill level={analysis.issue_type.confidence} />
+                                    </div>
+                                    <span style={{ fontSize: 12, color: 'var(--kb-field-label)', lineHeight: 1.5 }}>{analysis.issue_type.reason}</span>
+                                    {issueType !== analysis.issue_type.value && (
+                                      <span style={{ fontSize: 11, color: 'var(--kb-field-label)' }}>
+                                        Currently set to <strong>{issueType}</strong>
+                                      </span>
                                     )}
                                   </div>
                                 </div>
@@ -736,13 +794,13 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
                             />
                           )}
 
-                          {/* Card 1 — Labels (only if API returned labels) */}
-                          {(analysis.labels?.length ?? 0) > 0 && !dismissedCards.has(1) && (
+                          {/* Card 2 — Labels */}
+                          {(analysis.labels?.values?.length ?? 0) > 0 && !dismissedCards.has(2) && (
                             <SuggCard
-                              idx={1}
+                              idx={2}
                               iconBg="#FAEEDA"
                               cardTitle="Label suggestions"
-                              preview={analysis.labels.join(', ')}
+                              preview={analysis.labels.values.join(', ')}
                               applyLabel="Apply labels"
                               dismissLabel="Dismiss"
                               icon={
@@ -766,10 +824,14 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
                                     <div className="im-diff-label-row">
                                       <span className="im-diff-label-key">AI suggests</span>
                                       <div className="im-diff-chips">
-                                        {analysis.labels.map(n => (
+                                        {analysis.labels.values.map(n => (
                                           <span key={n} className="im-diff-chip im-diff-chip-add">+ {n}</span>
                                         ))}
                                       </div>
+                                    </div>
+                                    <div style={{ marginTop: 4 }}>
+                                      <ConfidencePill level={analysis.labels.confidence} />
+                                      <span style={{ fontSize: 11, color: 'var(--kb-field-label)', marginLeft: 6 }}>{analysis.labels.reason}</span>
                                     </div>
                                   </div>
                                 </div>
@@ -777,14 +839,14 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
                             />
                           )}
 
-                          {/* Card 2 — Assignee (only if API returned a recommendation) */}
-                          {analysis.recommended_user && !dismissedCards.has(2) && (
+                          {/* Card 3 — Assignee */}
+                          {analysis.assignee?.user && !dismissedCards.has(3) && (
                             <SuggCard
-                              idx={2}
+                              idx={3}
                               iconBg="#E1F5EE"
                               cardTitle="Assignee suggestion"
-                              preview={`${analysis.recommended_user.name} · ${analysis.analysis.capacity_analysis}`}
-                              applyLabel={`Assign to ${analysis.recommended_user.name.split(' ')[0]}`}
+                              preview={`${analysis.assignee.user.name} · ${analysis.assignee.confidence} confidence`}
+                              applyLabel={`Assign to ${analysis.assignee.user.name.split(' ')[0]}`}
                               dismissLabel="Dismiss"
                               icon={
                                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
@@ -797,20 +859,63 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
                                   <div className="im-diff-assignee-table">
                                     <div className="im-diff-assignee-row im-diff-assignee-rec">
                                       <span className="im-diff-person-av" style={{ background: '#378ADD' }}>
-                                        {analysis.recommended_user.name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
+                                        {analysis.assignee.user.name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
                                       </span>
                                       <div className="im-diff-person-info">
                                         <div className="im-diff-person-top">
-                                          <span className="im-diff-person-name">{analysis.recommended_user.name}</span>
-                                          <span className="im-diff-badge im-diff-badge-ok">{analysis.recommended_user.role}</span>
+                                          <span className="im-diff-person-name">{analysis.assignee.user.name}</span>
+                                          <span className="im-diff-badge im-diff-badge-ok">{analysis.assignee.user.role}</span>
+                                          <ConfidencePill level={analysis.assignee.confidence} />
                                         </div>
-                                        <span className="im-diff-person-reason">{analysis.analysis.capacity_analysis}</span>
+                                        <span className="im-diff-person-reason">{analysis.assignee.reason}</span>
                                       </div>
                                     </div>
                                   </div>
                                 </div>
                               }
                             />
+                          )}
+
+                          {/* Card 4 — Duplicate warning (informational, no apply action) */}
+                          {analysis.duplicate?.status !== 'no' && !dismissedCards.has(4) && (
+                            <div className="im-sugg-card im-sugg-card-warn">
+                              <div className="im-sugg-card-hdr" onClick={() => toggleCard(4)}>
+                                <div className="im-sugg-icon" style={{ background: analysis.duplicate.status === 'yes' ? '#FFF0F0' : '#FFF8EC' }}>
+                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                                    <path d="M12 9v4M12 17h.01" stroke={analysis.duplicate.status === 'yes' ? '#DE350B' : '#E09B1E'} strokeWidth="2" strokeLinecap="round"/>
+                                    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke={analysis.duplicate.status === 'yes' ? '#DE350B' : '#E09B1E'} strokeWidth="2" strokeLinejoin="round"/>
+                                  </svg>
+                                </div>
+                                <div className="im-sugg-info">
+                                  <div className="im-sugg-title" style={{ color: analysis.duplicate.status === 'yes' ? '#DE350B' : '#B7650B' }}>
+                                    {analysis.duplicate.status === 'yes' ? 'Possible duplicate detected' : 'Similar issue exists'}
+                                  </div>
+                                  <div className="im-sugg-preview">{analysis.duplicate.reason}</div>
+                                </div>
+                                <ChevronIcon open={expandedCards.has(4)} />
+                              </div>
+                              {expandedCards.has(4) && (
+                                <div className="im-sugg-body">
+                                  {analysis.duplicate.issues.length > 0 && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+                                      {analysis.duplicate.issues.map(i => (
+                                        <div key={i.id || i.ticket_id} style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                          <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--kb-field-label)', fontSize: 11 }}>{i.ticket_id}</span>
+                                          <span style={{ color: 'var(--kb-text)' }}>{i.title}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  <div style={{ marginBottom: 6 }}>
+                                    <ConfidencePill level={analysis.duplicate.confidence} />
+                                    <span style={{ fontSize: 11, color: 'var(--kb-field-label)', marginLeft: 6 }}>{analysis.duplicate.reason}</span>
+                                  </div>
+                                  <div className="im-sugg-footer">
+                                    <button className="im-sugg-dismiss-btn" onClick={() => dismissCard(4)}>Dismiss</button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           )}
 
                         </div>

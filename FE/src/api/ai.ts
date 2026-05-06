@@ -1,11 +1,24 @@
 import { apiClient } from './client';
 
-export interface AIAnalysisResult {
-  story_points: number;
-  justification: string;
-  required_roles: string[];
-  capacity_analysis: string;
-  recommended_team: { 'Assigned To': string };
+// ---------------------------------------------------------------------------
+// V2 response shape — context-aware analysis
+// ---------------------------------------------------------------------------
+
+export interface ConfidenceLevel {
+  confidence: 'high' | 'medium' | 'low';
+  reason: string;
+}
+
+export interface StoryPointsSuggestion extends ConfidenceLevel {
+  value: number;
+}
+
+export interface IssueTypeSuggestion extends ConfidenceLevel {
+  value: string;
+}
+
+export interface LabelsSuggestion extends ConfidenceLevel {
+  values: string[];
 }
 
 export interface RecommendedUser {
@@ -15,13 +28,44 @@ export interface RecommendedUser {
   role: string;
 }
 
-export interface AnalyzeIssueResponse {
-  issue_id: string;
-  issue_title: string;
-  labels: string[];
-  analysis: AIAnalysisResult;
-  recommended_user: RecommendedUser | null;
+export interface AssigneeSuggestion extends ConfidenceLevel {
+  user: RecommendedUser | null;
 }
+
+export interface DuplicateIssue {
+  id: string;
+  ticket_id: string;
+  title: string;
+}
+
+export interface DuplicateSuggestion extends ConfidenceLevel {
+  status: 'yes' | 'maybe' | 'no';
+  issues: DuplicateIssue[];
+}
+
+export interface AnalyzeIssueResponse {
+  issue_id: string | null;
+  issue_title: string;
+  story_points: StoryPointsSuggestion;
+  issue_type: IssueTypeSuggestion;
+  labels: LabelsSuggestion;
+  assignee: AssigneeSuggestion;
+  duplicate: DuplicateSuggestion;
+}
+
+// ---------------------------------------------------------------------------
+// Request payloads
+// ---------------------------------------------------------------------------
+
+export interface AnalyzeDraftPayload {
+  title: string;
+  description: string;
+  project_id: string;
+}
+
+// ---------------------------------------------------------------------------
+// Chat / chatbot types (unchanged)
+// ---------------------------------------------------------------------------
 
 export interface ChatResponse {
   answer: string;
@@ -43,18 +87,15 @@ export interface WikiContext {
   text: string;
 }
 
-export interface AnalyzeDraftPayload {
-  title: string;
-  description: string;
-  labels: string[];
-  project_id: string;
-}
-
 export interface SyncStatusData {
   in_sync: boolean;
   postgres: Record<string, number>;
   chroma: Record<string, number>;
 }
+
+// ---------------------------------------------------------------------------
+// API functions
+// ---------------------------------------------------------------------------
 
 export const aiApi = {
   analyzeIssue: (issueId: string): Promise<AnalyzeIssueResponse> =>
@@ -63,7 +104,6 @@ export const aiApi = {
   analyzeDraft: (payload: AnalyzeDraftPayload): Promise<AnalyzeIssueResponse> =>
     apiClient.post('/ai/analyze-draft', payload, { timeout: 60_000 }).then((r: { data: AnalyzeIssueResponse }) => r.data),
 
-  // Legacy endpoint — wiki context chat (passes raw wiki text inline)
   chat: (message: string, projectId?: string, wikiContext?: WikiContext): Promise<ChatResponse> =>
     apiClient.post('/ai/chat', {
       message,
@@ -71,7 +111,6 @@ export const aiApi = {
       ...(wikiContext ? { wiki_context: { title: wikiContext.title, text: wikiContext.text } } : {}),
     }, { timeout: 60_000 }).then((r: { data: ChatResponse }) => r.data),
 
-  // Sprint/project-aware endpoint — live DB page context, history, sprint scoping
   chatQuery: (payload: ChatQueryPayload): Promise<ChatResponse> =>
     apiClient.post('/ai/chatbot/query', payload, { timeout: 60_000 })
       .then((r: { data: ChatResponse }) => r.data),

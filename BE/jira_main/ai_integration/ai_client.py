@@ -52,6 +52,33 @@ def analyze_task(heading: str, description: str, labels: list[str]) -> dict:
     })
 
 
+def analyze_issue_v2(
+    heading: str,
+    description: str,
+    project_labels: list[str],
+    supported_issue_types: list[str],
+    team_members: list[dict],
+    sprint_summary: dict | None,
+    similar_issues: list[dict],
+) -> dict:
+    """
+    Context-aware issue analysis v2.
+
+    Sends pre-built project/sprint/team/similarity context to the AI service
+    and receives structured per-field suggestions (story points, issue type,
+    labels, assignee, duplicate) with confidence levels.
+    """
+    return _post("/analyze-issue-v2", {
+        "heading": heading,
+        "description": description,
+        "project_labels": project_labels,
+        "supported_issue_types": supported_issue_types,
+        "team_members": team_members,
+        "sprint_summary": sprint_summary,
+        "similar_issues": similar_issues,
+    })
+
+
 def chat(
     message: str,
     project_name: str | None = None,
