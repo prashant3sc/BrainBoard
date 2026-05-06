@@ -13,7 +13,7 @@ interface UseAIAnalysisResult {
 export function useAIAnalysis(): UseAIAnalysisResult {
   const [analysis, setAnalysis] = useState<AnalyzeIssueResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError]     = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function analyze(issueId: string) {
     setIsLoading(true);

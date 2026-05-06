@@ -3,6 +3,8 @@ import re
 import requests
 from concurrent.futures import ThreadPoolExecutor
 
+from django.db.models import Count
+
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -12,7 +14,7 @@ from django.contrib.auth import get_user_model
 
 logger = logging.getLogger(__name__)
 
-from issues.models import Issue
+from issues.models import Issue, Label
 from projects.models import Project, ProjectMember, Sprint, SprintRetro
 from wiki.models import WikiPage
 
@@ -281,16 +283,234 @@ class SyncStatusView(APIView):
         })
 
 
+def _build_analysis_context(
+    project: Project,
+    heading: str = "",
+    description: str = "",
+    exclude_issue_id: str | None = None,
+) -> dict:
+    """
+    Build the structured context payload sent to the AI v2 endpoint.
+
+    Gathers:
+    - Project labels (allowed label set)
+    - Team members with workload (total active + sprint-specific)
+    - Active sprint summary (name, goal, status, issue counts)
+    - Similar issues from ChromaDB for calibration / duplicate detection
+    """
+    # 1. Project labels
+    project_labels = list(
+        Label.objects.filter(project=project).values_list("name", flat=True)
+    )
+
+    # 2. Active sprint
+    active_sprint = (
+        Sprint.objects
+        .filter(project=project, status="active")
+        .first()
+    )
+    sprint_summary = None
+    sprint_issue_counts: dict[str, int] = {}  # user_id → count in this sprint
+
+    if active_sprint:
+        sprint_qs = Issue.objects.filter(sprint=active_sprint)
+        sprint_summary = {
+            "name":        active_sprint.name,
+            "goal":        active_sprint.goal or "",
+            "status":      active_sprint.status,
+            "todo":        sprint_qs.filter(status=Issue.TODO).count(),
+            "in_progress": sprint_qs.filter(status=Issue.IN_PROGRESS).count(),
+            "review":      sprint_qs.filter(status=Issue.REVIEW).count(),
+            "done":        sprint_qs.filter(status=Issue.DONE).count(),
+        }
+        for row in (
+            sprint_qs.exclude(status=Issue.DONE)
+            .exclude(assignee=None)
+            .values("assignee_id")
+            .annotate(cnt=Count("id"))
+        ):
+            sprint_issue_counts[str(row["assignee_id"])] = row["cnt"]
+
+    # 3. Team members with workload
+    project_members = (
+        ProjectMember.objects
+        .filter(project=project)
+        .select_related("user")
+    )
+    active_issue_counts: dict[str, int] = {}
+    for row in (
+        Issue.objects
+        .filter(project=project)
+        .exclude(status=Issue.DONE)
+        .exclude(assignee=None)
+        .values("assignee_id")
+        .annotate(cnt=Count("id"))
+    ):
+        active_issue_counts[str(row["assignee_id"])] = row["cnt"]
+
+    team_members = []
+    for pm in project_members:
+        uid = str(pm.user.id)
+        team_members.append({
+            "name":          pm.user.get_full_name().strip() or pm.user.email,
+            "email":         pm.user.email,
+            "role":          pm.user.role,
+            "active_issues": active_issue_counts.get(uid, 0),
+            "sprint_issues": sprint_issue_counts.get(uid, 0),
+        })
+
+    # 4. Similar issues via ChromaDB (top 12, scoped to this project)
+    search_query = f"{heading} {description[:400]}".strip() or heading or "issue"
+    similar_issues: list[dict] = []
+    try:
+        raw_results = ai_client.chromadb_query(
+            query=search_query,
+            project_id=str(project.id),
+            doc_types=["issue"],
+            top_k=12,
+        )
+        for r in raw_results:
+            doc_id = r.get("id", "")
+            if exclude_issue_id and doc_id == exclude_issue_id:
+                continue
+            try:
+                db_issue = (
+                    Issue.objects
+                    .select_related("assignee")
+                    .prefetch_related("labels")
+                    .get(pk=doc_id)
+                )
+                assignee_name = ""
+                if db_issue.assignee:
+                    assignee_name = db_issue.assignee.get_full_name().strip() or db_issue.assignee.email
+                similar_issues.append({
+                    "ticket_id":   db_issue.ticket_id or doc_id[:8],
+                    "title":       db_issue.title,
+                    "issue_type":  db_issue.issue_type,
+                    "labels":      list(db_issue.labels.values_list("name", flat=True)),
+                    "assignee":    assignee_name or "Unassigned",
+                    "status":      db_issue.status,
+                    "story_points": float(db_issue.story_points) if db_issue.story_points else None,
+                })
+            except Issue.DoesNotExist:
+                pass
+    except Exception as exc:
+        logger.warning(f"ChromaDB similar-issue lookup failed (non-fatal): {exc}")
+
+    return {
+        "project_labels":         project_labels,
+        "supported_issue_types":  ["task", "subtask", "bug"],
+        "team_members":           team_members,
+        "sprint_summary":         sprint_summary,
+        "similar_issues":         similar_issues,
+    }
+
+
+def _match_assignee(recommended_name: str, project_members) -> dict | None:
+    """Match AI's raw recommended name string to a real project member object."""
+    if not recommended_name or recommended_name.lower() == "unassigned":
+        return None
+    rec_lower = recommended_name.lower()
+    first_match = None
+    for pm in project_members:
+        full_name = pm.user.get_full_name().strip().lower()
+        if rec_lower == full_name or rec_lower in full_name or full_name in rec_lower:
+            return {
+                "id":    str(pm.user.id),
+                "name":  pm.user.get_full_name().strip() or pm.user.email,
+                "email": pm.user.email,
+                "role":  pm.user.role,
+            }
+        rec_parts = rec_lower.split()
+        fn_parts = full_name.split()
+        if rec_parts and fn_parts and rec_parts[0] == fn_parts[0] and first_match is None:
+            first_match = {
+                "id":    str(pm.user.id),
+                "name":  pm.user.get_full_name().strip() or pm.user.email,
+                "email": pm.user.email,
+                "role":  pm.user.role,
+            }
+    return first_match
+
+
+def _normalize_v2_response(ai_result: dict, context: dict, project) -> dict:
+    """
+    Convert raw AI v2 JSON into the final response shape sent to the frontend.
+
+    - Resolves assignee name → real user object
+    - Resolves duplicate ticket_ids → issue objects with title
+    - Guarantees the labels list only contains project-level labels
+    """
+    project_members = (
+        ProjectMember.objects
+        .filter(project=project)
+        .select_related("user")
+    )
+
+    # Assignee
+    assignee_raw = ai_result.get("assignee", {})
+    matched_user = _match_assignee(assignee_raw.get("name", ""), project_members)
+    assignee_out = {
+        "user":       matched_user,
+        "confidence": assignee_raw.get("confidence", "low"),
+        "reason":     assignee_raw.get("reason", ""),
+    }
+
+    # Labels — enforce project-level whitelist
+    allowed = set(context["project_labels"])
+    labels_raw = ai_result.get("labels", {})
+    safe_labels = [l for l in labels_raw.get("values", []) if l in allowed]
+    labels_out = {
+        "values":     safe_labels,
+        "confidence": labels_raw.get("confidence", "low"),
+        "reason":     labels_raw.get("reason", ""),
+    }
+
+    # Duplicate — enrich ticket_ids with titles from DB.
+    # ticket_id is "{KEY}-{seq}" (a @property), so we parse the sequence number.
+    dup_raw = ai_result.get("duplicate", {})
+    dup_issues = []
+    for tid in dup_raw.get("matching_ticket_ids", []):
+        matched_issue = None
+        try:
+            if "-" in tid:
+                seq_str = tid.rsplit("-", 1)[-1]
+                seq_num = int(seq_str)
+                matched_issue = Issue.objects.filter(project=project, sequence_number=seq_num).first()
+        except (ValueError, Exception):
+            pass
+        if matched_issue:
+            dup_issues.append({
+                "id":        str(matched_issue.id),
+                "ticket_id": matched_issue.ticket_id or tid,
+                "title":     matched_issue.title,
+            })
+        else:
+            dup_issues.append({"id": "", "ticket_id": tid, "title": tid})
+
+    duplicate_out = {
+        "status":     dup_raw.get("status", "no"),
+        "issues":     dup_issues,
+        "confidence": dup_raw.get("confidence", "low"),
+        "reason":     dup_raw.get("reason", ""),
+    }
+
+    return {
+        "story_points": ai_result.get("story_points", {}),
+        "issue_type":   ai_result.get("issue_type", {}),
+        "labels":       labels_out,
+        "assignee":     assignee_out,
+        "duplicate":    duplicate_out,
+    }
+
+
 class AnalyzeIssueView(APIView):
     """
     POST /ai/analyze-issue/<issue_id>
 
-    Fetches the issue (title, description, labels) from Postgres,
-    calls AI RAG to estimate story points and recommend an assignee
-    based on who handled similar labeled issues in the past.
-
-    The recommended name from AI is matched against actual project members
-    so the FE gets a real user object it can apply directly.
+    Fetches the issue from Postgres, builds full project/sprint/team/similarity
+    context, calls the AI v2 analysis endpoint, and returns structured
+    per-field suggestions with confidence levels.
     """
 
     permission_classes = [IsAuthenticated]
@@ -306,14 +526,19 @@ class AnalyzeIssueView(APIView):
         except Issue.DoesNotExist:
             return Response({"detail": "Issue not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        label_names = list(issue.labels.values_list("name", flat=True))
         description = issue.description or f"{issue.issue_type} issue, priority: {issue.priority}"
+        context = _build_analysis_context(
+            issue.project,
+            heading=issue.title,
+            description=description,
+            exclude_issue_id=str(issue.id),
+        )
 
         try:
-            analysis = ai_client.analyze_task(
+            ai_result = ai_client.analyze_issue_v2(
                 heading=issue.title,
                 description=description,
-                labels=label_names,
+                **context,
             )
         except requests.RequestException as exc:
             return Response(
@@ -321,43 +546,10 @@ class AnalyzeIssueView(APIView):
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
-        # Match AI's recommended name to a real project member
-        recommended_name = (analysis.get("recommended_team") or {}).get("Assigned To", "")
-        matched_user = None
-
-        if recommended_name and recommended_name != "Unassigned":
-            project_members = (
-                ProjectMember.objects
-                .filter(project=issue.project)
-                .select_related("user")
-            )
-            recommended_lower = recommended_name.lower()
-            for pm in project_members:
-                full_name = pm.user.get_full_name().strip().lower()
-                email = pm.user.email.lower()
-                if recommended_lower == full_name or recommended_lower in full_name or full_name in recommended_lower:
-                    matched_user = {
-                        "id": str(pm.user.id),
-                        "name": pm.user.get_full_name().strip() or pm.user.email,
-                        "email": pm.user.email,
-                        "role": pm.user.role,
-                    }
-                    break
-                # fallback: first-name match
-                if recommended_lower.split()[0] == full_name.split()[0]:
-                    matched_user = {
-                        "id": str(pm.user.id),
-                        "name": pm.user.get_full_name().strip() or pm.user.email,
-                        "email": pm.user.email,
-                        "role": pm.user.role,
-                    }
-
         return Response({
-            "issue_id": str(issue.id),
+            "issue_id":    str(issue.id),
             "issue_title": issue.title,
-            "labels": label_names,
-            "analysis": analysis,
-            "recommended_user": matched_user,  # real user object, or null if no match
+            **_normalize_v2_response(ai_result, context, issue.project),
         })
 
 
@@ -365,31 +557,50 @@ class AnalyzeDraftView(APIView):
     """
     POST /ai/analyze-draft
 
-    Analyzes an unsaved (draft) issue using title, description and labels
-    supplied directly in the request body — no issue_id required.
+    Analyzes an unsaved (draft) issue using title + description from the
+    request body. Builds the same rich context as AnalyzeIssueView using
+    project_id. No issue_id required.
 
-    Body: { "title", "description", "labels": [], "project_id" }
-    Returns the same shape as AnalyzeIssueView so the FE can reuse AIAnalysisPanel.
+    Body: { "title", "description", "project_id" }
     """
 
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        title       = request.data.get("title", "").strip()
+        title      = request.data.get("title", "").strip()
         description = request.data.get("description", "").strip()
-        labels      = request.data.get("labels", [])
-        project_id  = request.data.get("project_id", "").strip()
+        project_id = request.data.get("project_id", "").strip()
 
         if not title:
             return Response({"detail": "title is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         description = description or f"Issue titled: {title}"
 
+        project = None
+        context: dict = {
+            "project_labels":        [],
+            "supported_issue_types": ["task", "subtask", "bug"],
+            "team_members":          [],
+            "sprint_summary":        None,
+            "similar_issues":        [],
+        }
+
+        if project_id:
+            try:
+                project = Project.objects.get(pk=project_id)
+                context = _build_analysis_context(
+                    project,
+                    heading=title,
+                    description=description,
+                )
+            except Project.DoesNotExist:
+                pass
+
         try:
-            analysis = ai_client.analyze_task(
+            ai_result = ai_client.analyze_issue_v2(
                 heading=title,
                 description=description,
-                labels=labels,
+                **context,
             )
         except requests.RequestException as exc:
             return Response(
@@ -397,45 +608,18 @@ class AnalyzeDraftView(APIView):
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
-        # Match recommended name against project members if project_id provided
-        matched_user = None
-        recommended_name = (analysis.get("recommended_team") or {}).get("Assigned To", "")
-
-        if recommended_name and recommended_name != "Unassigned" and project_id:
-            try:
-                project = Project.objects.get(pk=project_id)
-                project_members = (
-                    ProjectMember.objects
-                    .filter(project=project)
-                    .select_related("user")
-                )
-                recommended_lower = recommended_name.lower()
-                for pm in project_members:
-                    full_name = pm.user.get_full_name().strip().lower()
-                    if recommended_lower == full_name or recommended_lower in full_name or full_name in recommended_lower:
-                        matched_user = {
-                            "id": str(pm.user.id),
-                            "name": pm.user.get_full_name().strip() or pm.user.email,
-                            "email": pm.user.email,
-                            "role": pm.user.role,
-                        }
-                        break
-                    if recommended_lower.split()[0] == full_name.split()[0]:
-                        matched_user = {
-                            "id": str(pm.user.id),
-                            "name": pm.user.get_full_name().strip() or pm.user.email,
-                            "email": pm.user.email,
-                            "role": pm.user.role,
-                        }
-            except Project.DoesNotExist:
-                pass
+        normalized = _normalize_v2_response(ai_result, context, project) if project else {
+            "story_points": ai_result.get("story_points", {}),
+            "issue_type":   ai_result.get("issue_type", {}),
+            "labels":       ai_result.get("labels", {}),
+            "assignee":     {"user": None, "confidence": "low", "reason": ""},
+            "duplicate":    {"status": "no", "issues": [], "confidence": "low", "reason": ""},
+        }
 
         return Response({
-            "issue_id": None,
+            "issue_id":    None,
             "issue_title": title,
-            "labels": labels,
-            "analysis": analysis,
-            "recommended_user": matched_user,
+            **normalized,
         })
 
 

@@ -7,7 +7,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.language_models import BaseChatModel
 
 from app.schemas import IssueDocument, WikiDocument, UserDocument, ProjectDocument, SprintDocument
-from app.prompts.task_prompts import SYSTEM_PROMPT_TEMPLATE
+from app.prompts.task_prompts import SYSTEM_PROMPT_TEMPLATE, ANALYZE_ISSUE_V2_PROMPT
 from app.config import get_settings
 from app.core.logging import get_logger
 
@@ -727,4 +727,91 @@ def analyze_task_with_rag(heading: str, description: str, labels: list[str]) -> 
         "description": description,
     })
 
+    return json.loads(response_msg.content)
+
+
+def analyze_issue_v2(
+    heading: str,
+    description: str,
+    project_labels: list,
+    supported_issue_types: list,
+    team_members: list,
+    sprint_summary: dict | None,
+    similar_issues: list,
+) -> dict:
+    """
+    Context-aware issue analysis v2.
+
+    Accepts pre-built project/sprint/team/similarity context from Django and
+    asks the LLM to produce structured suggestions with confidence levels for:
+    story points, issue type, labels (from allowed set only), assignee (from
+    team only), and duplicate detection.
+    """
+    settings = get_settings()
+    llm = get_llm(model_key="rag")
+
+    issue_types_str = ", ".join(supported_issue_types) if supported_issue_types else "task, subtask, bug"
+    labels_str = ", ".join(project_labels) if project_labels else "none defined"
+
+    if sprint_summary:
+        sprint_context = (
+            f"Sprint: {sprint_summary.get('name', 'N/A')} "
+            f"(status: {sprint_summary.get('status', 'active')})\n"
+            f"Goal: {sprint_summary.get('goal') or 'No goal set'}\n"
+            f"Issues: {sprint_summary.get('todo', 0)} to-do, "
+            f"{sprint_summary.get('in_progress', 0)} in-progress, "
+            f"{sprint_summary.get('review', 0)} in-review, "
+            f"{sprint_summary.get('done', 0)} done"
+        )
+    else:
+        sprint_context = "No active sprint."
+
+    if team_members:
+        team_lines = [
+            f"- {m['name']} ({m.get('role', '?')}): "
+            f"{m.get('active_issues', 0)} total active issues, "
+            f"{m.get('sprint_issues', 0)} in current sprint"
+            for m in team_members
+        ]
+        team_context = "\n".join(team_lines)
+    else:
+        team_context = "No team members available."
+
+    if similar_issues:
+        issue_lines = []
+        for i in similar_issues:
+            pts = f"{i['story_points']}pts" if i.get("story_points") else "no estimate"
+            lbs = ", ".join(i.get("labels", [])) or "no labels"
+            issue_lines.append(
+                f"[{i.get('ticket_id', '?')}] {i['title']} "
+                f"| type={i.get('issue_type', '?')} | labels={lbs} "
+                f"| assignee={i.get('assignee', 'unassigned')} "
+                f"| status={i.get('status', '?')} | {pts}"
+            )
+        similar_text = "\n".join(issue_lines)
+    else:
+        similar_text = "No similar issues found in this project."
+
+    logger.info(
+        f"analyze_issue_v2: heading={heading!r} | labels={labels_str} "
+        f"| team={len(team_members)} members | similar={len(similar_issues)} issues"
+    )
+
+    prompt = PromptTemplate(
+        template=ANALYZE_ISSUE_V2_PROMPT,
+        input_variables=[
+            "heading", "description", "issue_types", "project_labels",
+            "sprint_context", "team_context", "similar_issues",
+        ],
+    )
+    chain = prompt | llm
+    response_msg = chain.invoke({
+        "heading": heading,
+        "description": description[:800],
+        "issue_types": issue_types_str,
+        "project_labels": labels_str,
+        "sprint_context": sprint_context,
+        "team_context": team_context,
+        "similar_issues": similar_text,
+    })
     return json.loads(response_msg.content)
