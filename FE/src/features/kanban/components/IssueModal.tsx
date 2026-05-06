@@ -678,17 +678,8 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
                 />
 
                 {/* ── AI Suggestions Panel ── */}
-                {(aiLoading || analysis || aiError) && (
+                {(analysis || aiError) && (
                   <div className="im-sugg-container">
-                    {/* Loading state */}
-                    {aiLoading && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px', color: 'var(--kb-field-label)', fontSize: 13 }}>
-                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }}>
-                          <circle cx="8" cy="8" r="6" stroke="#A32E0E" strokeWidth="2" strokeDasharray="20 18"/>
-                        </svg>
-                        Analyzing with AI…
-                      </div>
-                    )}
 
                     {/* Error state */}
                     {aiError && !aiLoading && (
@@ -843,7 +834,7 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
                         <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ animation: 'spin 1s linear infinite' }}>
                           <circle cx="8" cy="8" r="6" stroke="#A32E0E" strokeWidth="2" strokeDasharray="20 18"/>
                         </svg>
-                        Analyzing<span className="im-ai-dots"><span>.</span><span>.</span><span>.</span></span>
+                        Analyzing<span className="im-ai-dots"><span/><span/><span/></span>
                       </>
                     ) : analysis ? (
                       <>
