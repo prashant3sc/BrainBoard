@@ -85,19 +85,26 @@ export function SprintSummaryModal({ sprint, issues, movedInfo, memberNames, onC
   const byAssignee = Object.values(assigneeMap).sort((a, b) => b.done - a.done);
 
   return (
-    <div
-      className="kb-modal-overlay"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
+    <>
+      {/* Backdrop */}
       <div
-        className="bb-modal-animate"
         style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(9, 30, 66, 0.35)',
+          zIndex: 200,
+        }}
+        onClick={onClose}
+      />
+
+      {/* Slide-over panel */}
+      <div
+        style={{
+          position: 'fixed', top: 0, right: 0, bottom: 0,
           width: '100%', maxWidth: 680,
-          maxHeight: '90vh',
           background: 'var(--bb-modal-bg, var(--bb-surface))',
-          border: '1px solid var(--bb-modal-border, var(--bb-border))',
-          borderRadius: 14,
-          boxShadow: '0 24px 64px rgba(23,43,77,.22)',
+          borderLeft: '1px solid var(--bb-modal-border, var(--bb-border))',
+          boxShadow: '-24px 0 48px rgba(9, 30, 66, 0.15)',
+          zIndex: 201,
           display: 'flex', flexDirection: 'column',
           overflow: 'hidden',
         }}
@@ -406,6 +413,6 @@ export function SprintSummaryModal({ sprint, issues, movedInfo, memberNames, onC
 
         </div>
       </div>
-    </div>
+    </>
   );
 }
