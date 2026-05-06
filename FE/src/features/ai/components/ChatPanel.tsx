@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAIChat, type ChatMessage } from '../useAIChat';
 
 interface Props {
@@ -79,6 +79,190 @@ function BrainBoardMark({ size = 18 }: { size?: number }) {
   );
 }
 
+/* ── Markdown text renderer ── */
+function MarkdownText({ text }: { text: string }) {
+  // Normalise line endings and split into paragraphs separated by blank lines
+  const rawLines = text.replace(/\r\n/g, '\n').split('\n');
+
+  // Inline formatting: **bold**, *italic*, `code`
+  function renderInline(str: string): React.ReactNode[] {
+    const parts: React.ReactNode[] = [];
+    let remaining = str;
+    let key = 0;
+
+    while (remaining.length > 0) {
+      // **bold**
+      const bold = remaining.match(/^(.*?)\*\*(.+?)\*\*(.*)/s);
+      // *italic*
+      const italic = remaining.match(/^(.*?)\*(.+?)\*(.*)/s);
+      // `code`
+      const code = remaining.match(/^(.*?)`(.+?)`(.*)/s);
+
+      const candidates = [
+        bold   ? { idx: bold[1].length,   type: 'bold',   match: bold   } : null,
+        italic ? { idx: italic[1].length, type: 'italic', match: italic } : null,
+        code   ? { idx: code[1].length,   type: 'code',   match: code   } : null,
+      ].filter(Boolean) as { idx: number; type: string; match: RegExpMatchArray }[];
+
+      if (candidates.length === 0) {
+        parts.push(remaining);
+        break;
+      }
+
+      // Pick the earliest match
+      candidates.sort((a, b) => a.idx - b.idx);
+      const winner = candidates[0];
+      const [, before, inner, after] = winner.match;
+
+      if (before) parts.push(before);
+      if (winner.type === 'bold')   parts.push(<strong key={key++} style={{ fontWeight: 700 }}>{inner}</strong>);
+      if (winner.type === 'italic') parts.push(<em     key={key++} style={{ fontStyle: 'italic' }}>{inner}</em>);
+      if (winner.type === 'code')   parts.push(
+        <code key={key++} style={{
+          fontFamily: 'monospace', fontSize: '0.88em',
+          background: 'var(--bb-tbl-wrap-bg)',
+          border: '1px solid var(--bb-border)',
+          borderRadius: 4, padding: '1px 5px',
+        }}>{inner}</code>
+      );
+      remaining = after;
+    }
+    return parts;
+  }
+
+  // Build block-level nodes
+  const nodes: React.ReactNode[] = [];
+  let i = 0;
+
+  while (i < rawLines.length) {
+    const line = rawLines[i];
+
+    // Heading: ## or ###
+    const headingMatch = line.match(/^(#{1,3})\s+(.+)/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const size = level === 1 ? 15 : level === 2 ? 13.5 : 12.5;
+      nodes.push(
+        <div key={i} style={{ fontSize: size, fontWeight: 700, color: 'var(--bb-text-primary)', marginTop: nodes.length > 0 ? 10 : 0, marginBottom: 4 }}>
+          {renderInline(headingMatch[2])}
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // Numbered list: collect consecutive `N. ` lines
+    if (/^\d+\.\s/.test(line)) {
+      const items: string[] = [];
+      while (i < rawLines.length && /^\d+\.\s/.test(rawLines[i])) {
+        items.push(rawLines[i].replace(/^\d+\.\s+/, ''));
+        i++;
+      }
+      nodes.push(
+        <ol key={`ol-${i}`} style={{ margin: '6px 0', paddingLeft: 22, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {items.map((item, idx) => (
+            <li key={idx} style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--bb-text-primary)' }}>
+              {renderInline(item)}
+            </li>
+          ))}
+        </ol>
+      );
+      continue;
+    }
+
+    // Bullet list: collect consecutive `- ` / `* ` / `• ` lines
+    if (/^[-*•]\s/.test(line)) {
+      const items: string[] = [];
+      while (i < rawLines.length && /^[-*•]\s/.test(rawLines[i])) {
+        items.push(rawLines[i].replace(/^[-*•]\s+/, ''));
+        i++;
+      }
+      nodes.push(
+        <ul key={`ul-${i}`} style={{ margin: '6px 0', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4, listStyleType: 'disc' }}>
+          {items.map((item, idx) => (
+            <li key={idx} style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--bb-text-primary)' }}>
+              {renderInline(item)}
+            </li>
+          ))}
+        </ul>
+      );
+      continue;
+    }
+
+    // Markdown table: line starts with |
+    if (line.trimStart().startsWith('|')) {
+      const tableLines: string[] = [];
+      while (i < rawLines.length && rawLines[i].trimStart().startsWith('|')) {
+        tableLines.push(rawLines[i]);
+        i++;
+      }
+      // Parse header, skip separator row, parse body
+      const parseRow = (row: string) =>
+        row.split('|').map((c) => c.trim()).filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
+
+      const isSeparator = (row: string) => /^\|[\s|:-]+\|$/.test(row.replace(/\s/g, ''));
+      const headers  = parseRow(tableLines[0]);
+      const dataRows = tableLines.slice(1).filter((r) => !isSeparator(r));
+
+      nodes.push(
+        <div key={`tbl-${i}`} style={{ overflowX: 'auto', margin: '6px 0' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr>
+                {headers.map((h, hi) => (
+                  <th key={hi} style={{
+                    padding: '5px 10px', textAlign: 'left',
+                    fontWeight: 700, fontSize: 11,
+                    color: 'var(--bb-text-muted)',
+                    background: 'var(--bb-tbl-head-bg, var(--bb-bg-input))',
+                    borderBottom: '1px solid var(--bb-border)',
+                    textTransform: 'uppercase', letterSpacing: '0.05em',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {renderInline(h)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {dataRows.map((row, ri) => (
+                <tr key={ri} style={{ borderBottom: '1px solid var(--bb-border)' }}>
+                  {parseRow(row).map((cell, ci) => (
+                    <td key={ci} style={{
+                      padding: '5px 10px', fontSize: 12,
+                      color: 'var(--bb-text-primary)', lineHeight: 1.5,
+                    }}>
+                      {renderInline(cell)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      continue;
+    }
+
+    // Blank line → small spacing
+    if (line.trim() === '') {
+      nodes.push(<div key={i} style={{ height: 6 }} />);
+      i++;
+      continue;
+    }
+
+    // Regular paragraph line
+    nodes.push(
+      <div key={i} style={{ fontSize: 13, lineHeight: 1.65, color: 'var(--bb-text-primary)' }}>
+        {renderInline(line)}
+      </div>
+    );
+    i++;
+  }
+
+  return <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>{nodes}</div>;
+}
+
 /* ── Send icon ── */
 function SendIcon({ color }: { color: string }) {
   return (
@@ -145,7 +329,7 @@ function AssistantBubble({ msg }: { msg: ChatMessage }) {
             boxShadow: '0 1px 4px rgba(9,30,66,0.05)',
           }}
         >
-          {msg.isLoading ? <TypingDots /> : msg.content}
+          {msg.isLoading ? <TypingDots /> : <MarkdownText text={msg.content} />}
         </div>
 
         {/* Source citations */}

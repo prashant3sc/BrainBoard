@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useWikiLinks, useWikiHistory, useLinkTicket, useUnlinkTicket } from '@/features/wiki/useWiki';
 import { issuesApi } from '@/api/issues';
 import { useUsers } from '@/features/users/useUsers';
 import { useRBAC } from '@/hooks/useRBAC';
+import { IssueModal } from '@/features/kanban/components/IssueModal';
 import type { Issue, WikiPage, TocItem } from '@/types';
 
 export type PanelTab = 'issues' | 'history' | 'info';
@@ -76,6 +78,8 @@ const PANEL_TITLE: Record<PanelTab, string> = {
 export function LinkedIssuesPanel({ page, allPages, projectId, initialTab = 'issues', onClose }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
+  const [issueModalOpen, setIssueModalOpen] = useState(false);
   const { can } = useRBAC();
 
   const { data: linkedItems = [] } = useWikiLinks(page.id);
@@ -192,7 +196,17 @@ export function LinkedIssuesPanel({ page, allPages, projectId, initialTab = 'iss
               const initials = assignee ? userInitials(assignee.name) : null;
               const color    = assignee ? avatarColor(assignee.name) : '#94A3B8';
               return (
-                <div className="lip-card" key={issue.id}>
+                <div
+                className="lip-card"
+                key={issue.id}
+                style={{ cursor: 'pointer' }}
+                onClick={(e) => {
+                  // Don't open modal when clicking the unlink button
+                  if ((e.target as HTMLElement).closest('.lip-unlink-btn')) return;
+                  setActiveIssue(issue);
+                  setIssueModalOpen(true);
+                }}
+              >
                   <div className="lip-card-top">
                     <div className="lip-card-id">
                       <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
@@ -324,6 +338,18 @@ export function LinkedIssuesPanel({ page, allPages, projectId, initialTab = 'iss
         )}
 
       </div>
+
+      {/* Issue detail modal — portalled to body to escape wiki layout overflow/stacking */}
+      {issueModalOpen && createPortal(
+        <IssueModal
+          issue={activeIssue}
+          isOpen={issueModalOpen}
+          projectId={projectId}
+          onClose={() => { setIssueModalOpen(false); setActiveIssue(null); }}
+          onNavigate={(issue) => { setActiveIssue(issue); setIssueModalOpen(true); }}
+        />,
+        document.body
+      )}
     </div>
   );
 }
