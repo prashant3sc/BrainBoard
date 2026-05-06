@@ -46,6 +46,30 @@ def _sync_checks_for_issue(issue: Issue):
         ComplianceCheck.objects.bulk_create(new_checks, ignore_conflicts=True)
 
 
+def _sync_template_to_existing_issues(template: ComplianceTemplate):
+    """
+    When a template is created or reactivated, create ComplianceCheck rows
+    for all existing issues in the project that match the template's applies_to.
+    This ensures openComplianceCount is accurate without needing to open each issue first.
+    """
+    from issues.models import Issue as IssueModel
+    if template.applies_to == "all":
+        issues = IssueModel.objects.filter(project=template.project)
+    else:
+        issues = IssueModel.objects.filter(project=template.project, issue_type=template.applies_to)
+
+    existing_issue_ids = set(
+        ComplianceCheck.objects.filter(template=template).values_list("issue_id", flat=True)
+    )
+    new_checks = [
+        ComplianceCheck(issue=issue, template=template)
+        for issue in issues
+        if issue.id not in existing_issue_ids
+    ]
+    if new_checks:
+        ComplianceCheck.objects.bulk_create(new_checks, ignore_conflicts=True)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Template management (project-level, admin/PM only)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -80,6 +104,8 @@ class ProjectComplianceTemplateListView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         template = serializer.save(project=project)
+        if template.is_active:
+            _sync_template_to_existing_issues(template)
         return Response(ComplianceTemplateSerializer(template).data, status=status.HTTP_201_CREATED)
 
 
@@ -106,6 +132,8 @@ class ProjectComplianceTemplateDetailView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         template = serializer.save()
+        if template.is_active:
+            _sync_template_to_existing_issues(template)
         return Response(ComplianceTemplateSerializer(template).data)
 
     def delete(self, request, project_id, template_id):
