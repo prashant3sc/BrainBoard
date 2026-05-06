@@ -26,6 +26,7 @@ interface Props {
   onClose: () => void;
   onNavigate?: (issue: Issue) => void;
   readOnly?: boolean;    // force view-only (e.g. archived project)
+  initialTemplateId?: string | null;
 }
 
 const PRIORITIES: Priority[]   = ['critical', 'high', 'medium', 'low'];
@@ -125,7 +126,7 @@ function ChevronIcon({ open }: { open: boolean }) {
   );
 }
 
-export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, readOnly = false }: Props) {
+export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, readOnly = false, initialTemplateId }: Props) {
   const isEdit   = issue !== null;
   const navigate = useNavigate();
   const { can } = useRBAC();
@@ -330,7 +331,26 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
     } else {
       setDestination('backlog');
     }
-  }, [issue, isOpen]);
+    // Pre-apply template when opened from the navbar dropdown
+    if (!issue && initialTemplateId && issueTemplates.length > 0) {
+      const tpl = issueTemplates.find((t) => t.id === initialTemplateId);
+      if (tpl) {
+        const cfg = tpl.config as IssueTemplateConfig;
+        if (cfg.title)       setTitle(cfg.title);
+        if (cfg.description) setDesc(htmlToPlainText(cfg.description));
+        if (cfg.issue_type)  setIssueType(cfg.issue_type as IssueType);
+        if (cfg.priority)    setPriority(cfg.priority as Priority);
+        if (cfg.story_points != null) setPoints(cfg.story_points);
+        if (cfg.label_names?.length) {
+          const matched = projectLabels
+            .filter((l) => cfg.label_names.some((n) => n.toLowerCase() === l.name.toLowerCase()))
+            .map((l) => l.id);
+          setLabelIds(matched);
+        }
+        setActiveTemplateId(initialTemplateId);
+      }
+    }
+  }, [issue, isOpen, initialTemplateId, issueTemplates]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function close() { onClose(); }
 
@@ -419,12 +439,33 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
     );
   })() : true;
 
+  function htmlToPlainText(html: string): string {
+    return html
+      .replace(/<h[1-6][^>]*>(.*?)<\/h[1-6]>/gi, (_m, t) => `\n## ${t.replace(/<[^>]+>/g, '').trim()}\n`)
+      .replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, (_m, inner) => {
+        let i = 0;
+        return inner.replace(/<li[^>]*>(.*?)<\/li>/gi, (_m2: string, t: string) =>
+          `${++i}. ${t.replace(/<[^>]+>/g, '').trim()}\n`
+        );
+      })
+      .replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, (_m, inner) =>
+        inner.replace(/<li[^>]*>(.*?)<\/li>/gi, (_m2: string, t: string) =>
+          `- ${t.replace(/<[^>]+>/g, '').trim()}\n`
+        )
+      )
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<p[^>]*>(.*?)<\/p>/gi, (_m, t) => `${t.replace(/<[^>]+>/g, '').trim()}\n`)
+      .replace(/<[^>]+>/g, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
   function applyIssueTemplate(tplId: string) {
     const tpl = issueTemplates.find((t) => t.id === tplId);
     if (!tpl) return;
     const cfg = tpl.config as IssueTemplateConfig;
     if (cfg.title)       setTitle(cfg.title);
-    if (cfg.description) setDesc(cfg.description);
+    if (cfg.description) setDesc(htmlToPlainText(cfg.description));
     if (cfg.issue_type)  setIssueType(cfg.issue_type as IssueType);
     if (cfg.priority)    setPriority(cfg.priority as Priority);
     if (cfg.story_points != null) setPoints(cfg.story_points);
@@ -527,6 +568,43 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
     <div className="kb-modal-overlay" onClick={handleOverlay}>
       <div className="kb-modal-wide bb-modal-animate im-modal">
 
+        {/* ── Template bar — create mode only, sits above header ── */}
+        {!isEdit && issueTemplates.length > 0 && (
+          <div className="im-tpl-topbar">
+            <span className="im-tpl-label">TEMPLATE</span>
+            <div className="im-tpl-chips">
+              <button
+                type="button"
+                className={`im-tpl-chip${activeTemplateId === null ? ' im-tpl-chip-active' : ''}`}
+                onClick={() => {
+                  setActiveTemplateId(null);
+                  setTitle(''); setDesc('');
+                  setIssueType('task'); setPriority('medium');
+                  setPoints(3); setLabelIds([]);
+                }}
+              >
+                📄 Blank
+              </button>
+              {issueTemplates.map((tpl) => (
+                <button
+                  key={tpl.id}
+                  type="button"
+                  className={`im-tpl-chip${activeTemplateId === tpl.id ? ' im-tpl-chip-active' : ''}`}
+                  onClick={() => applyIssueTemplate(tpl.id)}
+                  title={tpl.description}
+                >
+                  {tpl.icon || '📋'} {tpl.name}
+                </button>
+              ))}
+            </div>
+            <button className="kb-modal-close" onClick={close}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+              </svg>
+            </button>
+          </div>
+        )}
+
         {/* ── Header ── */}
         <div className="im-header">
           <div className="im-header-left">
@@ -536,11 +614,13 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
             </span>
             {issueKey && <span className="im-issue-key">{issueKey}</span>}
           </div>
-          <button className="kb-modal-close" onClick={close}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-            </svg>
-          </button>
+          {(isEdit || issueTemplates.length === 0) && (
+            <button className="kb-modal-close" onClick={close}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* ── Read-only banners ── */}
@@ -569,38 +649,6 @@ export function IssueModal({ issue, isOpen, projectId, onClose, onNavigate, read
 
             {/* ═══ LEFT — content ═══ */}
             <div className="im-col-main">
-
-              {/* Template strip — create mode only */}
-              {!isEdit && issueTemplates.length > 0 && (
-                <div className="im-tpl-strip">
-                  <span className="im-tpl-label">Template</span>
-                  <div className="im-tpl-chips">
-                    <button
-                      type="button"
-                      className={`im-tpl-chip${activeTemplateId === null ? ' im-tpl-chip-active' : ''}`}
-                      onClick={() => {
-                        setActiveTemplateId(null);
-                        setTitle(''); setDesc('');
-                        setIssueType('task'); setPriority('medium');
-                        setPoints(3); setLabelIds([]);
-                      }}
-                    >
-                      📄 Blank
-                    </button>
-                    {issueTemplates.map((tpl) => (
-                      <button
-                        key={tpl.id}
-                        type="button"
-                        className={`im-tpl-chip${activeTemplateId === tpl.id ? ' im-tpl-chip-active' : ''}`}
-                        onClick={() => applyIssueTemplate(tpl.id)}
-                        title={tpl.description}
-                      >
-                        {tpl.icon || '📋'} {tpl.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* Title */}
               <div className="im-section">

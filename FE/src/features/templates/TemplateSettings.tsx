@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { EmojiPicker } from './EmojiPicker';
 import { useProjectTemplates, useCreateTemplate, useUpdateTemplate, useDeleteTemplate } from './useTemplates';
 import type { WorkflowTemplate, TemplateType } from '@/types';
 
@@ -283,15 +284,7 @@ function TemplateForm({
             <label>Icon</label>
             {readOnly
               ? <span className="tpl-read-val">{form.icon || '—'}</span>
-              : (
-                <input
-                  className="tpl-input tpl-input-sm"
-                  value={form.icon}
-                  placeholder="🐛"
-                  maxLength={4}
-                  onChange={(e) => setForm((f) => ({ ...f, icon: e.target.value }))}
-                />
-              )
+              : <EmojiPicker value={form.icon} templateType={form.template_type} onChange={(v) => setForm((f) => ({ ...f, icon: v }))} />
             }
           </div>
           <div style={{ flex: 1 }}>
