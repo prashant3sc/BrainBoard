@@ -4124,18 +4124,104 @@
    COMPLIANCE SECTION  (cs-)  — IssueModal left column
    ══════════════════════════════════════════════════════════ */
 
-.cs-root {
-  border: 1px solid var(--bb-border);
-  border-radius: 8px;
-  overflow: hidden;
+/* ── Compliance Section ── */
+.cs-root { display: flex; flex-direction: column; gap: 10px; }
+
+/* Header */
+.cs-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 2px;
 }
-.cs-progress {
-  display: flex; align-items: center; justify-content: flex-end;
-  padding: 0 0 6px 0;
+.cs-header-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--bb-text-muted);
 }
-.cs-summary { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--kb-field-label); }
-.cs-bar-wrap { display: inline-flex; width: 60px; height: 5px; background: var(--bb-border); border-radius: 4px; overflow: hidden; }
-.cs-bar-fill  { background: #22C55E; border-radius: 4px; transition: width .3s; }
+.cs-header-right { display: flex; align-items: center; gap: 10px; }
+.cs-header-bar {
+  width: 100px; height: 4px; border-radius: 99px;
+  background: var(--bb-border); overflow: hidden;
+}
+.cs-header-bar-fill { height: 100%; background: #E75026; border-radius: 99px; transition: width .4s; }
+.cs-header-count { font-size: 12px; color: var(--bb-text-muted); white-space: nowrap; }
+
+/* Cards */
+.cs-cards { display: flex; flex-direction: column; gap: 8px; }
+.cs-card {
+  display: flex; align-items: flex-start; gap: 12px;
+  border: 1px solid var(--bb-border); border-radius: 8px;
+  padding: 12px 14px; background: var(--bb-surface);
+  transition: border-color .15s;
+}
+.cs-card:hover { border-color: var(--bb-text-muted); }
+
+/* Left: circle + info */
+.cs-card-left { display: flex; align-items: flex-start; gap: 10px; flex: 1; min-width: 0; }
+
+.cs-circle {
+  width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+  border: 2px solid var(--bb-border); background: none;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  margin-top: 1px; transition: border-color .15s, background .15s;
+}
+.cs-circle:hover:not(:disabled) { border-color: #E75026; }
+.cs-circle-done { background: #E75026; border-color: #E75026; }
+.cs-circle:disabled { cursor: default; opacity: .6; }
+
+.cs-card-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cs-card-name { font-size: 13px; font-weight: 600; color: var(--bb-text-primary); }
+.cs-card-name-done { color: var(--bb-text-muted); text-decoration: line-through; }
+.cs-card-gates { font-size: 11px; color: var(--bb-text-muted); }
+.cs-card-completed-by { font-size: 11px; color: #E75026; margin-top: 2px; }
+
+/* Center: badge + dots */
+.cs-card-center {
+  display: flex; align-items: center; gap: 6px;
+  flex-shrink: 0; padding-top: 1px;
+}
+.cs-badge-new {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11.5px; font-weight: 600;
+  padding: 3px 10px; border-radius: 99px; flex-shrink: 0;
+}
+.cs-badge-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+/* Three-dot menu */
+.cs-menu-wrap { position: relative; }
+.cs-dots-btn {
+  width: 24px; height: 24px; border-radius: 5px;
+  border: none; background: none; cursor: pointer;
+  color: var(--bb-text-muted); display: flex; align-items: center; justify-content: center;
+  transition: background .12s, color .12s;
+}
+.cs-dots-btn:hover { background: var(--bb-nav-active-bg); color: var(--bb-text-primary); }
+.cs-menu {
+  position: absolute; top: calc(100% + 4px); right: 0;
+  background: var(--bb-surface); border: 1px solid var(--bb-border);
+  border-radius: 8px; box-shadow: 0 4px 16px rgba(9,30,66,.12);
+  min-width: 160px; z-index: 50; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.cs-menu-item {
+  text-align: left; padding: 8px 14px; font-size: 12.5px;
+  color: var(--bb-text-primary); background: none; border: none;
+  cursor: pointer; font-family: inherit; transition: background .1s;
+}
+.cs-menu-item:hover { background: var(--bb-nav-active-bg); }
+
+/* Note textarea */
+.cs-note-textarea {
+  width: 180px; flex-shrink: 0;
+  border: 1px solid var(--bb-border); border-radius: 6px;
+  background: var(--bb-bg-input); color: var(--bb-text-primary);
+  padding: 6px 10px; font-size: 12px; font-family: inherit;
+  resize: none; line-height: 1.5;
+  transition: border-color .15s;
+}
+.cs-note-textarea:focus { outline: none; border-color: #E75026; box-shadow: 0 0 0 2px rgba(231,80,38,0.1); }
+.cs-note-textarea:disabled { opacity: .5; cursor: not-allowed; }
+.cs-note-textarea::placeholder { color: var(--bb-text-muted); }
+
+/* Loading / error states */
 .cs-loading, .cs-empty {
   padding: 16px 14px; font-size: 12.5px; color: var(--bb-text-muted);
   display: flex; align-items: center; gap: 6px;
@@ -4150,57 +4236,11 @@
   border-radius: 5px; padding: 2px 10px; cursor: pointer;
 }
 .cs-retry-btn:hover { background: var(--bb-nav-active-bg); }
-.cs-list { display: flex; flex-direction: column; }
-
-.cs-check-row { border-bottom: 1px solid var(--bb-border); }
-.cs-check-row:last-child { border-bottom: none; }
-.cs-check-header {
-  display: flex; align-items: center; gap: 8px;
-  padding: 9px 14px; cursor: pointer;
-  transition: background .1s;
-}
-.cs-check-header:hover { background: var(--bb-nav-active-bg); }
-.cs-check-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.cs-check-name { flex: 1; font-size: 13px; color: var(--bb-text-primary); }
-.cs-check-blocks { font-size: 11px; color: var(--bb-text-muted); display: flex; align-items: center; gap: 3px; }
-.cs-check-blocks code { background: var(--bb-surface-raised, #F4F5F7); padding: 1px 4px; border-radius: 3px; font-size: 10px; }
-.cs-chevron { color: var(--bb-text-muted); transition: transform .15s; flex-shrink: 0; }
-.cs-chevron-open { transform: rotate(180deg); }
-
-.cs-check-body { padding: 6px 14px 12px 30px; background: var(--bb-surface-raised, var(--bb-surface)); }
-.cs-check-desc { font-size: 12.5px; color: var(--bb-text-muted); margin: 0 0 8px; line-height: 1.5; }
-.cs-check-meta { font-size: 11.5px; color: var(--bb-text-muted); margin: 0 0 8px; }
-.cs-note-label { display: block; font-size: 11px; font-weight: 600; color: var(--bb-text-secondary); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
-.cs-note-input {
-  width: 100%; border: 1px solid var(--bb-border); border-radius: 6px;
-  background: var(--bb-bg-input); color: var(--bb-text-primary);
-  padding: 6px 10px; font-size: 12.5px; font-family: inherit; resize: vertical;
-}
-.cs-note-input:disabled { opacity: .6; cursor: not-allowed; }
-.cs-check-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-
-.cs-btn { padding: 5px 12px; border-radius: 5px; border: 1px solid transparent; font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit; transition: all .12s; }
-.cs-btn-complete { background: #22C55E; color: #fff; }
-.cs-btn-complete:hover { background: #16A34A; }
-.cs-btn-na      { background: var(--bb-surface-raised, #F4F5F7); color: var(--bb-text-secondary); border-color: var(--bb-border); }
-.cs-btn-na:hover { background: var(--bb-border); }
-.cs-btn-blocked { background: #FEF2F2; color: #EF4444; border-color: #FECACA; }
-.cs-btn-blocked:hover { background: #FEE2E2; }
-.cs-btn-reset   { background: none; color: var(--bb-text-muted); border-color: var(--bb-border); }
-.cs-btn-reset:hover { background: var(--bb-border); }
-
-/* Status badges */
-.cs-badge { font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 10px; flex-shrink: 0; }
-.cs-badge-pending  { background: #FFF7ED; color: #C2410C; }
-.cs-badge-complete { background: #F0FDF4; color: #15803D; }
-.cs-badge-blocked  { background: #FEF2F2; color: #B91C1C; }
-.cs-badge-na       { background: var(--bb-surface-raised, #F4F5F7); color: var(--bb-text-muted); }
 
 /* Dark overrides */
-.dark .cs-root { border-color: var(--bb-border); }
-.dark .cs-note-input { background: var(--bb-bg-input); color: var(--bb-text-primary); border-color: var(--bb-border); }
-.dark .cs-btn-na { background: rgba(255,255,255,.06); }
-.dark .cs-btn-reset { background: none; }
+.dark .cs-card { background: var(--bb-surface); }
+.dark .cs-note-textarea { background: var(--bb-bg-input); color: var(--bb-text-primary); border-color: var(--bb-border); }
+.dark .cs-menu { background: var(--bb-surface); }
 
 
 /* ══════════════════════════════════════════════════════════
