@@ -449,12 +449,12 @@ export function SprintRetroPanel({ sprint, issues, projectId, memberNames, onClo
                 onClick={handleGenerate}
                 style={{
                   width: '100%', padding: '12px 20px',
-                  background: '#0052CC', color: '#fff', border: 'none',
+                  background: '#E75026', color: '#fff', border: 'none',
                   borderRadius: 8, fontSize: 14, fontWeight: 600,
                   cursor: 'pointer', letterSpacing: '-0.1px',
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = '#0747A6')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = '#0052CC')}
+                onMouseEnter={(e) => (e.currentTarget.style.background = '#C73D16')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = '#E75026')}
               >
                 Generate AI Retro
               </button>
@@ -470,7 +470,7 @@ export function SprintRetroPanel({ sprint, issues, projectId, memberNames, onClo
               <div style={{
                 width: 44, height: 44,
                 border: '3px solid var(--bb-tbl-wrap-border)',
-                borderTopColor: '#0052CC',
+                borderTopColor: '#E75026',
                 borderRadius: '50%',
                 animation: 'bb-spin 0.9s linear infinite',
               }} />
@@ -550,7 +550,7 @@ export function SprintRetroPanel({ sprint, issues, projectId, memberNames, onClo
                   disabled={phase === 'saving'}
                   style={{
                     flex: 1, padding: '9px 16px',
-                    background: '#0052CC', color: '#fff', border: 'none',
+                    background: '#E75026', color: '#fff', border: 'none',
                     borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer',
                     opacity: phase === 'saving' ? 0.7 : 1,
                   }}
