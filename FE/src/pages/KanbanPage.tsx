@@ -11,6 +11,7 @@ import { useActiveSprint } from '@/features/projects/useSprints';
 import { KanbanBoard } from '@/features/kanban/components/KanbanBoard';
 import { IssueListView } from '@/features/kanban/components/IssueListView';
 import { IssueModal } from '@/features/kanban/components/IssueModal';
+import { useTemplates } from '@/features/templates/useTemplates';
 import { issuesApi } from '@/api/issues';
 import type { Issue } from '@/types';
 
@@ -45,8 +46,13 @@ export function KanbanPage() {
   const [assigneeFilter,     setAssigneeFilter]     = useState<string[]>([]);
   const [overflowOpen,       setOverflowOpen]       = useState(false);
   const [overflowPos,        setOverflowPos]        = useState({ top: 0, right: 0 });
+  const [tplDropOpen,        setTplDropOpen]        = useState(false);
+  const [tplDropPos,         setTplDropPos]         = useState({ top: 0, right: 0 });
+  const [initialTemplateId,  setInitialTemplateId]  = useState<string | null>(null);
   const overflowRef    = useRef<HTMLDivElement>(null);
   const overflowBtnRef = useRef<HTMLDivElement>(null);
+  const tplDropRef     = useRef<HTMLDivElement>(null);
+  const tplDropBtnRef  = useRef<HTMLButtonElement>(null);
 
   const openOverflow = useCallback(() => {
     if (overflowBtnRef.current) {
@@ -55,7 +61,17 @@ export function KanbanPage() {
     }
     setOverflowOpen((v) => !v);
   }, []);
+
+  const openTplDrop = useCallback(() => {
+    if (tplDropBtnRef.current) {
+      const r = tplDropBtnRef.current.getBoundingClientRect();
+      setTplDropPos({ top: r.bottom + 6, right: window.innerWidth - r.right });
+    }
+    setTplDropOpen((v) => !v);
+  }, []);
+
   const { data: members  = [] } = useProjectMembers(projectId ?? '');
+  const { data: issueTemplates = [] } = useTemplates('issue', projectId ?? '');
   const { data: activeSprintData, isLoading: issuesLoading } = useActiveSprint(projectId ?? '');
   const allIssues = activeSprintData?.issues ?? [];
 
@@ -97,6 +113,19 @@ export function KanbanPage() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, [overflowOpen]);
 
+  /* Close template dropdown on outside click */
+  useEffect(() => {
+    if (!tplDropOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (
+        tplDropRef.current && !tplDropRef.current.contains(e.target as Node) &&
+        tplDropBtnRef.current && !tplDropBtnRef.current.contains(e.target as Node)
+      ) setTplDropOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [tplDropOpen]);
+
 
   if (!projectId) {
     return (
@@ -106,8 +135,9 @@ export function KanbanPage() {
     );
   }
 
-  function openAdd() {
+  function openAdd(templateId?: string | null) {
     setSelectedIssue(null);
+    setInitialTemplateId(templateId ?? null);
     setModalOpen(true);
   }
 
@@ -116,7 +146,7 @@ export function KanbanPage() {
     setModalOpen(true);
   }
 
-  function closeModal() { setModalOpen(false); }
+  function closeModal() { setModalOpen(false); setInitialTemplateId(null); }
 
   return (
     <div className="kb-page">
@@ -309,14 +339,79 @@ export function KanbanPage() {
             </button>
           </div>
 
-          {/* Add Card */}
+          {/* Add Card + template dropdown */}
           {can('editIssue') && !isWriteLocked && (
-            <button className="kb-btn-primary" onClick={() => openAdd()}>
-              <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-                <path d="M7 2v10M2 7h10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
-              Add Card
-            </button>
+            <div style={{ display: 'flex', alignItems: 'stretch', position: 'relative' }}>
+              <button
+                className="kb-btn-primary"
+                style={{ borderRadius: issueTemplates.length > 0 ? '6px 0 0 6px' : undefined, paddingRight: issueTemplates.length > 0 ? 10 : undefined }}
+                onClick={() => openAdd()}
+              >
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                  <path d="M7 2v10M2 7h10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                Create Issue
+              </button>
+
+              {issueTemplates.length > 0 && (
+                <>
+                  <button
+                    ref={tplDropBtnRef}
+                    className="kb-btn-primary"
+                    style={{ borderRadius: '0 6px 6px 0', borderLeft: '1px solid rgba(255,255,255,0.25)', padding: '0 8px' }}
+                    title="Create from template"
+                    onClick={openTplDrop}
+                  >
+                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                      <path d="M2 4l4 4 4-4" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
+
+                  {tplDropOpen && createPortal(
+                    <div
+                      ref={tplDropRef}
+                      style={{
+                        position: 'fixed',
+                        top: tplDropPos.top,
+                        right: tplDropPos.right,
+                        background: 'var(--kb-modal-bg, #fff)',
+                        border: '1.5px solid var(--bb-border)',
+                        borderRadius: 10,
+                        boxShadow: '0 6px 24px rgba(9,30,66,0.18)',
+                        padding: '4px 0',
+                        minWidth: 200,
+                        zIndex: 9999,
+                      }}
+                    >
+                      <div style={{ padding: '6px 12px 4px', fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--bb-text-muted)' }}>
+                        Template
+                      </div>
+                      {issueTemplates.map((tpl) => (
+                        <button
+                          key={tpl.id}
+                          type="button"
+                          onClick={() => { setTplDropOpen(false); openAdd(tpl.id); }}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 8,
+                            width: '100%', padding: '7px 12px',
+                            border: 'none', background: 'transparent',
+                            cursor: 'pointer', textAlign: 'left',
+                            fontSize: 13, color: 'var(--bb-text-primary)',
+                            transition: 'background .1s',
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bb-bg-input, #F4F5F7)')}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                        >
+                          <span style={{ fontSize: 15 }}>{tpl.icon || '📋'}</span>
+                          <span>{tpl.name}</span>
+                        </button>
+                      ))}
+                    </div>,
+                    document.body,
+                  )}
+                </>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -350,6 +445,7 @@ export function KanbanPage() {
         onClose={closeModal}
         onNavigate={openEdit}
         readOnly={isWriteLocked}
+        initialTemplateId={initialTemplateId}
       />
     </div>
   );
