@@ -41,12 +41,12 @@ const TABS: Tab[] = [
     description: 'Knowledge base activity and coverage metrics',
     icon: <KBIcon />,
   },
-  {
-    id: 'compliance',
-    label: 'Compliance',
-    description: 'Sign-off completion rates and blocking checks across issues',
-    icon: <ComplianceIcon />,
-  },
+  // {
+  //   id: 'compliance',
+  //   label: 'Compliance',
+  //   description: 'Sign-off completion rates and blocking checks across issues',
+  //   icon: <ComplianceIcon />,
+  // },
 ];
 
 /* ── Page ────────────────────────────────────────────────────────────────── */

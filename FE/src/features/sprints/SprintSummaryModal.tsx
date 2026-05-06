@@ -389,12 +389,12 @@ export function SprintSummaryModal({ sprint, issues, movedInfo, memberNames, onC
                 onClick={() => { onClose(); onGenerateRetro(); }}
                 style={{
                   width: '100%', padding: '11px 20px',
-                  background: '#0052CC', color: '#fff', border: 'none',
+                  background: '#E75026', color: '#fff', border: 'none',
                   borderRadius: 8, fontSize: 14, fontWeight: 600,
                   cursor: 'pointer', letterSpacing: '-0.1px',
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = '#0747A6')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = '#0052CC')}
+                onMouseEnter={(e) => (e.currentTarget.style.background = '#C73D16')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = '#E75026')}
               >
                 Generate AI Retro
               </button>

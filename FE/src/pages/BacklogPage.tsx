@@ -44,6 +44,7 @@ function beError(err: unknown): string {
 interface CompleteModalProps {
   sprint: Sprint;
   unfinishedIssues: Issue[];
+  allIssues: Issue[];
   plannedSprints: Sprint[];
   projectId: string;
   onConfirm: (action: 'backlog' | 'next_sprint', nextSprintId?: string) => void;
@@ -51,83 +52,313 @@ interface CompleteModalProps {
   isPending: boolean;
 }
 
-function CompleteSprintModal({ sprint, unfinishedIssues, plannedSprints, projectId, onConfirm, onClose, isPending }: CompleteModalProps) {
-  const [action, setAction] = useState<'backlog' | 'next_sprint'>('backlog');
+function CompleteSprintModal({ sprint, unfinishedIssues, allIssues, plannedSprints, projectId, onConfirm, onClose, isPending }: CompleteModalProps) {
+  const [action,       setAction]       = useState<'backlog' | 'next_sprint'>('backlog');
   const [nextSprintId, setNextSprintId] = useState(plannedSprints[0]?.id ?? '');
+  const [postOpen,     setPostOpen]     = useState(false);
+  const [postActions,  setPostActions]  = useState({ report: true, notify: true, retro: false });
+
+  const completed   = allIssues.filter((i) => i.status === 'done').length;
+  const total       = allIssues.length;
+  const nextSprint  = plannedSprints.find((s) => s.id === nextSprintId) ?? plannedSprints[0];
+  const nextIssues  = allIssues.filter((i) => i.sprintId === nextSprint?.id).length;
+  const nextCap     = nextSprint?.capacity ?? 40;
 
   function handleConfirm() {
     if (action === 'next_sprint' && !nextSprintId) return;
+
     onConfirm(action, action === 'next_sprint' ? nextSprintId : undefined);
   }
 
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Enter' && !isPending) handleConfirm();
+      if (e.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [action, nextSprintId, isPending]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function formatDate(d?: string | null) {
+    if (!d) return '';
+    const dt = new Date(d);
+    return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+
+  const OPTS = [
+    {
+      id:    'backlog' as const,
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <line x1="2" y1="4" x2="14" y2="4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          <line x1="2" y1="8" x2="14" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          <line x1="2" y1="12" x2="10" y2="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
+      ),
+      title:    'Send to Backlog',
+      subtitle: 'Triage and re-estimate during the next planning session.',
+      meta:     `+${unfinishedIssues.length}`,
+      metaLabel:'TO BACKLOG',
+      disabled: false,
+    },
+    {
+      id:    'next_sprint' as const,
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <path d="M2 8h10M8 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      ),
+      title:    'Move to next sprint',
+      subtitle: nextSprint
+        ? `${nextSprint.name}${nextSprint.startDate ? ` · starts ${formatDate(nextSprint.startDate)}` : ''}`
+        : 'No planned sprints available.',
+      meta:     nextSprint ? `${nextIssues} / ${nextCap}` : '—',
+      metaLabel:'CAPACITY',
+      disabled: plannedSprints.length === 0,
+    },
+  ];
+
   return (
     <div className="kb-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="kb-modal-wide bb-modal-animate" style={{ maxWidth: 480 }}>
-        <div className="kb-modal-header">
-          <span className="kb-modal-title">Complete "{sprint.name}"</span>
-          <button className="kb-modal-close" onClick={onClose}>
+      <div className="bb-modal-animate" style={{
+        width: '100%', maxWidth: 520,
+        background: 'var(--bb-modal-bg, #fff)',
+        border: '1px solid var(--bb-modal-border, var(--bb-border))',
+        borderRadius: 14,
+        boxShadow: '0 24px 64px rgba(23,43,77,.18)',
+        display: 'flex', flexDirection: 'column',
+        overflow: 'hidden',
+      }}>
+
+        {/* ── Header ── */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '14px 20px 12px',
+          borderBottom: '1px solid var(--bb-border)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+              background: '#FFF3F0', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                <path d="M8 2a6 6 0 110 12A6 6 0 018 2z" stroke="#E75026" strokeWidth="1.4"/>
+                <path d="M8 5v3l2 2" stroke="#E75026" strokeWidth="1.4" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: '#E75026', marginBottom: 2 }}>
+                Wrap Up Sprint
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 700, color: 'var(--bb-text-primary)' }}>
+                <span>Complete</span>
+                <span style={{
+                  fontSize: 11, fontWeight: 600, padding: '1px 8px', borderRadius: 5,
+                  background: 'var(--bb-nav-hover-bg, #F4F5F7)', color: 'var(--bb-text-secondary)',
+                  border: '1px solid var(--bb-border)',
+                }}>
+                  {sprint.name}
+                </span>
+              </div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--bb-text-muted)', padding: 4, borderRadius: 6, display: 'flex' }}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
             </svg>
           </button>
         </div>
 
-        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
-          {unfinishedIssues.length === 0 ? (
-            <p style={{ fontSize: 13, color: 'var(--bb-bl-count)', margin: 0 }}>
-              All issues are done. Sprint will be closed.
-            </p>
-          ) : (
-            <>
-              <p style={{ fontSize: 13, color: 'var(--bb-bl-count)', margin: 0 }}>
-                <strong>{unfinishedIssues.length}</strong> unfinished {unfinishedIssues.length === 1 ? 'issue' : 'issues'} remaining. Where should they go?
-              </p>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, cursor: 'pointer', color: 'var(--bb-text-primary)' }}>
-                  <input type="radio" name="action" value="backlog" checked={action === 'backlog'} onChange={() => setAction('backlog')} />
-                  Move to <strong>Backlog</strong>
-                </label>
-
-                <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, cursor: 'pointer', color: 'var(--bb-text-primary)', opacity: plannedSprints.length === 0 ? 0.4 : 1 }}>
-                  <input
-                    type="radio"
-                    name="action"
-                    value="next_sprint"
-                    checked={action === 'next_sprint'}
-                    disabled={plannedSprints.length === 0}
-                    onChange={() => setAction('next_sprint')}
-                  />
-                  Move to <strong>Sprint</strong>
-                  {plannedSprints.length === 0 && <span style={{ fontSize: 11, opacity: 0.6 }}>(no planned sprints)</span>}
-                </label>
-
-                {action === 'next_sprint' && plannedSprints.length > 0 && (
-                  <div style={{ marginLeft: 24 }}>
-                    <CustomSelect
-                      value={nextSprintId}
-                      onChange={setNextSprintId}
-                      options={plannedSprints.map((s) => ({ value: s.id, label: s.name }))}
-                    />
-                  </div>
-                )}
-              </div>
-            </>
-          )}
+        {/* ── Stats ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', borderBottom: '1px solid var(--bb-border)' }}>
+          {[
+            { val: completed,              label: 'Completed',    color: '#1D9E75' },
+            { val: unfinishedIssues.length, label: 'Unfinished',  color: '#E75026' },
+            { val: total,                  label: 'Total Issues', color: '#172B4D' },
+          ].map((s, i) => (
+            <div key={s.label} style={{
+              padding: '14px 0', textAlign: 'center',
+              borderRight: i < 2 ? '1px solid var(--bb-border)' : 'none',
+            }}>
+              <div style={{ fontSize: 28, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.val}</div>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--bb-text-muted)', marginTop: 4 }}>{s.label}</div>
+            </div>
+          ))}
         </div>
 
-        <ProcessDefinitionPanel
-          projectId={projectId}
-          context="sprint_completion"
-          compact={false}
-        />
+        {/* ── Body ── */}
+        <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-        <div className="kb-modal-footer">
-          <div />
-          <div className="kb-modal-footer-right">
+          {unfinishedIssues.length > 0 ? (
+            <>
+              <p style={{ margin: '0 0 4px', fontSize: 13, color: 'var(--bb-text-secondary)' }}>
+                <strong style={{ color: 'var(--bb-text-primary)' }}>{unfinishedIssues.length} issue{unfinishedIssues.length !== 1 ? 's' : ''}</strong> didn't ship this sprint. Where should they go?
+              </p>
+
+              {OPTS.map((opt) => {
+                const sel = action === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    disabled={opt.disabled}
+                    onClick={() => { if (!opt.disabled) setAction(opt.id); if (opt.id === 'next_sprint' && !nextSprintId && plannedSprints[0]) setNextSprintId(plannedSprints[0].id); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      width: '100%', padding: '11px 14px',
+                      border: '1.5px solid var(--bb-border)',
+                      borderRadius: 9,
+                      background: '#F4F5F7',
+                      cursor: opt.disabled ? 'not-allowed' : 'pointer',
+                      opacity: opt.disabled ? 0.45 : 1,
+                      textAlign: 'left',
+                      transition: 'border-color .12s, background .12s',
+                    }}
+                  >
+                    {/* Radio */}
+                    <span style={{
+                      width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
+                      border: `2px solid ${sel ? '#E75026' : 'var(--bb-border)'}`,
+                      background: sel ? '#E75026' : 'transparent',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {sel && <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#fff' }} />}
+                    </span>
+
+                    {/* Icon */}
+                    <span style={{ color: sel ? '#E75026' : 'var(--bb-text-muted)', flexShrink: 0 }}>{opt.icon}</span>
+
+                    {/* Text */}
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: sel ? '#E75026' : 'var(--bb-text-primary)' }}>{opt.title}</span>
+                      <span style={{ display: 'block', fontSize: 11.5, color: 'var(--bb-text-muted)', marginTop: 1 }}>{opt.subtitle}</span>
+                    </span>
+
+                    {/* Meta */}
+                    <span style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color: sel ? '#E75026' : 'var(--bb-text-primary)' }}>{opt.meta}</span>
+                      <span style={{ display: 'block', fontSize: 9, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--bb-text-muted)', marginTop: 1 }}>{opt.metaLabel}</span>
+                    </span>
+                  </button>
+                );
+              })}
+
+              {action === 'next_sprint' && plannedSprints.length > 1 && (
+                <div style={{ paddingLeft: 44 }}>
+                  <CustomSelect
+                    value={nextSprintId}
+                    onChange={setNextSprintId}
+                    options={plannedSprints.map((s) => ({ value: s.id, label: s.name }))}
+                  />
+                </div>
+              )}
+            </>
+          ) : (
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--bb-text-secondary)' }}>
+              All issues are done. The sprint will be closed.
+            </p>
+          )}
+
+          {/* ── Process Definition Panel ── */}
+          <ProcessDefinitionPanel projectId={projectId} context="sprint_completion" compact={false} />
+
+          {/* ── POST-SPRINT ACTIONS ── */}
+          <div style={{ borderTop: '1px solid var(--bb-border)', marginTop: 4 }}>
+            <button
+              type="button"
+              onClick={() => setPostOpen((v) => !v)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                width: '100%', padding: '10px 0 6px',
+                background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: 11, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase',
+                color: 'var(--bb-text-muted)',
+              }}
+            >
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" style={{ transition: 'transform .15s', transform: postOpen ? 'rotate(180deg)' : '' }}>
+                <path d="M3 4.5l3 3 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Post-Sprint Actions
+            </button>
+
+            {postOpen && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 6 }}>
+                {[
+                  { key: 'report', label: 'Generate sprint report', suffix: '— burndown, velocity, scope changes.', tag: 'PDF' },
+                  { key: 'notify', label: 'Notify the team', suffix: 'in #medi-eng with a summary.', tag: 'SLACK' },
+                  { key: 'retro',  label: 'Schedule retro', suffix: 'for Friday at 3:00 PM.', tag: 'CAL · 45M' },
+                ].map((item) => {
+                  const checked = postActions[item.key as keyof typeof postActions];
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => setPostActions((p) => ({ ...p, [item.key]: !p[item.key as keyof typeof p] }))}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '9px 10px', borderRadius: 7,
+                        border: '1px solid var(--bb-border)',
+                        background: 'var(--bb-card-bg, #fff)',
+                        cursor: 'pointer', textAlign: 'left',
+                        transition: 'border-color .1s',
+                      }}
+                    >
+                      {/* Checkbox */}
+                      <span style={{
+                        width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                        border: `2px solid ${checked ? '#E75026' : 'var(--bb-border)'}`,
+                        background: checked ? '#E75026' : 'transparent',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: 'background .1s, border-color .1s',
+                      }}>
+                        {checked && (
+                          <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+                            <path d="M2 5l2.5 2.5 3.5-4" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </span>
+
+                      {/* Text */}
+                      <span style={{ flex: 1, fontSize: 12.5, color: 'var(--bb-text-primary)', lineHeight: 1.4 }}>
+                        <strong>{item.label}</strong>{' '}
+                        <span style={{ color: 'var(--bb-text-muted)' }}>{item.suffix}</span>
+                      </span>
+
+                      {/* Tag */}
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, letterSpacing: '.05em',
+                        color: 'var(--bb-text-muted)', whiteSpace: 'nowrap', flexShrink: 0,
+                      }}>
+                        {item.tag}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Footer ── */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 20px 14px',
+          borderTop: '1px solid var(--bb-border)',
+        }}>
+          <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
             <button className="kb-btn-ghost" onClick={onClose}>Cancel</button>
-            <button className="kb-btn-create" onClick={handleConfirm} disabled={isPending}>
-              {isPending ? 'Completing…' : 'Complete Sprint'}
+            <button
+              className="kb-btn-create"
+              onClick={handleConfirm}
+              disabled={isPending || (action === 'next_sprint' && !nextSprintId)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              {isPending ? 'Completing…' : 'Complete sprint'}
+              {!isPending && (
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
             </button>
           </div>
         </div>
@@ -478,7 +709,7 @@ interface SprintBlockProps {
   canMoveIssue: boolean;
   plannedSprints: Sprint[];
   onStart: () => void;
-  onComplete: (sprint: Sprint, unfinished: Issue[]) => void;
+  onComplete: (sprint: Sprint, unfinished: Issue[], all: Issue[]) => void;
   onIssueClick: (issue: Issue) => void;
   onViewSummary: (sprint: Sprint, issues: Issue[]) => void;
   onViewRetro: (sprint: Sprint, issues: Issue[]) => void;
@@ -527,7 +758,7 @@ function SprintBlock({ sprint, issues, search, collapsed, onToggle, canManage, c
           </button>
         )}
         {canManage && isActive && (
-          <button className="bb-sprint-action" onClick={(e) => { e.stopPropagation(); onComplete(sprint, unfinished); }}>
+          <button className="bb-sprint-action" onClick={(e) => { e.stopPropagation(); onComplete(sprint, unfinished, issues); }}>
             Complete sprint
           </button>
         )}
@@ -762,7 +993,7 @@ export default function BacklogPage() {
 
   const [collapsed,       setCollapsed]       = useState<Record<string, boolean>>({});
   const [search,          setSearch]          = useState('');
-  const [completeModal,   setCompleteModal]   = useState<{ sprint: Sprint; unfinished: Issue[] } | null>(null);
+  const [completeModal,   setCompleteModal]   = useState<{ sprint: Sprint; unfinished: Issue[]; all: Issue[] } | null>(null);
   const [summaryModal,    setSummaryModal]    = useState<{ sprint: Sprint; issues: Issue[]; movedInfo?: { action: 'backlog' | 'next_sprint'; nextSprintName?: string; count: number } } | null>(null);
   const [retroPanel,      setRetroPanel]      = useState<{ sprint: Sprint; issues: Issue[] } | null>(null);
   const [showCreateModal,    setShowCreateModal]    = useState(false);
@@ -801,8 +1032,8 @@ export default function BacklogPage() {
     );
   }
 
-  function handleOpenCompleteModal(sprint: Sprint, unfinished: Issue[]) {
-    setCompleteModal({ sprint, unfinished });
+  function handleOpenCompleteModal(sprint: Sprint, unfinished: Issue[], all: Issue[]) {
+    setCompleteModal({ sprint, unfinished, all });
   }
 
   function handleConfirmComplete(action: 'backlog' | 'next_sprint', nextSprintId?: string) {
@@ -1063,6 +1294,7 @@ export default function BacklogPage() {
         <CompleteSprintModal
           sprint={completeModal.sprint}
           unfinishedIssues={completeModal.unfinished}
+          allIssues={completeModal.all}
           plannedSprints={plannedSprints}
           projectId={projectId}
           onConfirm={handleConfirmComplete}

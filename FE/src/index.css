@@ -4898,6 +4898,7 @@
   background: var(--bb-surface-raised, var(--bb-tbl-wrap-bg));
   margin: 12px 0 4px;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .pd-panel-toggle {
@@ -5096,10 +5097,12 @@
 
 .pds-list-item {
   padding: 9px 11px; border-radius: 8px; cursor: pointer;
-  border: 1px solid transparent;
+  border: 1px solid var(--bb-border);
+  background: #fff;
   display: flex; flex-direction: column; gap: 5px;
   transition: background .1s, border-color .1s;
 }
+.dark .pds-list-item { background: var(--bb-surface-raised, #1E2028); }
 .pds-list-item:hover { background: var(--bb-nav-hover-bg); }
 .pds-list-item--selected {
   background: #FFF3F0; border-color: rgba(231,80,38,.28);
