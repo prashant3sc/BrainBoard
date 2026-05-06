@@ -79,6 +79,11 @@ export function KanbanBoard({ projectId, searchQuery, assigneeFilter, onIssueCli
         { id: draggableId, dto: { status: newStatus }, projectId },
         {
           onError: (err) => {
+            setLocalIssues((prev) =>
+              prev.map((issue) =>
+                issue.id === draggableId ? { ...issue, status: oldStatus } : issue,
+              ),
+            );
             const ax = err as AxiosError<{ status?: string; detail?: string }>;
             const msg =
               ax?.response?.data?.status ??
@@ -129,7 +134,7 @@ export function KanbanBoard({ projectId, searchQuery, assigneeFilter, onIssueCli
     {/* Kanban error toast */}
     <div className={toast.visible ? 'bb-toast-enter' : 'bb-toast-exit'} style={{
       position: 'fixed', bottom: 28, right: 28,
-      background: '#FFF0EE', border: '1px solid #FFBDAD', borderRadius: 10,
+      background: '#FFFFFF', border: '1px solid #FFBDAD', borderRadius: 10,
       padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 8,
       boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 300,
       fontSize: 13, fontWeight: 500, color: '#DE350B',
