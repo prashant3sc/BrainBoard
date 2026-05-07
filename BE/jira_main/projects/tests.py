@@ -163,7 +163,7 @@ class ProjectMemberTests(TestCase):
             {"userId": str(self.dev.id)},
             format="json",
         )
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 201)
         self.assertTrue(ProjectMember.objects.filter(project=self.project, user=self.dev).exists())
 
     def test_add_member_idempotent(self):
@@ -179,7 +179,7 @@ class ProjectMemberTests(TestCase):
     def test_remove_member(self):
         ProjectMember.objects.get_or_create(project=self.project, user=self.dev)
         resp = self.pm_client.delete(f"/projects/{self.project.id}/members/{self.dev.id}")
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 204)
         self.assertFalse(ProjectMember.objects.filter(project=self.project, user=self.dev).exists())
 
     def test_developer_cannot_add_member(self):
@@ -249,7 +249,7 @@ class SprintTests(TestCase):
         Sprint.objects.create(project=self.project, name="Active", status=Sprint.ACTIVE)
         resp = self.pm_client.get(f"/projects/{self.project.id}/active-sprint")
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.data["status"], Sprint.ACTIVE)
+        self.assertEqual(resp.data["sprint"]["status"], Sprint.ACTIVE)
 
     def test_active_sprint_returns_404_when_none(self):
         Sprint.objects.create(project=self.project, name="Planned", status=Sprint.PLANNED)
