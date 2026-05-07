@@ -231,8 +231,9 @@ class SprintListView(APIView):
 
 class SprintDetailView(APIView):
     """
-    GET   /sprints/:id — retrieve sprint details (any authenticated user)
-    PATCH /sprints/:id — start (planned→active) or end (active→completed) a sprint (admin, pm only)
+    GET    /sprints/:id — retrieve sprint details (any authenticated user)
+    PATCH  /sprints/:id — start (planned→active) or end (active→completed) a sprint (admin, pm only)
+    DELETE /sprints/:id — delete a planned sprint (admin, pm only)
     """
 
     permission_classes = [IsAuthenticated]
@@ -303,6 +304,15 @@ class SprintDetailView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         sprint = serializer.save()
         return Response(SprintSerializer(sprint).data)
+
+    def delete(self, request, pk):
+        if not request.user.can_plan_sprints:
+            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
+        sprint = self._get_sprint(pk)
+        if not sprint:
+            return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        sprint.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class VelocityView(APIView):

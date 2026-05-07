@@ -63,7 +63,7 @@ class TemplateListTests(TestCase):
         resp = self.dev_client.get("/templates", {"type": WorkflowTemplate.PROJECT})
         self.assertEqual(resp.status_code, 200)
         for t in resp.data:
-            self.assertEqual(t["template_type"], WorkflowTemplate.PROJECT)
+            self.assertEqual(t["templateType"], WorkflowTemplate.PROJECT)
 
     def test_list_with_project_id_includes_custom_templates(self):
         resp = self.dev_client.get("/templates", {"project_id": str(self.project.id)})
@@ -130,7 +130,7 @@ class ProjectTemplateTests(TestCase):
             {"type": WorkflowTemplate.ISSUE},
         )
         for t in resp.data:
-            self.assertEqual(t["template_type"], WorkflowTemplate.ISSUE)
+            self.assertEqual(t["templateType"], WorkflowTemplate.ISSUE)
 
     def test_list_templates_for_nonexistent_project(self):
         import uuid

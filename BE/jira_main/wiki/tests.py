@@ -8,7 +8,7 @@ User = get_user_model()
 
 
 def _make_user(email, role="pm"):
-    u = User.objects.create_user(username=email, email=email, password="pass", role=role)
+    u = User.objects.create_user(email=email, password="pass", role=role, first_name=email.split("@")[0])
     return u
 
 
@@ -118,8 +118,8 @@ class ProcessDefinitionAPITest(TestCase):
         self.pm = _make_user("pm@test.com", "pm")
         self.dev = _make_user("dev@test.com", "developer")
         self.project = _make_project(self.pm)
-        ProjectMember.objects.create(project=self.project, user=self.pm, role="pm")
-        ProjectMember.objects.create(project=self.project, user=self.dev, role="developer")
+        ProjectMember.objects.create(project=self.project, user=self.pm)
+        ProjectMember.objects.create(project=self.project, user=self.dev)
         self.page1 = _make_page(self.project, "Sprint Completion Checklist")
         self.page2 = _make_page(self.project, "Bug Triage Process")
         self.sprint_pd = ProcessDefinition.objects.create(
@@ -144,11 +144,9 @@ class ProcessDefinitionAPITest(TestCase):
         )
 
     def _auth(self, user):
-        from django.test import Client
-        c = Client()
-        from rest_framework.authtoken.models import Token
-        token, _ = Token.objects.get_or_create(user=user)
-        c.defaults["HTTP_AUTHORIZATION"] = f"Token {token.key}"
+        from rest_framework.test import APIClient
+        c = APIClient()
+        c.force_authenticate(user=user)
         return c
 
     def test_list_returns_all_for_pm(self):

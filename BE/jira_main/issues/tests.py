@@ -205,6 +205,8 @@ class CommentTests(TestCase):
         self.viewer = _make_user("viewer@test.com", role=User.VIEWER)
         self.project = _make_project(self.dev, key="CMT")
         self.issue = _make_issue(self.project, self.dev, title="Commented Issue")
+        ProjectMember.objects.get_or_create(project=self.project, user=self.other)
+        ProjectMember.objects.get_or_create(project=self.project, user=self.viewer)
         self.dev_client = _auth(self.dev)
         self.other_client = _auth(self.other)
         self.viewer_client = _auth(self.viewer)
