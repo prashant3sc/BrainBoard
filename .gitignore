@@ -1,6 +1,7 @@
 # ── Environment — never commit real credentials ───────────────────────────────
 .env
 .env.*
+!.env.example
 
 # ── Claude Code ───────────────────────────────────────────────────────────────
 .claude/
